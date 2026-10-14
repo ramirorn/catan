@@ -1,0 +1,25 @@
+{
+  "name": "catan-game",
+  "version": "1.0.0",
+  "description": "Juego completo de Catan multijugador en tiempo real con React, Node.js y Socket.io",
+  "scripts": {
+    "server": "npm --prefix server start",
+    "client": "npm --prefix client dev",
+    "build:client": "npm --prefix client run build",
+    "test:server": "npm --prefix server test",
+    "build": "npm install --prefix server && npm install --prefix client --include=dev && npm --prefix client run build",
+    "start": "npm --prefix server start"
+  },
+  "keywords": [
+    "catan",
+    "react",
+    "socket.io",
+    "nodejs",
+    "boardgame"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=20"
+  }
+}

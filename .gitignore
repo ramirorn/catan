@@ -1,0 +1,9 @@
+node_modules/
+client/dist/
+.env
+*.log
+.venv/
+graphify-out/
+dist/
+.DS_Store
+Thumbs.db

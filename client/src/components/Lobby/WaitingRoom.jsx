@@ -1,0 +1,143 @@
+import { useGame } from '../../context/GameContext';
+import { pieceColor } from '../../utils/theme';
+import { SettlementIcon, CrownIcon, CopyIcon, HourglassIcon } from '../Shared/Icons';
+import { ScrollPanel } from '../Shared/ScrollPanel';
+import { BrandPlate } from '../Shared/Brand';
+import { RoomRules } from './RoomRules';
+
+export function WaitingRoom() {
+  const { gameState, myPlayerId, startGame, addToast, updateRoomSettings } = useGame();
+
+  if (!gameState) return null;
+
+  const players = Object.values(gameState.players || {});
+  const hostId = gameState.playerOrder?.[0];
+  const isHost = hostId === myPlayerId;
+  const canStart = players.length >= 2;
+
+  const copyRoomCode = () => {
+    navigator.clipboard.writeText(gameState.roomId);
+    addToast('¡Código de sala copiado al portapapeles!', 'success');
+  };
+
+  const maxPlayers = gameState.boardType === 'extended' ? 6 : 4;
+  const emptySlots = Math.max(0, maxPlayers - players.length);
+
+  return (
+    <div className="night-surface relative h-dvh w-full overflow-hidden">
+      <div className="h-full w-full flex flex-col items-center justify-center px-4 py-4 sm:py-6">
+        <div className="flex items-center gap-3 mb-3 sm:mb-4 shrink-0">
+          <BrandPlate className="w-12 h-8" />
+          <span className="font-display text-[30px] sm:text-[36px] leading-none text-paper-light drop-shadow-[0_2px_0_rgba(0,0,0,0.5)]">
+            Catán <span className="text-chakra">Shinobi</span>
+          </span>
+        </div>
+
+        <ScrollPanel className="animate-modal-pop w-full max-w-lg md:max-w-3xl min-h-0 flex flex-col" bodyClassName="px-5 sm:px-8 pt-5 pb-5 min-h-0 flex flex-col md:grid md:grid-cols-2 md:grid-rows-[auto_1fr] md:gap-x-8">
+          <div className="shrink-0 md:col-start-1 md:row-start-1">
+          <p className="label-caps">Sala de reunión</p>
+          <h2 className="font-display text-[26px] sm:text-[30px] leading-tight text-ink mt-0.5">
+            Reuniendo al escuadrón
+          </h2>
+
+          {/* Room Code */}
+          <div className="mt-3 mb-4 flex items-center justify-between gap-4 px-4 py-2.5 shrink-0 border-y-2 border-double border-ink/40 bg-paper-deep/30">
+            <div>
+              <div className="text-[12px] text-ink-faint">Comparte este código de sala</div>
+              <div className="inline-block font-serif font-extrabold text-[28px] sm:text-[32px] leading-none tracking-[0.22em] text-shu mt-1.5 px-2 py-1 border-2 border-shu rounded-[3px] -rotate-1">
+                {gameState.roomId}
+              </div>
+            </div>
+            <button type="button" onClick={copyRoomCode} className="btn btn-ghost px-3 py-2 text-[13px] shrink-0">
+              <CopyIcon className="w-4 h-4" />
+              <span>Copiar</span>
+            </button>
+          </div>
+
+          {/* Room rules: the host can still change them; the others see them */}
+          <RoomRules
+            idPrefix="room"
+            className="mb-4"
+            readOnly={!isHost}
+            vpToWin={gameState.vpToWin}
+            turnTimeLimit={gameState.turnTimeLimit}
+            onChange={updateRoomSettings}
+          />
+          </div>
+
+          {/* Settlers List */}
+          <div className="mb-4 md:mb-0 min-h-0 flex flex-col md:col-start-2 md:row-start-1 md:row-span-2 md:pt-1">
+            <div className="flex items-baseline justify-between mb-1 shrink-0">
+              <span className="label-caps">Ninjas conectados</span>
+              <span className="font-serif font-extrabold text-lg text-ink">
+                {players.length}
+                <span className="text-ink-faint"> / {maxPlayers}</span>
+              </span>
+            </div>
+
+            <ul className="border-t border-ink/15 min-h-0 overflow-y-auto">
+              {players.map((p) => {
+                const isThisHost = p.id === hostId;
+                const isMe = p.id === myPlayerId;
+
+                return (
+                  <li key={p.id} className="flex items-center justify-between gap-3 py-2 border-b border-ink/15">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className="w-7 h-7 rounded-[3px] flex items-center justify-center shrink-0 shadow-[inset_0_-2px_0_rgba(0,0,0,0.25)]"
+                        style={{ backgroundColor: pieceColor(p.color) }}
+                      >
+                        <SettlementIcon className="w-4.5 h-4.5 text-paper-light" />
+                      </span>
+                      <span className="text-[15px] font-bold text-ink truncate">
+                        {p.name}
+                        {isMe && <span className="ml-1.5 font-normal italic text-ink-faint text-[13px]">(tú)</span>}
+                      </span>
+                    </div>
+
+                    {isThisHost && (
+                      <span className="inline-flex items-center gap-1 text-[12px] font-bold text-chakra shrink-0">
+                        <CrownIcon className="w-4 h-4" />
+                        Anfitrión
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+              {Array.from({ length: emptySlots }, (_, i) => (
+                <li key={`empty-${i}`} className="flex items-center gap-3 py-2 border-b border-ink/15">
+                  <span className="w-7 h-7 rounded-[3px] border border-dashed border-ink/30 shrink-0" />
+                  <span className="text-[14px] italic text-ink-faint">Plaza libre</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Start / Waiting Action */}
+          {isHost ? (
+            <div className="shrink-0 md:col-start-1 md:row-start-2 md:self-end">
+              <button
+                type="button"
+                onClick={startGame}
+                disabled={!canStart}
+                className="btn btn-primary w-full py-3 text-[15px]"
+              >
+                {canStart ? 'Comenzar la misión' : 'Esperando más ninjas (mínimo 2)…'}
+              </button>
+              {!canStart && (
+                <p className="text-center text-[13px] italic text-ink-faint mt-2">
+                  ¡Comparte el código con un amigo o abre otra ventana del navegador para jugar!
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 py-2 text-[14px] italic text-ink-soft shrink-0 md:col-start-1 md:row-start-2 md:self-end">
+              <HourglassIcon className="w-4 h-4 text-chakra" />
+              <span>Esperando a que el anfitrión inicie la partida…</span>
+            </div>
+          )}
+        </ScrollPanel>
+      </div>
+    </div>
+  );
+}

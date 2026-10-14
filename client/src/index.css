@@ -1,0 +1,486 @@
+@import "tailwindcss";
+
+/* ───────────────────────────────────────────────────────────
+   Catán Shinobi
+   Night-indigo village sky, washi scroll paper, sumi ink,
+   vermilion sealing ink (shu), chakra orange, forehead-plate
+   steel. Hand-made, printed-and-brushed feel.
+   ─────────────────────────────────────────────────────────── */
+
+@theme {
+  --font-display: 'Yuji Syuku', 'Shippori Mincho B1', Georgia, serif;
+  --font-serif: 'Shippori Mincho B1', Georgia, serif;
+  --font-sans: 'Zen Kaku Gothic New', 'Segoe UI', system-ui, sans-serif;
+
+  /* sumi ink */
+  --color-ink: #1f1b17;
+  --color-ink-soft: #4b443c;
+  --color-ink-faint: #857a6b;
+
+  /* washi */
+  --color-paper: #f1e9d6;
+  --color-paper-light: #f9f4e8;
+  --color-paper-deep: #e4d8bd;
+  --color-paper-edge: #b9a681;
+
+  /* night sky / lacquer */
+  --color-night: #141c2c;
+  --color-night-dark: #0b101b;
+  --color-night-light: #24314b;
+
+  /* vermilion sealing ink */
+  --color-shu: #b6331f;
+  --color-shu-dark: #861f11;
+  --color-shu-light: #d4492f;
+
+  /* chakra orange */
+  --color-chakra: #e2711d;
+  --color-chakra-light: #f6a04b;
+  --color-chakra-dark: #a94f0c;
+
+  /* forehead-plate steel */
+  --color-steel: #a9b2ba;
+  --color-steel-light: #dfe4e8;
+  --color-steel-dark: #59626c;
+
+  --color-leaf: #4c7a3a;
+  --color-sea: #23506a;
+
+  --color-res-wood: #3c6a3e;
+  --color-res-brick: #b2532d;
+  --color-res-sheep: #8cae58;
+  --color-res-wheat: #d6a238;
+  --color-res-ore: #67717d;
+}
+
+/* ─── Base ─── */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: lining-nums;
+  background-color: var(--color-night);
+}
+
+button { font-family: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--color-chakra);
+  outline-offset: 2px;
+}
+
+::selection { background: rgba(226, 113, 29, 0.3); }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(75, 68, 60, 0.3);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: rgba(75, 68, 60, 0.5); }
+
+@layer components {
+/* ─── Surfaces ─── */
+
+/* Night over the village: ink-wash sky, faint asanoha (hemp-leaf) weave,
+   a warm lantern glow behind the board. */
+.night-surface {
+  background-color: var(--color-night);
+  background-image:
+    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(226, 113, 29, 0.10), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(3, 6, 12, 0.6) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='41.569'%3E%3Cpath d='M-12 20.78L0 0M-24 0L0 0M-12 6.93L0 0M-12 20.78L0 13.86M0 0L12 20.78M0 0L0 13.86M-12 20.78L12 20.78M0 13.86L12 20.78M0 0L12 6.93M12 20.78L24 0M12 20.78L12 6.93M0 0L24 0M12 6.93L24 0M12 20.78L24 13.86M24 0L36 20.78M24 0L24 13.86M12 20.78L36 20.78M24 13.86L36 20.78M24 0L36 6.93M24 0L48 0M-12 20.78L0 41.57M-24 41.57L0 41.57M-12 34.64L0 41.57M-12 20.78L0 27.71M0 41.57L12 20.78M0 27.71L0 41.57M0 27.71L12 20.78M0 41.57L12 34.64M12 20.78L24 41.57M12 20.78L12 34.64M0 41.57L24 41.57M12 34.64L24 41.57M12 20.78L24 27.71M24 41.57L36 20.78M24 27.71L24 41.57M24 27.71L36 20.78M24 41.57L36 34.64M24 41.57L48 41.57' stroke='%23c9d3e6' stroke-width='0.6' stroke-opacity='0.07' fill='none'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.008 0.012' numOctaves='3' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 0.02 0 0 0 0 0.03 0 0 0 0 0.06 0 0 0 0.7 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: auto, auto, 24px 41.569px, 520px 520px;
+}
+
+/* Washi: warm fibrous paper */
+.paper {
+  background-color: var(--color-paper);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.05' numOctaves='2' seed='5'/%3E%3CfeColorMatrix values='0 0 0 0 0.45 0 0 0 0 0.36 0 0 0 0 0.22 0 0 0 0.13 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23p)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='q'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' seed='2'/%3E%3CfeColorMatrix values='0 0 0 0 0.4 0 0 0 0 0.32 0 0 0 0 0.2 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23q)'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 45%);
+  color: var(--color-ink);
+}
+
+/* Hanging scroll (kakejiku): paper mounted on indigo cloth,
+   thin rod on top, weighted roller with lacquered knobs below. */
+.scroll-sheet {
+  position: relative;
+  border-style: solid;
+  border-color: var(--color-night-light);
+  border-width: 12px 7px 14px;
+  border-radius: 1px;
+  box-shadow:
+    inset 0 0 0 1px rgba(226, 113, 29, 0.55),
+    inset 0 0 0 3px var(--color-paper),
+    inset 0 0 0 4px rgba(31, 27, 23, 0.18),
+    0 22px 44px -14px rgba(0, 0, 0, 0.75),
+    0 4px 10px rgba(0, 0, 0, 0.35);
+  background-clip: padding-box;
+}
+
+.scroll-panel { position: relative; }
+.scroll-rod {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: 999px;
+}
+.scroll-rod-top {
+  top: -5px;
+  left: -8px;
+  right: -8px;
+  height: 9px;
+  background: linear-gradient(180deg, #6a4a33 0%, #3a2416 55%, #1c110a 100%);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.45);
+}
+.scroll-rod-bottom {
+  bottom: -9px;
+  left: -4px;
+  right: -4px;
+  height: 15px;
+  background: linear-gradient(180deg, #74513a 0%, #452b1b 45%, #1e130b 100%);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+}
+.scroll-rod-bottom::before,
+.scroll-rod-bottom::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  width: 12px;
+  height: 21px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #0d0d0f, #34343a 45%, #0d0d0f);
+  box-shadow: inset 0 0 0 1.5px rgba(223, 228, 232, 0.25), 0 3px 5px rgba(0, 0, 0, 0.5);
+}
+.scroll-rod-bottom::before { left: -10px; }
+.scroll-rod-bottom::after { right: -10px; }
+
+.paper-inset {
+  background: rgba(185, 166, 129, 0.15);
+  border: 1px solid rgba(185, 166, 129, 0.75);
+  border-radius: 2px;
+}
+
+/* Lacquer-black rail for header & footer */
+.night-rail {
+  background-color: #10141d;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='120'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006 0.3' numOctaves='3' seed='14'/%3E%3CfeColorMatrix values='0 0 0 0 0.12 0 0 0 0 0.15 0 0 0 0 0.22 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='300' height='120' filter='url(%23g)'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #1a2030, #0c1018);
+  color: var(--color-paper);
+}
+
+/* Yuji Syuku sets its Latin wide; pull it in a little */
+.font-display { letter-spacing: -0.02em; }
+
+/* Small-caps label used for section headings */
+.label-caps {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+/* A single tapered brush stroke */
+.brush-rule {
+  border: 0;
+  height: 7px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 8' preserveAspectRatio='none'%3E%3Cpath d='M0 4.6 C40 2.6 90 2.2 160 2.8 C240 3.4 320 2.4 400 3.6 L400 4.4 C330 5.2 250 6.6 170 5.6 C100 5 40 5.8 0 4.6Z' fill='%231f1b17' fill-opacity='0.55'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+}
+
+/* ─── Buttons ─── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { cursor: not-allowed; }
+
+/* Vermilion, like a torii beam with a sumi base */
+.btn-primary {
+  background: var(--color-shu);
+  color: #fbf3e4;
+  border: 1px solid var(--color-shu-dark);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 190, 0.25), inset 0 -2px 0 rgba(0, 0, 0, 0.18), 0 2px 0 #1f1b17, 0 4px 8px rgba(0, 0, 0, 0.3);
+  letter-spacing: 0.02em;
+}
+.btn-primary:hover:not(:disabled) { background: var(--color-shu-light); }
+.btn-primary:active:not(:disabled) { box-shadow: inset 0 1px 0 rgba(255, 220, 190, 0.2), 0 1px 0 #1f1b17; }
+.btn-primary:disabled {
+  background: #a49a8c;
+  border-color: #877d70;
+  color: #efe8da;
+  box-shadow: none;
+}
+
+/* Sumi outline on washi */
+.btn-ghost {
+  background: transparent;
+  color: var(--color-ink);
+  border: 1px solid rgba(31, 27, 23, 0.5);
+}
+.btn-ghost:hover:not(:disabled) { background: rgba(31, 27, 23, 0.07); border-color: var(--color-ink); }
+.btn-ghost:disabled { opacity: 0.4; }
+
+/* Leaf green for "accept" */
+.btn-leaf {
+  background: var(--color-leaf);
+  color: #f4efe0;
+  border: 1px solid #355a28;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 2px 0 #1f1b17;
+}
+.btn-leaf:hover:not(:disabled) { background: #5a8b45; }
+
+/* Counter +/- stepper */
+.stepper {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(31, 27, 23, 0.5);
+  background: var(--color-paper-light);
+  color: var(--color-ink);
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.stepper:hover:not(:disabled) { background: #fffaf0; border-color: var(--color-chakra); }
+.stepper:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Form fields on washi */
+.field {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 252, 244, 0.7);
+  border: 1px solid rgba(31, 27, 23, 0.4);
+  border-bottom-width: 2px;
+  border-radius: 2px;
+  color: var(--color-ink);
+  font-size: 15px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.field::placeholder { color: #a39784; }
+.field:focus { outline: none; border-color: var(--color-chakra); background: #fffcf5; }
+
+/* ─── Resource card (hand): small karuta-style card ─── */
+.res-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 3px;
+  background: #f7f0e1;
+  border: 1px solid #2a241e;
+  padding: 2px;
+  box-shadow: inset 0 0 0 1px #f7f0e1, inset 0 0 0 2px rgba(182, 51, 31, 0.5), 0 3px 6px rgba(0, 0, 0, 0.4);
+  transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease;
+}
+.res-card-art {
+  position: relative;
+  flex: 1;
+  margin: 1px;
+  border-radius: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(252, 247, 236, 0.97);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25), inset 0 -10px 14px -8px rgba(0, 0, 0, 0.35);
+}
+/* Brushed ensō circle behind the glyph */
+.res-card-art::before {
+  content: '';
+  position: absolute;
+  inset: 8% 4%;
+  opacity: 0.32;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath d='M30.5 9.5 C26 5.6 18 5 12.4 9 C6.5 13.2 5.6 22.4 9.6 28.2 C13.6 34 22.4 35.6 28.4 31.4 C33 28.2 34.8 22.6 33.6 17.4 C33.2 21.6 31.4 26.6 27 29.2 C21.8 32.4 14.6 31.2 11.6 26.4 C8.4 21.4 9.6 14.4 14.2 11 C18.8 7.6 25.6 7.8 30.5 9.5Z' fill='%23fff'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.res-card.is-empty { opacity: 0.45; }
+.res-card.is-empty .res-card-art { filter: grayscale(0.75); }
+
+/* Tiny vermilion seal with the resource's kanji */
+.res-kanji {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--color-shu);
+  color: #fbf1e0;
+  font-family: var(--font-display);
+  font-size: 9px;
+  line-height: 1;
+  box-shadow: 0 0 0 1px rgba(251, 241, 224, 0.6);
+}
+
+.res-bg-wood { background: linear-gradient(165deg, #4f7f4b, #284a2c); }
+.res-bg-brick { background: linear-gradient(165deg, #c76a3e, #8a3a1c); }
+.res-bg-sheep { background: linear-gradient(165deg, #a2c06c, #66863e); }
+.res-bg-wheat { background: linear-gradient(165deg, #e6b951, #b07c1f); }
+.res-bg-ore { background: linear-gradient(165deg, #848e9a, #4b545f); }
+
+/* Hanko (round seal) badge */
+.hanko {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-shu);
+  color: #fbf1e0;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1.5px rgba(251, 241, 224, 0.55), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Forehead-plate steel */
+.steel-plate {
+  background: linear-gradient(180deg, #e8ecef 0%, #b9c1c8 45%, #8d97a1 100%);
+  border: 1px solid #4b535c;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.4);
+  color: #2c333b;
+}
+}
+
+/* ─── Animations (purposeful, short) ─── */
+@keyframes diceTumble {
+  0% { transform: rotate(0deg) translateY(0); }
+  30% { transform: rotate(-24deg) translateY(-7px); }
+  60% { transform: rotate(14deg) translateY(2px); }
+  100% { transform: rotate(0deg) translateY(0); }
+}
+@keyframes diceSettle {
+  0% { transform: rotate(-10deg) scale(0.9); }
+  60% { transform: rotate(3deg) scale(1.04); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+/* A scroll unrolling downwards */
+@keyframes scrollOpen {
+  from { opacity: 0; transform: translateY(-6px) scaleY(0.92); }
+  to { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+@keyframes slipIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pieceDrop {
+  0% { transform: translateY(-10px) scale(1.15); opacity: 0; }
+  70% { transform: translateY(1px) scale(0.98); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes resBump {
+  0% { transform: translateY(0); }
+  35% { transform: translateY(-5px); }
+  100% { transform: translateY(0); }
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@keyframes ringTurn { to { transform: rotate(360deg); } }
+@keyframes turnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(226, 113, 29, 0); }
+  50% { box-shadow: 0 0 0 3px rgba(226, 113, 29, 0.45); }
+}
+@keyframes cardIn {
+  0% { opacity: 0; transform: translateY(14px) rotate(-6deg) scale(0.9); }
+  70% { opacity: 1; transform: translateY(-2px) rotate(1deg) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+
+.animate-dice-tumble { animation: diceTumble 0.45s ease-in-out infinite; }
+.animate-dice-settle { animation: diceSettle 0.35s ease-out; }
+.animate-modal-pop { animation: scrollOpen 0.24s cubic-bezier(0.2, 0.8, 0.3, 1) both; transform-origin: 50% 0; }
+.animate-card-in { animation: cardIn 0.4s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+.animate-toast-slide { animation: slipIn 0.22s ease-out both; }
+.animate-fade-in { animation: fadeIn 0.2s ease-out both; }
+.animate-res-bump { animation: resBump 0.4s ease-out; }
+.animate-turn-pulse { animation: turnPulse 2.4s ease-in-out infinite; }
+.animate-spin-slow { animation: ringTurn 14s linear infinite; }
+
+/* ─── Board ─── */
+.hex-polygon {
+  stroke: rgba(31, 27, 23, 0.85);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  transition: filter 0.2s ease;
+}
+
+.hex-tile.clickable .hex-polygon { filter: brightness(1.05); }
+.hex-tile.clickable:hover .hex-polygon { filter: brightness(1.16) saturate(1.1); }
+.hex-art { transition: filter 0.2s ease; }
+.hex-tile.clickable .hex-art { filter: brightness(1.05); }
+.hex-tile.clickable:hover .hex-art { filter: brightness(1.16) saturate(1.1); }
+.hex-tile .robber-target {
+  fill: none;
+  stroke: #f6a04b;
+  stroke-width: 2.4;
+  stroke-dasharray: 7 5;
+  opacity: 0;
+  pointer-events: none;
+}
+.hex-tile.clickable .robber-target { opacity: 0.7; animation: breathe 1.8s ease-in-out infinite; }
+.hex-tile.clickable:hover .robber-target { stroke: #ffd29a; opacity: 1; animation: none; stroke-width: 3.2; }
+
+.number-token { pointer-events: none; }
+
+/* Vertices / settlements / cities */
+.vertex-spot { cursor: pointer; }
+.vertex-spot .spot-marker { animation: breathe 1.6s ease-in-out infinite; }
+.vertex-spot .spot-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ringTurn 9s linear infinite;
+}
+.vertex-spot:hover .spot-marker { animation: none; opacity: 1; }
+.vertex-spot:hover .spot-dot { fill: #fff4e2; }
+
+.piece {
+  transform-box: fill-box;
+  transform-origin: 50% 90%;
+  animation: pieceDrop 0.38s cubic-bezier(0.3, 0.9, 0.4, 1) both;
+}
+
+/* Edges / roads */
+.edge-spot { cursor: pointer; }
+.edge-spot .road-marker { animation: breathe 1.6s ease-in-out infinite; }
+.edge-spot:hover .road-marker { animation: none; opacity: 1; }
+.road-built {
+  animation: fadeIn 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

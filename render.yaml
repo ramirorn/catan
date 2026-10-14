@@ -1,0 +1,13 @@
+# Render Blueprint: one web service runs the Socket.io server and also serves
+# the built React client, so the whole game lives at a single URL.
+services:
+  - type: web
+    name: catan-shinobi
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

@@ -1,0 +1,120 @@
+import { useState, useRef, useEffect } from 'react';
+import { useGame } from '../../context/GameContext';
+import { pieceColor, shade } from '../../utils/theme';
+import { ScrollIcon, ChatIcon } from '../Shared/Icons';
+
+export function GameLog() {
+  const { gameState, chatMessages, sendChatMessage } = useGame();
+  const [activeTab, setActiveTab] = useState('log');
+  const [text, setText] = useState('');
+  const scrollRef = useRef(null);
+
+  const logs = gameState?.gameLog || [];
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [logs, chatMessages, activeTab]);
+
+  const handleSendChat = (e) => {
+    e.preventDefault();
+    if (!text.trim()) return;
+    sendChatMessage(text.trim());
+    setText('');
+  };
+
+  const tabClass = (isActive) =>
+    `flex-1 flex items-center justify-center gap-1.5 py-2 text-[13px] font-bold border-b-2 transition-colors cursor-pointer ${
+      isActive ? 'border-chakra text-ink' : 'border-transparent text-ink-faint hover:text-ink-soft'
+    }`;
+
+  return (
+    <div className="flex flex-col flex-1 overflow-hidden min-h-0 border-t border-paper-edge">
+      {/* Tab Header */}
+      <div className="flex px-3 shrink-0 border-b border-ink/15" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'log'}
+          onClick={() => setActiveTab('log')}
+          className={tabClass(activeTab === 'log')}
+        >
+          <ScrollIcon className="w-4 h-4" />
+          <span>Registro</span>
+          <span className="font-normal text-ink-faint text-[11px]">{logs.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'chat'}
+          onClick={() => setActiveTab('chat')}
+          className={tabClass(activeTab === 'chat')}
+        >
+          <ChatIcon className="w-4 h-4" />
+          <span>Chat</span>
+          <span className="font-normal text-ink-faint text-[11px]">{chatMessages.length}</span>
+        </button>
+      </div>
+
+      {/* Message Feed */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-2 text-[13px] leading-snug">
+        {activeTab === 'log' ? (
+          logs.length === 0 ? (
+            <p className="text-center italic text-ink-faint py-6">
+              La misión ha comenzado. Aquí quedará escrito cada suceso.
+            </p>
+          ) : (
+            <ol>
+              {logs.map((entry, idx) => (
+                <li
+                  key={idx}
+                  className={`py-1.5 border-b border-dotted border-ink/20 last:border-b-0 ${
+                    idx === logs.length - 1 ? 'text-ink font-semibold' : 'text-ink-soft'
+                  }`}
+                >
+                  {entry.message}
+                </li>
+              ))}
+            </ol>
+          )
+        ) : chatMessages.length === 0 ? (
+          <p className="text-center italic text-ink-faint py-6">
+            No hay mensajes aún. ¡Envía un saludo a los demás ninjas!
+          </p>
+        ) : (
+          <ol>
+            {chatMessages.map((msg, idx) => (
+              <li key={msg.id ?? idx} className="py-1.5 border-b border-dotted border-ink/20 last:border-b-0 break-words">
+                <span className="font-extrabold" style={{ color: shade(pieceColor(msg.playerColor), -0.15) }}>
+                  {msg.playerName}:
+                </span>{' '}
+                <span className="text-ink">{msg.message}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+
+      {/* Chat input form */}
+      {activeTab === 'chat' && (
+        <form
+          onSubmit={handleSendChat}
+          className="flex items-center gap-2 px-3 py-2.5 border-t border-paper-edge shrink-0 bg-paper-deep/40"
+        >
+          <input
+            type="text"
+            className="field !py-1.5 !text-[13px] flex-1"
+            placeholder="Escribe un mensaje a los demás ninjas…"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={500}
+          />
+          <button type="submit" className="btn btn-primary px-3 py-1.5 text-[13px] shrink-0">
+            Enviar
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
