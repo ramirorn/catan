@@ -1,43 +1,18 @@
 import { memo } from 'react';
 import { useGame } from '../../context/GameContext';
-import { PHASE } from '../../utils/constants';
+import { vertexActionFor, runVertexAction } from './boardActions';
 import { pieceColor, shade } from '../../utils/theme';
 
 export const Vertex = memo(function Vertex({ vertex }) {
-  const {
-    gameState,
-    isMyTurn,
-    canActOnBoard,
-    buildMode,
-    setupPlaceSettlement,
-    buildSettlement,
-    buildCity,
-  } = useGame();
+  const game = useGame();
+  const { gameState } = game;
 
-  const isSetup =
-    gameState?.phase === PHASE.SETUP_FORWARD ||
-    gameState?.phase === PHASE.SETUP_REVERSE;
-
-  const validSettlements = gameState?.validPlacements?.validSettlements || [];
-  const validCities = gameState?.validPlacements?.validCities || [];
-
-  const isValidSetupSettlement = isSetup && isMyTurn && validSettlements.includes(vertex.id);
-  const isValidMainSettlement =
-    !isSetup && canActOnBoard && buildMode === 'settlement' && validSettlements.includes(vertex.id);
-  const isValidMainCity =
-    !isSetup && canActOnBoard && buildMode === 'city' && validCities.includes(vertex.id);
-
-  const isValidSpot = isValidSetupSettlement || isValidMainSettlement || isValidMainCity;
+  const action = vertexActionFor(game, vertex.id);
+  const isValidSpot = action !== null;
 
   const handleClick = (e) => {
     e.stopPropagation();
-    if (isValidSetupSettlement) {
-      setupPlaceSettlement(vertex.id);
-    } else if (isValidMainSettlement) {
-      buildSettlement(vertex.id);
-    } else if (isValidMainCity) {
-      buildCity(vertex.id);
-    }
+    runVertexAction(game, action, vertex.id);
   };
 
   const building = vertex.building;

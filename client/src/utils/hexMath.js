@@ -19,6 +19,11 @@ export function getHexPoints(centerX, centerY, size = HEX_SIZE) {
   ).join(' ');
 }
 
+/** Union of hexagons of the given radius as one SVG path (one shape, one paint) */
+export function hexUnionPath(hexList, size) {
+  return hexList.map((h) => `M${getHexPoints(h.x, h.y, size).replace(/ /g, 'L')}Z`).join('');
+}
+
 /**
  * Compute the bounding box of the board to set an optimal viewBox
  */

@@ -43,6 +43,8 @@ export class GameEngine {
     this.lastProduction = null;
     this.lastCompletedTrade = null;
     this.productionCounter = 0;
+    // Grows on every roll so clients can tell two equal rolls apart
+    this.diceRollCounter = 0;
     this.gameLog = [];
 
     // Road building dev card state
@@ -318,7 +320,8 @@ export class GameEngine {
     const die1 = Math.floor(Math.random() * 6) + 1;
     const die2 = Math.floor(Math.random() * 6) + 1;
     const roll = die1 + die2;
-    this.lastDiceRoll = { die1, die2, total: roll };
+    this.diceRollCounter++;
+    this.lastDiceRoll = { id: this.diceRollCounter, die1, die2, total: roll };
 
     this.log(`${this.getCurrentPlayer().name} sacó ${die1} + ${die2} = ${roll}`);
 

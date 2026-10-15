@@ -1,5 +1,5 @@
 import { getHexPoints, HEX_SIZE } from '../../utils/hexMath';
-import { PHASE } from '../../utils/constants';
+import { canMoveRobberTo } from './boardActions';
 import { NumberToken } from './NumberToken';
 import { Robber } from './Robber';
 import { TerrainArt } from './TerrainArt';
@@ -8,10 +8,8 @@ import { memo } from 'react';
 import { TERRAIN_BASE } from '../../utils/theme';
 
 export const HexTile = memo(function HexTile({ hex }) {
-  const { gameState, isMyTurn, moveRobber } = useGame();
-
-  const isRobberMovePhase = gameState?.phase === PHASE.ROBBER_MOVE && isMyTurn;
-  const canPlaceRobberHere = isRobberMovePhase && !hex.hasRobber;
+  const game = useGame();
+  const canPlaceRobberHere = canMoveRobberTo(game, hex);
 
   const points = getHexPoints(hex.x, hex.y);
   const innerPoints = getHexPoints(hex.x, hex.y, HEX_SIZE - 4);
@@ -22,7 +20,7 @@ export const HexTile = memo(function HexTile({ hex }) {
 
   const handleClick = () => {
     if (canPlaceRobberHere) {
-      moveRobber(hex.id);
+      game.moveRobber(hex.id);
     }
   };
 

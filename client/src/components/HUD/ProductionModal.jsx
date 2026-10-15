@@ -2,9 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { Modal } from '../Shared/Modal';
 import { ResourceCard } from '../Shared/ResourceCard';
+import { whenDiceIdle } from '../Dice3D/diceSignal';
 
-// Lets the dice settle before the cards appear
+// Second setup settlement: a short beat after the piece lands
 const SHOW_DELAY_MS = 700;
+// Dice payouts: give the 3D throw a moment to start, then wait until it has
+// finished (diceSignal) and open right as it fades out
+const ROLL_START_MS = 150;
+const AFTER_DICE_MS = 120;
+// Never hold the cards back longer than this, whatever happens to the dice
+const MAX_WAIT_MS = 8000;
 
 /**
  * Shows the resources this player just received (dice roll or second
@@ -37,8 +44,30 @@ export function ProductionModal() {
     const total = mine ? Object.values(mine).reduce((a, b) => a + b, 0) : 0;
     if (total === 0) return undefined;
 
-    const timer = setTimeout(() => setShown({ mine, source, roll }), SHOW_DELAY_MS);
-    return () => clearTimeout(timer);
+    let done = false;
+    const show = () => {
+      if (done) return;
+      done = true;
+      setShown({ mine, source, roll });
+    };
+    if (source !== 'roll') {
+      const timer = setTimeout(show, SHOW_DELAY_MS);
+      return () => clearTimeout(timer);
+    }
+    let after = null;
+    let cancelWait = () => {};
+    const start = setTimeout(() => {
+      cancelWait = whenDiceIdle(() => {
+        after = setTimeout(show, AFTER_DICE_MS);
+      });
+    }, ROLL_START_MS);
+    const cap = setTimeout(show, MAX_WAIT_MS);
+    return () => {
+      clearTimeout(start);
+      clearTimeout(after);
+      clearTimeout(cap);
+      cancelWait();
+    };
   }, [productionId, mineKey, source, roll]);
 
   if (!shown) return null;

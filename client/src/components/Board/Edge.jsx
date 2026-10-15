@@ -1,37 +1,18 @@
 import { memo } from 'react';
 import { useGame } from '../../context/GameContext';
-import { PHASE } from '../../utils/constants';
+import { edgeActionFor, runEdgeAction } from './boardActions';
 import { pieceColor, shade } from '../../utils/theme';
 
 export const Edge = memo(function Edge({ edge }) {
-  const {
-    gameState,
-    isMyTurn,
-    canActOnBoard,
-    buildMode,
-    setupPlaceRoad,
-    buildRoad,
-  } = useGame();
+  const game = useGame();
+  const { gameState } = game;
 
-  const isSetup =
-    gameState?.phase === PHASE.SETUP_FORWARD ||
-    gameState?.phase === PHASE.SETUP_REVERSE;
-
-  const validRoads = gameState?.validPlacements?.validRoads || [];
-
-  const isValidSetupRoad = isSetup && isMyTurn && validRoads.includes(edge.id);
-  const isValidMainRoad =
-    !isSetup && canActOnBoard && buildMode === 'road' && validRoads.includes(edge.id);
-
-  const isValidSpot = isValidSetupRoad || isValidMainRoad;
+  const action = edgeActionFor(game, edge.id);
+  const isValidSpot = action !== null;
 
   const handleClick = (e) => {
     e.stopPropagation();
-    if (isValidSetupRoad) {
-      setupPlaceRoad(edge.id);
-    } else if (isValidMainRoad) {
-      buildRoad(edge.id);
-    }
+    runEdgeAction(game, action, edge.id);
   };
 
   const road = edge.road;

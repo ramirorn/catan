@@ -2,6 +2,7 @@ import { getHexPoints, HEX_SIZE, SQRT3 } from '../../utils/hexMath';
 import { TerrainDefs } from '../Board/TerrainDefs';
 import { NumberToken } from '../Board/NumberToken';
 import { TerrainArt } from '../Board/TerrainArt';
+import { Robber } from '../Board/Robber';
 
 // Decorative, static chart of the island for the title screens.
 const LAYOUT = [
@@ -61,6 +62,7 @@ export function IslandChart({ className = '' }) {
           </g>
           <polygon points={getHexPoints(h.x, h.y)} fill="url(#hex-shade)" stroke="rgba(31,27,23,0.85)" strokeWidth="1.6" strokeLinejoin="round" />
           {h.number && <NumberToken number={h.number} x={h.x} y={h.y} />}
+          {h.terrain === 'desert' && <Robber x={h.x} y={h.y} />}
         </g>
       ))}
 

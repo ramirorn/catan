@@ -5,7 +5,8 @@ import { PHASE } from './utils/constants';
 
 import { LobbyScreen } from './components/Lobby/LobbyScreen';
 import { WaitingRoom } from './components/Lobby/WaitingRoom';
-import { HexBoard } from './components/Board/HexBoard';
+import { BoardView } from './components/Board/BoardView';
+import { DiceOverlay } from './components/Dice3D/DiceOverlay';
 import { GameHeader } from './components/HUD/GameHeader';
 import { ResourceBar } from './components/HUD/ResourceBar';
 import { ActionPanel } from './components/HUD/ActionPanel';
@@ -47,7 +48,9 @@ function GameContent() {
       <div className="relative flex-1 flex overflow-hidden min-h-0">
         {/* Center SVG Board Area */}
         <main className="relative flex-1 h-full w-full flex items-center justify-center overflow-hidden">
-          <HexBoard />
+          <BoardView />
+          {/* Dice throw seen by every player (over the 2D or 3D board, never clickable) */}
+          <DiceOverlay />
 
           {/* Mobile sidebar toggle button */}
           <button
