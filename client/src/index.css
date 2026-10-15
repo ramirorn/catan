@@ -844,3 +844,8 @@ button { font-family: inherit; }
   55% { opacity: 1; transform: scale(0.92) rotate(-5deg); }
   100% { opacity: 1; transform: scale(1) rotate(-6deg); }
 }
+
+/* Board areas: a long press shows an info card, not the phone's callout */
+.board-tip-area {
+  -webkit-touch-callout: none;
+}

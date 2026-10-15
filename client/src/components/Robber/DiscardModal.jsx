@@ -3,7 +3,7 @@ import { useGame } from '../../context/GameContext';
 import { Modal } from '../Shared/Modal';
 import { RESOURCE, RESOURCE_NAMES } from '../../utils/constants';
 import { ResourceCard } from '../Shared/ResourceCard';
-import { AlertIcon } from '../Shared/Icons';
+import { AlertIcon, PlusIcon, MinusIcon } from '../Shared/Icons';
 
 export function DiscardModal({ isOpen }) {
   const { myPlayer, discardCards } = useGame();
@@ -113,7 +113,7 @@ export function DiscardModal({ isOpen }) {
                     className="stepper"
                     aria-label={`Quitar ${RESOURCE_NAMES[res]}`}
                   >
-                    −
+                    <MinusIcon className="w-4 h-4" />
                   </button>
                   <span className="font-serif font-extrabold text-xl w-7 text-center text-ink">{count}</span>
                   <button
@@ -123,7 +123,7 @@ export function DiscardModal({ isOpen }) {
                     className="stepper"
                     aria-label={`Añadir ${RESOURCE_NAMES[res]}`}
                   >
-                    +
+                    <PlusIcon className="w-4 h-4" />
                   </button>
                 </div>
               </li>

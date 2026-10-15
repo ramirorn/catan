@@ -163,7 +163,7 @@ export default function HexBoard3D() {
       />
 
       <div
-        className="absolute inset-x-0 bottom-0 top-11 sm:top-12 touch-none"
+        className="board-tip-area absolute inset-x-0 bottom-0 top-11 sm:top-12 touch-none"
         onPointerDownCapture={onPointerDownCapture}
         onPointerUpCapture={onPointerUpCapture}
         onPointerCancelCapture={onPointerUpCapture}
@@ -171,6 +171,7 @@ export default function HexBoard3D() {
       >
         {sceneCtx ? (
           <Canvas
+            data-board-surface
             frameloop="demand"
             dpr={lowPower ? [1, 1.5] : [1, 1.75]}
             shadows={shadows ? 'percentage' : false}

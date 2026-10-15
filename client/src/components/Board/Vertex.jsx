@@ -25,6 +25,7 @@ export const Vertex = memo(function Vertex({ vertex }) {
       transform={`translate(${vertex.x}, ${vertex.y})`}
       onClick={handleClick}
       pointerEvents={isValidSpot || building ? 'all' : 'none'}
+      data-tip={building ? `vertex:${vertex.id}` : undefined}
     >
       {/* Invisible larger hover hit-target */}
       {isValidSpot && (

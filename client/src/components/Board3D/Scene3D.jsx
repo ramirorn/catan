@@ -18,6 +18,7 @@ import {
 import { PX, TILE_H, TILE_SCALE, INK } from './resources';
 
 import { SceneContext } from './sceneContext';
+import { tipHandlers3D } from '../Board/boardTip';
 const useScene = () => useContext(SceneContext);
 
 // drei <Outlines> thickness is in device pixels (constant on screen)
@@ -84,6 +85,21 @@ const SeaAndFrame = memo(function SeaAndFrame({ bounds }) {
 const Tile = memo(function Tile({ hex, robberTarget, onRobber }) {
   const { res, isTap, noteAction } = useScene();
   const [hover, hoverHandlers] = useHover(robberTarget);
+  const tip = tipHandlers3D('hex', hex.id);
+  const handlers = useMemo(
+    () => ({
+      ...tip,
+      onPointerOver: (e) => {
+        tip.onPointerOver(e);
+        hoverHandlers.onPointerOver(e);
+      },
+      onPointerOut: (e) => {
+        tip.onPointerOut(e);
+        hoverHandlers.onPointerOut(e);
+      },
+    }),
+    [tip, hoverHandlers]
+  );
   const top = res.mat.tileTop[hex.terrain];
   if (!top) return null;
   const onClick = (e) => {
@@ -101,7 +117,7 @@ const Tile = memo(function Tile({ hex, robberTarget, onRobber }) {
         position-y={TILE_H}
         receiveShadow
         onClick={robberTarget ? onClick : undefined}
-        {...hoverHandlers}
+        {...handlers}
       />
       {robberTarget && (
         <mesh geometry={res.geo.robberRing} material={res.mat.robberRing} position-y={TILE_H + 0.006} renderOrder={3} />
@@ -134,8 +150,9 @@ const Token = memo(function Token({ x, z, number }) {
 
 /* ─── Harbours: wooden jetty + paper talisman on a post ─── */
 
-const Port3D = memo(function Port3D({ port, v1, v2, center }) {
+const Port3D = memo(function Port3D({ port, index, v1, v2, center }) {
   const { res } = useScene();
+  const tip = tipHandlers3D('port', index);
   const ref = useRef(null);
   // Push the badge out to sea, perpendicular to the coastline edge (as in 2D)
   let bx = port.x;
@@ -178,9 +195,9 @@ const Port3D = memo(function Port3D({ port, v1, v2, center }) {
     <group>
       {v1 && pier(v1)}
       {v2 && pier(v2)}
-      <mesh geometry={res.geo.post} material={res.mat.woodDark} position={[b[0], 0.3, b[1]]} scale-y={0.6} castShadow />
+      <mesh geometry={res.geo.post} material={res.mat.woodDark} position={[b[0], 0.3, b[1]]} scale-y={0.6} castShadow {...tip} />
       <group ref={ref} position={[b[0], 0.66, b[1]]}>
-        {mat && <mesh geometry={res.geo.talisman} material={mat} castShadow />}
+        {mat && <mesh geometry={res.geo.talisman} material={mat} castShadow {...tip} />}
       </group>
     </group>
   );
@@ -277,8 +294,9 @@ function Robber3D({ x, z }) {
 const easeOutBack = (t) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
 
 /** A building / road in a player's colour, with an ink outline; drops in when placed */
-const Piece = memo(function Piece({ geometry, color }) {
+const Piece = memo(function Piece({ geometry, color, tipId }) {
   const { res, bornAt } = useScene();
+  const tip = tipId ? tipHandlers3D('vertex', tipId) : null;
   const dpr = useOutlinePx();
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef(null);
@@ -301,7 +319,7 @@ const Piece = memo(function Piece({ geometry, color }) {
   });
 
   return (
-    <mesh ref={ref} geometry={geometry} material={res.pieceMaterial(color)} castShadow receiveShadow>
+    <mesh ref={ref} geometry={geometry} material={res.pieceMaterial(color)} castShadow receiveShadow {...tip}>
       {/* ink line + a thin washi rim around it, like the 2D pieces */}
       <Outlines thickness={OUTLINE_PX * dpr} color={INK} />
       <Outlines thickness={RIM_PX * dpr} color="#fff4dc" />
@@ -311,9 +329,27 @@ const Piece = memo(function Piece({ geometry, color }) {
 
 /* ─── Placement markers ─── */
 
-function VertexMarker({ upgrade, onAct }) {
+function VertexMarker({ upgrade, onAct, tipId }) {
   const { res, isTap } = useScene();
-  const [hover, handlers] = useHover();
+  const [hover, hoverHandlers] = useHover();
+  const tip = tipId ? tipHandlers3D('vertex', tipId) : null;
+  const handlers = useMemo(
+    () =>
+      tip
+        ? {
+            ...tip,
+            onPointerOver: (e) => {
+              tip.onPointerOver(e);
+              hoverHandlers.onPointerOver(e);
+            },
+            onPointerOut: (e) => {
+              tip.onPointerOut(e);
+              hoverHandlers.onPointerOut(e);
+            },
+          }
+        : hoverHandlers,
+    [tip, hoverHandlers]
+  );
   const onClick = (e) => {
     e.stopPropagation();
     if (isTap(e)) onAct();
@@ -500,9 +536,16 @@ export function Board3D({ board, bounds, center, radius, shadows, lowPower }) {
             key={v.building.type}
             geometry={v.building.type === 'city' ? res.geo.city : res.geo.settlement}
             color={colorOf(v.building.playerId)}
+            tipId={v.id}
           />
         )}
-        {action && <VertexMarker upgrade={!!v.building} onAct={() => act.vertex(action, v.id)} />}
+        {action && (
+          <VertexMarker
+            upgrade={!!v.building}
+            tipId={v.building ? v.id : undefined}
+            onAct={() => act.vertex(action, v.id)}
+          />
+        )}
       </group>
     );
   }
@@ -537,6 +580,7 @@ export function Board3D({ board, bounds, center, radius, shadows, lowPower }) {
         <Port3D
           key={`${p.edgeId || i}`}
           port={p}
+          index={i}
           v1={board.vertices?.[p.vertices?.[0]]}
           v2={board.vertices?.[p.vertices?.[1]]}
           center={centerPx}

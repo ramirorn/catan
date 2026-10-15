@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ChevronDownIcon } from './Icons';
 
 // Themed replacements for native form selectors.
 //  - SegmentedControl: a row of chips (radiogroup) for a handful of options.
@@ -260,9 +261,7 @@ export function Dropdown({
           {current?.icon}
           <span className="truncate">{current?.label}</span>
         </span>
-        <svg viewBox="0 0 12 12" className="dd-caret" aria-hidden="true">
-          <path d="M2.5 4.5 L6 8 L9.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ChevronDownIcon className="dd-caret" />
       </button>
 
       {open && pos && createPortal(

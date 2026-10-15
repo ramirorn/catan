@@ -8,6 +8,7 @@ import { Vertex } from './Vertex';
 import { Port } from './Port';
 import { useBoardZoom } from './useBoardZoom';
 import { BoardBanner, ZoomControls } from './BoardChrome';
+import { tipDomHandlers } from './boardTip';
 
 const EMPTY = {};
 const BoardDefs = memo(TerrainDefs);
@@ -96,7 +97,10 @@ export function HexBoard() {
   const portList = board.ports || [];
 
   return (
-    <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden select-none pt-12 sm:pt-14 pb-2 px-2">
+    <div
+      className="board-tip-area relative flex-1 w-full h-full flex items-center justify-center overflow-hidden select-none pt-12 sm:pt-14 pb-2 px-2"
+      {...tipDomHandlers}
+    >
       {/* Turn / Action Phase Banner + "your turn" cues */}
       <BoardBanner />
 
@@ -110,6 +114,7 @@ export function HexBoard() {
       />
 
       <svg
+        data-board-surface
         ref={zoom.svgRef}
         preserveAspectRatio="xMidYMid meet"
         className={`board-svg w-full h-full max-w-full max-h-full touch-none ${zoom.canZoomOut ? 'cursor-grab active:cursor-grabbing' : ''}`}
@@ -122,7 +127,7 @@ export function HexBoard() {
         {/* Layer 1: Ports */}
         <g className="ports-layer">
           {portList.map((port, idx) => (
-            <Port key={`port-${idx}`} port={port} vertices={board.vertices} center={center} />
+            <Port key={`port-${idx}`} port={port} index={idx} vertices={board.vertices} center={center} />
           ))}
         </g>
 

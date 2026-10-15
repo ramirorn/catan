@@ -1,10 +1,12 @@
 // Picks the board renderer: the SVG board (2D, always available) or the
 // three.js board (3D, lazy-loaded so three.js is only downloaded when used).
 
-import { Component, lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { HexBoard } from './HexBoard';
 import { BoardViewContext, hasWebGL, initialViewMode, storeViewMode } from './boardViewMode';
+import { BoardTooltip } from './BoardTooltip';
+import { resetTip } from './boardTip';
 
 const HexBoard3D = lazy(() => import('../Board3D/HexBoard3D'));
 
@@ -51,6 +53,9 @@ export function BoardView() {
 
   const value = useMemo(() => ({ mode, webgl, toggle, setMode }), [mode, webgl, toggle, setMode]);
 
+  // Switching 2D ↔ 3D drops any info card of the old board
+  useEffect(() => resetTip(), [mode]);
+
   return (
     <BoardViewContext.Provider value={value}>
       {mode === '3d' ? (
@@ -63,6 +68,8 @@ export function BoardView() {
       ) : (
         <HexBoard />
       )}
+      {/* Hover / long-press info cards (shared by both boards) */}
+      <BoardTooltip />
     </BoardViewContext.Provider>
   );
 }

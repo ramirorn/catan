@@ -27,6 +27,7 @@ export const HexTile = memo(function HexTile({ hex }) {
   return (
     <g
       className={`hex-tile ${canPlaceRobberHere ? 'clickable' : ''}`}
+      data-tip={`hex:${hex.id}`}
       onClick={handleClick}
       style={{ cursor: canPlaceRobberHere ? 'pointer' : 'default' }}
     >

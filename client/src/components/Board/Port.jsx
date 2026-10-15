@@ -11,7 +11,7 @@ const PORT_TINT = {
   generic: '#1f1b17',
 };
 
-export const Port = memo(function Port({ port, vertices, center = { x: 0, y: 0 } }) {
+export const Port = memo(function Port({ port, index, vertices, center = { x: 0, y: 0 } }) {
   if (!port) return null;
 
   const [vk1, vk2] = port.vertices || [];
@@ -52,7 +52,6 @@ export const Port = memo(function Port({ port, vertices, center = { x: 0, y: 0 }
 
   return (
     <g className="port-group" pointerEvents="none">
-      <title>{isGeneric ? `Puerto genérico ${label}` : `Puerto de ${RESOURCE_NAMES[port.type] || port.type} ${label}`}</title>
       {hasVertexCoords && (
         <>
           {pier(v1)}
@@ -61,7 +60,14 @@ export const Port = memo(function Port({ port, vertices, center = { x: 0, y: 0 }
       )}
 
       {/* Harbour talisman: a paper ofuda with a tinted head band */}
-      <g transform={`translate(${bx}, ${by})`}>
+      {/* The talisman takes the pointer (info card); the piers stay inert */}
+      <g
+        transform={`translate(${bx}, ${by})`}
+        pointerEvents="all"
+        data-tip={`port:${index}`}
+        role="img"
+        aria-label={isGeneric ? `Puerto genérico ${label}` : `Puerto de ${RESOURCE_NAMES[port.type] || port.type} ${label}`}
+      >
         <rect x="-10" y="-13.5" width="21.5" height="31" rx="1.5" fill="#07090f" opacity="0.45" />
         <rect x="-10.5" y="-15.5" width="21" height="31" rx="1" fill="#f6efdf" stroke="#1f1b17" strokeWidth="1.1" />
         <rect x="-10.5" y="-15.5" width="21" height="5" rx="1" fill={tint} />

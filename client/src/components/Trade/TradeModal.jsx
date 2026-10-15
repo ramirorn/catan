@@ -3,7 +3,7 @@ import { useGame } from '../../context/GameContext';
 import { Modal } from '../Shared/Modal';
 import { RESOURCE, RESOURCE_NAMES } from '../../utils/constants';
 import { ResourceChip } from '../Shared/ResourceCard';
-import { AnchorIcon, TradeIcon, CheckIcon, CloseIcon, ArrowRightIcon } from '../Shared/Icons';
+import { AnchorIcon, TradeIcon, CheckIcon, CloseIcon, ArrowRightIcon, PlusIcon, MinusIcon } from '../Shared/Icons';
 
 const EMPTY_BUNDLE = {
   [RESOURCE.WOOD]: 0,
@@ -164,7 +164,7 @@ export function TradeModal({ isOpen, onClose }) {
                           className="stepper !w-7 !h-7"
                           aria-label={`Menos ${RESOURCE_NAMES[res]}`}
                         >
-                          −
+                          <MinusIcon className="w-3.5 h-3.5" />
                         </button>
                         <span className="font-serif font-extrabold text-lg w-6 text-center text-ink">{col.values[res] || 0}</span>
                         <button
@@ -173,7 +173,7 @@ export function TradeModal({ isOpen, onClose }) {
                           className="stepper !w-7 !h-7"
                           aria-label={`Más ${RESOURCE_NAMES[res]}`}
                         >
-                          +
+                          <PlusIcon className="w-3.5 h-3.5" />
                         </button>
                       </span>
                     </li>
