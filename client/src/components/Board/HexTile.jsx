@@ -4,8 +4,10 @@ import { NumberToken } from './NumberToken';
 import { Robber } from './Robber';
 import { TerrainArt } from './TerrainArt';
 import { useGame } from '../../context/GameContext';
+import { memo } from 'react';
+import { TERRAIN_BASE } from '../../utils/theme';
 
-export function HexTile({ hex }) {
+export const HexTile = memo(function HexTile({ hex }) {
   const { gameState, isMyTurn, moveRobber } = useGame();
 
   const isRobberMovePhase = gameState?.phase === PHASE.ROBBER_MOVE && isMyTurn;
@@ -40,6 +42,11 @@ export function HexTile({ hex }) {
       <g className="hex-art" clipPath={`url(#${clipId})`}>
         <TerrainArt terrain={hex.terrain} x={hex.x} y={hex.y} />
       </g>
+      {/* Ground-coloured wash: knocks back the scenery (little houses, torii,
+          posts) so the players' pieces win the visual hierarchy */}
+      {TERRAIN_BASE[hex.terrain] && (
+        <polygon points={points} fill={TERRAIN_BASE[hex.terrain]} fillOpacity="0.32" pointerEvents="none" />
+      )}
       <polygon points={points} className="hex-polygon" fill="none" pointerEvents="none" />
 
       {/* Printed-tile depth: vignette + inner bevel */}
@@ -65,4 +72,4 @@ export function HexTile({ hex }) {
       {hex.hasRobber && <Robber x={hex.x} y={hex.y} />}
     </g>
   );
-}
+});

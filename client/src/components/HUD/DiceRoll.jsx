@@ -64,7 +64,7 @@ export function DiceRoll() {
           type="button"
           onClick={rollDice}
           disabled={isRolling}
-          className="btn btn-primary px-3 sm:px-4 py-2.5 text-sm whitespace-nowrap"
+          className={`btn btn-primary px-3 sm:px-5 py-2.5 text-sm sm:text-[15px] whitespace-nowrap ${isRolling ? '' : 'btn-cta'}`}
         >
           <DiceIcon className={`w-5 h-5 ${isRolling ? 'animate-dice-tumble' : ''}`} />
           <span>{isRolling ? 'Tirando…' : 'Lanzar dados'}</span>

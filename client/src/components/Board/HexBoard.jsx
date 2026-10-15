@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { computeBoardBounds, getHexPoints, HEX_SIZE } from '../../utils/hexMath';
 import { pieceColor } from '../../utils/theme';
@@ -11,13 +11,119 @@ import { Port } from './Port';
 import { useBoardZoom } from './useBoardZoom';
 import { ZoomInIcon, ZoomOutIcon, FitIcon, KunaiIcon } from '../Shared/Icons';
 
+const EMPTY = {};
+const BoardDefs = memo(TerrainDefs);
+
+/** Union of hexagons of the given radius as one <path> (one shape, one paint) */
+function hexUnionPath(hexList, size) {
+  return hexList.map((h) => `M${getHexPoints(h.x, h.y, size).replace(/ /g, 'L')}Z`).join('');
+}
+
+/**
+ * Scroll frame around the island: washi margin, vermilion rule, ink line,
+ * seigaiha sea, foam and sand. Each ring is a single path (no group opacity,
+ * no filters), so zooming never re-composites translucent layers.
+ */
+const BoardFrame = memo(function BoardFrame({ hexList }) {
+  const paths = useMemo(() => {
+    const r = (k) => hexUnionPath(hexList, HEX_SIZE * k);
+    return {
+      shadow: hexUnionPath(hexList, HEX_SIZE * 1.9 + 5),
+      margin: r(1.9),
+      red: r(1.83),
+      white: r(1.81),
+      line: r(1.78),
+      sea: r(1.75),
+      foam: hexUnionPath(hexList, HEX_SIZE * 1.16 + 3),
+      shore: r(1.1),
+    };
+  }, [hexList]);
+
+  return (
+    <g pointerEvents="none">
+      {/* Short, soft drop shadow under the scroll */}
+      <path d={paths.shadow} transform="translate(1.5 4)" fill="#03050a" fillOpacity="0.5" />
+      <path d={paths.margin} fill="#efe6d0" stroke="#efe6d0" strokeWidth="8" strokeLinejoin="round" />
+      <path d={paths.red} fill="#b6331f" />
+      <path d={paths.white} fill="#efe6d0" />
+      <path d={paths.line} fill="#1f1b17" />
+      <path d={paths.sea} fill="url(#pat-sea)" />
+      {/* Sandy shoreline with a foam line */}
+      <path d={paths.foam} fill="#e9eef0" fillOpacity="0.45" />
+      <path d={paths.shore} fill="#d6bf8a" stroke="#d6bf8a" strokeWidth="6" strokeLinejoin="round" />
+    </g>
+  );
+});
+
+/**
+ * "¡Tu turno!" cues: a one-shot banner when the turn (or my special build)
+ * passes to me, plus a persistent glow around the board while I may act.
+ */
+function TurnCues({ mine, turnKey, special }) {
+  // Remember the last key so the banner fires only on a change, not on load
+  const [prevKey, setPrevKey] = useState(turnKey);
+  const [flash, setFlash] = useState(null);
+  if (turnKey !== prevKey) {
+    setPrevKey(turnKey);
+    if (turnKey) setFlash({ key: turnKey, special });
+  }
+
+  // Tab title hint for players looking at another tab
+  useEffect(() => {
+    if (!mine) return undefined;
+    const base = document.title.replace(/^● Tu turno · /, '');
+    document.title = `● Tu turno · ${base}`;
+    return () => {
+      document.title = base;
+    };
+  }, [mine]);
+
+  return (
+    <>
+      {mine && <div className="turn-glow" aria-hidden="true" />}
+      {flash && flash.key === turnKey && (
+        <div key={flash.key} className="turn-banner" role="status" aria-live="polite">
+          <div className="turn-banner-strip">
+            <span className="turn-banner-title">¡Tu turno!</span>
+            <span className="turn-banner-sub">{flash.special ? 'Construcción especial' : 'Es tu momento, ninja'}</span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function HexBoard() {
   const { gameState, isMyTurn, isSpecialBuild, isMySpecialBuild, buildMode } = useGame();
   const board = gameState?.board;
+  const hexes = board?.hexes || EMPTY;
 
-  const bounds = useMemo(() => {
-    return computeBoardBounds(board?.hexes, 72);
-  }, [board?.hexes]);
+  // Geometry only changes with the map, not with every state update
+  const hexGeomKey = Object.values(hexes).map((h) => `${h.id}@${h.x},${h.y}`).join(';');
+  const hexGeom = useMemo(
+    () => Object.values(hexes).map(({ id, x, y }) => ({ id, x, y })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hexGeomKey]
+  );
+  const rawBounds = computeBoardBounds(hexes, 72);
+  const bounds = useMemo(
+    () => rawBounds,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rawBounds.minX, rawBounds.minY, rawBounds.width, rawBounds.height]
+  );
+  const islandPath = useMemo(() => hexUnionPath(hexGeom, HEX_SIZE), [hexGeom]);
+
+  // Island centre, used to orient harbour badges out to sea
+  const center = useMemo(
+    () =>
+      hexGeom.length
+        ? {
+            x: hexGeom.reduce((a, h) => a + h.x, 0) / hexGeom.length,
+            y: hexGeom.reduce((a, h) => a + h.y, 0) / hexGeom.length,
+          }
+        : { x: 0, y: 0 },
+    [hexGeom]
+  );
 
   const zoom = useBoardZoom(bounds);
 
@@ -71,15 +177,12 @@ export function HexBoard() {
     }...)`;
   }
 
-  // Island centre, used to orient harbour badges out to sea
-  const center = hexList.length
-    ? {
-        x: hexList.reduce((a, h) => a + h.x, 0) / hexList.length,
-        y: hexList.reduce((a, h) => a + h.y, 0) / hexList.length,
-      }
-    : { x: 0, y: 0 };
-
   const turnColor = pieceColor((specialBuilder || currentTurnPlayer)?.color);
+
+  // Identifies "my chance to act": changes when the turn / special build passes to me
+  const turnKey = bannerMine
+    ? `${gameState.turnNumber}:${gameState.currentPlayerId}:${isSpecialBuild ? `sb-${gameState.specialBuilderId}` : 'turn'}`
+    : null;
 
   return (
     <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden select-none pt-12 sm:pt-14 pb-2 px-2">
@@ -101,6 +204,8 @@ export function HexBoard() {
         </div>
       </div>
 
+      <TurnCues mine={bannerMine} turnKey={turnKey} special={isSpecialBuild} />
+
       {/* Zoom controls */}
       <div className="absolute bottom-3 right-3 z-10 flex flex-col paper border border-ink/70 rounded-[2px] shadow-[0_4px_10px_rgba(0,0,0,0.55)] overflow-hidden">
         <button type="button" onClick={zoom.zoomIn} disabled={!zoom.canZoomIn} className="p-2 text-ink hover:bg-chakra/20 hover:text-shu disabled:opacity-35 cursor-pointer disabled:cursor-default" title="Acercar" aria-label="Acercar">
@@ -116,45 +221,13 @@ export function HexBoard() {
 
       <svg
         ref={zoom.svgRef}
-        viewBox={zoom.viewBox}
         preserveAspectRatio="xMidYMid meet"
-        className={`w-full h-full max-w-full max-h-full touch-none ${zoom.canZoomOut ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        className={`board-svg w-full h-full max-w-full max-h-full touch-none ${zoom.canZoomOut ? 'cursor-grab active:cursor-grabbing' : ''}`}
         {...zoom.handlers}
       >
-        <TerrainDefs />
+        <BoardDefs />
 
-        {/* Scroll frame: washi margin, vermilion rule, ink line, then the seigaiha sea */}
-        <g pointerEvents="none">
-          <g opacity="0.55" transform="translate(3 9)">
-            {hexList.map((hex) => (
-              <polygon key={`fo-${hex.id}`} points={getHexPoints(hex.x, hex.y, HEX_SIZE * 1.9)} fill="#03050a" stroke="#03050a" strokeWidth="12" strokeLinejoin="round" />
-            ))}
-          </g>
-          {hexList.map((hex) => (
-            <polygon key={`fr-${hex.id}`} points={getHexPoints(hex.x, hex.y, HEX_SIZE * 1.9)} fill="#efe6d0" stroke="#efe6d0" strokeWidth="8" strokeLinejoin="round" />
-          ))}
-          {hexList.map((hex) => (
-            <polygon key={`fred-${hex.id}`} points={getHexPoints(hex.x, hex.y, HEX_SIZE * 1.83)} fill="#b6331f" />
-          ))}
-          {hexList.map((hex) => (
-            <polygon key={`fw-${hex.id}`} points={getHexPoints(hex.x, hex.y, HEX_SIZE * 1.81)} fill="#efe6d0" />
-          ))}
-          {hexList.map((hex) => (
-            <polygon key={`fl-${hex.id}`} points={getHexPoints(hex.x, hex.y, HEX_SIZE * 1.78)} fill="#1f1b17" />
-          ))}
-          {hexList.map((hex) => (
-            <polygon key={`sea-${hex.id}`} points={getHexPoints(hex.x, hex.y, HEX_SIZE * 1.75)} fill="url(#pat-sea)" />
-          ))}
-          {/* Sandy shoreline with a foam line */}
-          <g opacity="0.45">
-            {hexList.map((hex) => (
-              <polygon key={`fm-${hex.id}`} points={getHexPoints(hex.x, hex.y, HEX_SIZE * 1.16)} fill="#e9eef0" stroke="#e9eef0" strokeWidth="6" strokeLinejoin="round" />
-            ))}
-          </g>
-          {hexList.map((hex) => (
-            <polygon key={`sh-${hex.id}`} points={getHexPoints(hex.x, hex.y, HEX_SIZE * 1.1)} fill="#d6bf8a" stroke="#d6bf8a" strokeWidth="6" strokeLinejoin="round" />
-          ))}
-        </g>
+        <BoardFrame hexList={hexGeom} />
 
         {/* Layer 1: Ports */}
         <g className="ports-layer">
@@ -170,17 +243,8 @@ export function HexBoard() {
           ))}
         </g>
 
-        {/* Printed grain over the whole chart */}
-        <rect
-          x={bounds.minX}
-          y={bounds.minY}
-          width={bounds.width}
-          height={bounds.height}
-          filter="url(#board-grain)"
-          opacity="0.35"
-          pointerEvents="none"
-          style={{ mixBlendMode: 'multiply' }}
-        />
+        {/* Printed grain over the island (static pattern, no filter / blend mode) */}
+        <path d={islandPath} fill="url(#pat-grain)" fillOpacity="0.4" pointerEvents="none" />
 
         {/* Layer 3: Edges (Roads) */}
         <g className="edges-layer">

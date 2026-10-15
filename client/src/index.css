@@ -288,6 +288,144 @@ button { font-family: inherit; }
 .field::placeholder { color: #a39784; }
 .field:focus { outline: none; border-color: var(--color-chakra); background: #fffcf5; }
 
+/* ─── Custom selectors (replace native <select>) ─── */
+
+/* Dropdown trigger: a washi field with a brushed caret */
+.dd-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem 0.4rem 0.7rem;
+  background: rgba(255, 252, 244, 0.7);
+  border: 1px solid rgba(31, 27, 23, 0.4);
+  border-bottom-width: 2px;
+  border-radius: 2px;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.dd-button:hover:not(:disabled) { border-color: var(--color-ink); background: #fffcf5; }
+.dd-button:focus-visible,
+.dd-button.is-open {
+  outline: none;
+  border-color: var(--color-chakra);
+  background: #fffcf5;
+  box-shadow: 0 0 0 2px rgba(226, 113, 29, 0.28);
+}
+.dd-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.dd-caret {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: var(--color-shu);
+  transition: transform 0.15s ease;
+}
+.dd-button.is-open .dd-caret { transform: rotate(180deg); }
+
+/* Popup list: a slip of paper with an ink border */
+.dd-list {
+  z-index: 80;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-ink);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255, 252, 244, 0.6), 0 10px 22px -6px rgba(0, 0, 0, 0.6), 0 2px 0 #1f1b17;
+}
+.dd-list:focus { outline: none; }
+.dd-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 32px;
+  padding: 0.3rem 0.6rem 0.3rem 0.45rem;
+  border-radius: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dd-option.is-active { background: rgba(226, 113, 29, 0.18); box-shadow: inset 0 0 0 1px rgba(226, 113, 29, 0.55); }
+.dd-option.is-selected { font-weight: 800; }
+/* Selected marker: a small vermilion seal */
+.dd-mark {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 27, 23, 0.35);
+}
+.dd-option.is-selected .dd-mark {
+  border-color: var(--color-shu-dark);
+  background: var(--color-shu);
+  box-shadow: 0 0 0 2px rgba(182, 51, 31, 0.2);
+}
+
+/* Segmented chips: a strip of paper tabs, the chosen one stamped in shu */
+.seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.seg-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid rgba(31, 27, 23, 0.35);
+  border-bottom-width: 2px;
+  border-radius: 2px;
+  background: rgba(255, 252, 244, 0.55);
+  color: var(--color-ink-soft);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.seg-chip:hover:not(:disabled) { border-color: var(--color-ink); color: var(--color-ink); background: #fffcf5; }
+.seg-chip:focus-visible { outline: 2px solid var(--color-chakra); outline-offset: 1px; }
+.seg-chip.is-on {
+  background: var(--color-paper-light);
+  border-color: var(--color-shu);
+  color: var(--color-ink);
+  box-shadow: 0 0 0 1px var(--color-shu);
+}
+.seg-chip.is-on::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--color-shu);
+  box-shadow: 0 0 0 1.5px var(--color-paper-light);
+}
+.seg-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Resource pickers: icon-only chips, the name stays for screen readers */
+.seg-chip.res-pick { min-width: 36px; min-height: 34px; padding: 0.25rem; }
+.seg-chip.res-pick .seg-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.seg-chip.res-pick > span:first-child { width: 22px; height: 22px; }
+
 /* ─── Resource card (hand): small karuta-style card ─── */
 .res-card {
   position: relative;
@@ -426,6 +564,112 @@ button { font-family: inherit; }
 .animate-turn-pulse { animation: turnPulse 2.4s ease-in-out infinite; }
 .animate-spin-slow { animation: ringTurn 14s linear infinite; }
 
+/* ─── "Your turn" cues ─── */
+@keyframes turnBanner {
+  0% { opacity: 0; transform: translateY(-50%) scaleX(0.6); }
+  12% { opacity: 1; transform: translateY(-50%) scaleX(1.03); }
+  20% { transform: translateY(-50%) scaleX(1); }
+  78% { opacity: 1; transform: translateY(-50%) scaleX(1); }
+  100% { opacity: 0; transform: translateY(-50%) scaleX(1); visibility: hidden; }
+}
+@keyframes turnBannerText {
+  0% { opacity: 0; letter-spacing: 0.3em; }
+  20% { opacity: 1; letter-spacing: 0.04em; }
+  100% { opacity: 1; letter-spacing: 0.04em; }
+}
+@keyframes turnGlow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+@keyframes ctaPulse {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 220, 190, 0.25), 0 2px 0 #1f1b17, 0 0 0 0 rgba(246, 160, 75, 0.0), 0 0 12px 1px rgba(246, 160, 75, 0.35); }
+  50% { box-shadow: inset 0 1px 0 rgba(255, 220, 190, 0.25), 0 2px 0 #1f1b17, 0 0 0 4px rgba(246, 160, 75, 0.55), 0 0 22px 4px rgba(246, 160, 75, 0.5); }
+}
+@keyframes pillGlow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(246, 160, 75, 0.9), 0 0 10px 1px rgba(226, 113, 29, 0.45); }
+  50% { box-shadow: 0 0 0 3px rgba(246, 160, 75, 0.75), 0 0 20px 4px rgba(226, 113, 29, 0.6); }
+}
+
+/* One-shot banner across the board when the turn passes to me */
+.turn-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 42%;
+  /* above modals such as «Recursos recibidos», which often open right as the turn arrives */
+  z-index: 60;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  transform-origin: 50% 50%;
+  animation: turnBanner 1.7s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.turn-banner-strip {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.6rem 1rem 0.7rem;
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(11, 16, 27, 0.92) 18%, rgba(11, 16, 27, 0.92) 82%, transparent 100%);
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-image: linear-gradient(90deg, transparent, var(--color-chakra) 20%, var(--color-chakra-light) 50%, var(--color-chakra) 80%, transparent) 1;
+}
+.turn-banner-title {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 6vw, 52px);
+  line-height: 1;
+  color: var(--color-paper-light);
+  text-shadow: 0 0 18px rgba(226, 113, 29, 0.8), 0 3px 0 var(--color-shu-dark);
+  animation: turnBannerText 1.7s ease-out both;
+}
+.turn-banner-sub {
+  margin-top: 0.35rem;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-chakra-light);
+}
+
+/* Persistent, subtle chakra frame around the board while I may act */
+.turn-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 2px rgba(246, 160, 75, 0.85),
+    inset 0 0 28px 4px rgba(226, 113, 29, 0.38),
+    inset 0 0 90px 10px rgba(226, 113, 29, 0.14);
+  animation: turnGlow 2.8s ease-in-out infinite;
+}
+
+/* Primary call to action (e.g. «Lanzar dados») */
+.btn-cta { animation: ctaPulse 1.8s ease-in-out infinite; }
+.pill-mine { animation: pillGlow 2.2s ease-in-out infinite; }
+
+/* Turn timer bar under the header */
+.timer-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 5px;
+  background: rgba(3, 5, 10, 0.75);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  overflow: hidden;
+}
+.timer-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 50%;
+  transition: transform 0.26s linear, background-color 0.3s ease;
+}
+.timer-fill.is-low { animation: breathe 0.8s ease-in-out infinite; }
+
 /* ─── Board ─── */
 .hex-polygon {
   stroke: rgba(31, 27, 23, 0.85);
@@ -477,10 +721,28 @@ button { font-family: inherit; }
   animation: fadeIn 0.35s ease-out both;
 }
 
+/* While panning / zooming, freeze the decorative loops so each frame only
+   re-draws the board once */
+.board-svg.is-moving .spot-marker,
+.board-svg.is-moving .road-marker,
+.board-svg.is-moving .spot-ring,
+.board-svg.is-moving .robber-target { animation-play-state: paused; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* Reduced motion: the "your turn" banner still shows, as a plain fade */
+@keyframes turnBannerFade {
+  0% { opacity: 0; transform: translateY(-50%); }
+  10%, 80% { opacity: 1; transform: translateY(-50%); }
+  100% { opacity: 0; transform: translateY(-50%); visibility: hidden; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .turn-banner { animation: turnBannerFade 1.8s linear both !important; }
+  .turn-banner-title { animation: none !important; }
 }

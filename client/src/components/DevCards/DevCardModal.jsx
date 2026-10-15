@@ -9,7 +9,8 @@ import {
   RESOURCE_NAMES,
 } from '../../utils/constants';
 import { DevCardIcon, HourglassIcon, MedalIcon, CardsIcon } from '../Shared/Icons';
-import { ResourceBundle } from '../Shared/ResourceCard';
+import { ResourceBundle, ResourceChip } from '../Shared/ResourceCard';
+import { SegmentedControl } from '../Shared/Choice';
 
 export function DevCardModal({ isOpen, onClose }) {
   const { gameState, myPlayer, isMyTurn, isSpecialBuild, isMySpecialBuild, buyDevCard, playDevCard } = useGame();
@@ -60,7 +61,12 @@ export function DevCardModal({ isOpen, onClose }) {
     RESOURCE.ORE,
   ];
 
-  const selectClass = 'field !py-1.5 !text-[13px] cursor-pointer';
+  const resourceOptions = resourceList.map((r) => ({
+    value: r,
+    label: RESOURCE_NAMES[r],
+    title: RESOURCE_NAMES[r],
+    icon: <ResourceChip type={r} className="w-4 h-4" iconClassName="w-3 h-3" />,
+  }));
 
   return (
     <Modal
@@ -167,51 +173,42 @@ export function DevCardModal({ isOpen, onClose }) {
                       <div className="mt-3 pt-3 border-t border-dashed border-ink/25">
                         {card === DEV_CARD.YEAR_OF_PLENTY && (
                           <div className="space-y-1.5 mb-2.5">
-                            <span className="label-caps !text-[10px]">Elige 2 recursos</span>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <select
-                                className={selectClass}
-                                value={yopRes1}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => setYopRes1(e.target.value)}
-                              >
-                                {resourceList.map((r) => (
-                                  <option key={r} value={r}>
-                                    {RESOURCE_NAMES[r]}
-                                  </option>
-                                ))}
-                              </select>
-                              <select
-                                className={selectClass}
-                                value={yopRes2}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => setYopRes2(e.target.value)}
-                              >
-                                {resourceList.map((r) => (
-                                  <option key={r} value={r}>
-                                    {RESOURCE_NAMES[r]}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                            <span className="flex flex-wrap items-baseline gap-x-1.5">
+                              <span className="label-caps !text-[10px]">Elige 2 recursos</span>
+                              <span className="text-[12px] font-bold text-ink">
+                                {RESOURCE_NAMES[yopRes1]} + {RESOURCE_NAMES[yopRes2]}
+                              </span>
+                            </span>
+                            <SegmentedControl
+                              ariaLabel="Primer recurso"
+                              options={resourceOptions}
+                              value={yopRes1}
+                              onChange={setYopRes1}
+                              chipClassName="res-pick"
+                            />
+                            <SegmentedControl
+                              ariaLabel="Segundo recurso"
+                              options={resourceOptions}
+                              value={yopRes2}
+                              onChange={setYopRes2}
+                              chipClassName="res-pick"
+                            />
                           </div>
                         )}
 
                         {card === DEV_CARD.MONOPOLY && (
                           <div className="space-y-1.5 mb-2.5">
-                            <span className="label-caps !text-[10px]">Recurso objetivo</span>
-                            <select
-                              className={selectClass}
+                            <span className="flex flex-wrap items-baseline gap-x-1.5">
+                              <span className="label-caps !text-[10px]">Recurso objetivo</span>
+                              <span className="text-[12px] font-bold text-ink">{RESOURCE_NAMES[monopolyRes]}</span>
+                            </span>
+                            <SegmentedControl
+                              ariaLabel="Recurso objetivo"
+                              options={resourceOptions}
                               value={monopolyRes}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => setMonopolyRes(e.target.value)}
-                            >
-                              {resourceList.map((r) => (
-                                <option key={r} value={r}>
-                                  {RESOURCE_NAMES[r]}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={setMonopolyRes}
+                              chipClassName="res-pick"
+                            />
                           </div>
                         )}
 

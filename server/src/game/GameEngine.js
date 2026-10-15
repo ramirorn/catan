@@ -68,7 +68,7 @@ export class GameEngine {
 
     // Room settings (chosen by the host before starting)
     this.vpToWin = VP_TO_WIN;
-    this.turnTimeLimit = 0;   // seconds per turn, 0 = no limit
+    this.turnTimeLimit = 90;  // seconds per turn, 0 = no limit (default 90 s)
     // Absolute epoch ms when whoever must act runs out of time. Managed by the
     // socket layer's turn timer (null when no timer is running).
     this.turnDeadline = null;

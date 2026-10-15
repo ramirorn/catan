@@ -14,7 +14,7 @@ export function LobbyScreen() {
   const [name, setName] = useState(playerName);
   const [roomCode, setRoomCode] = useState('');
   const [boardType, setBoardType] = useState('standard');
-  const [rules, setRules] = useState({ vpToWin: DEFAULT_VP_TO_WIN, turnTimeLimit: 0 });
+  const [rules, setRules] = useState({ vpToWin: DEFAULT_VP_TO_WIN, turnTimeLimit: 90 });
   const [publicRooms, setPublicRooms] = useState([]);
   // Only rooms still waiting for players and with a free seat
   const openRooms = publicRooms.filter((r) => r.phase === 'lobby' && r.playerCount < r.maxPlayers);

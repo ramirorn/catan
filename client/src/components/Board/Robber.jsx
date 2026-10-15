@@ -15,7 +15,7 @@ function Cloud({ x, y, s = 1 }) {
 // The robber: a rogue ninja in a dark high-collared cloak and a straw hat.
 export function Robber({ x, y }) {
   return (
-    <g transform={`translate(${x}, ${y - 4}) scale(1.3)`} pointerEvents="none" filter="url(#piece-shadow)">
+    <g transform={`translate(${x}, ${y - 4}) scale(1.3)`} pointerEvents="none">
       <ellipse cx="0" cy="16" rx="12" ry="3.6" fill="#07090f" opacity="0.45" />
 
       {/* Cloak */}

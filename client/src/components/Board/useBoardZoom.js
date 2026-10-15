@@ -8,35 +8,86 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /**
  * Zoom (wheel, pinch, buttons) and pan (drag) for the board SVG, done by
- * moving the viewBox. A drag swallows the click that ends it, so pieces
- * aren't placed by accident; a plain tap still clicks through.
+ * moving the viewBox. The view lives in a ref and is written straight to the
+ * <svg> once per animation frame, so gestures never re-render the board; React
+ * state only changes when the zoom buttons' enabled state flips.
+ * A drag swallows the click that ends it, so pieces aren't placed by accident;
+ * a plain tap still clicks through.
  */
 export function useBoardZoom(bounds) {
-  const svgRef = useRef(null);
+  const svgEl = useRef(null);
   // zoom factor + offset of the view centre from the board centre (board units)
-  const [view, setView] = useState({ zoom: 1, x: 0, y: 0 });
-  const viewRef = useRef(view);
-  useEffect(() => {
-    viewRef.current = view;
-  }, [view]);
+  const viewRef = useRef({ zoom: 1, x: 0, y: 0 });
+  const boundsRef = useRef(bounds);
+  const frame = useRef(0);
+  const movingTimer = useRef(0);
+  // Only what the buttons / cursor need; updated on threshold changes
+  const [zoomFlags, setZoomFlags] = useState({ canZoomIn: true, canZoomOut: false });
 
   const pointers = useRef(new Map());
   const gesture = useRef(null);
   const swallowClick = useRef(false);
 
-  const clampView = useCallback(
-    ({ zoom, x, y }) => {
-      const z = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
-      const maxX = (bounds.width / 2) * (1 - 1 / z);
-      const maxY = (bounds.height / 2) * (1 - 1 / z);
-      return { zoom: z, x: clamp(x, -maxX, maxX), y: clamp(y, -maxY, maxY) };
+  const viewBoxOf = useCallback((v) => {
+    const b = boundsRef.current;
+    const cx = b.minX + b.width / 2;
+    const cy = b.minY + b.height / 2;
+    const w = b.width / v.zoom;
+    const h = b.height / v.zoom;
+    return `${cx + v.x - w / 2} ${cy + v.y - h / 2} ${w} ${h}`;
+  }, []);
+
+  const writeViewBox = useCallback(() => {
+    frame.current = 0;
+    const svg = svgEl.current;
+    if (svg) svg.setAttribute('viewBox', viewBoxOf(viewRef.current));
+  }, [viewBoxOf]);
+
+  const clampView = useCallback(({ zoom, x, y }) => {
+    const b = boundsRef.current;
+    const z = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+    const maxX = (b.width / 2) * (1 - 1 / z);
+    const maxY = (b.height / 2) * (1 - 1 / z);
+    return { zoom: z, x: clamp(x, -maxX, maxX), y: clamp(y, -maxY, maxY) };
+  }, []);
+
+  // Store a new view and paint it on the next frame
+  const setView = useCallback(
+    (next) => {
+      const v = clampView(typeof next === 'function' ? next(viewRef.current) : next);
+      viewRef.current = v;
+      if (!frame.current) frame.current = requestAnimationFrame(writeViewBox);
+      // Mark the board as moving so CSS can pause decorative animations
+      const svg = svgEl.current;
+      if (svg) {
+        svg.classList.add('is-moving');
+        clearTimeout(movingTimer.current);
+        movingTimer.current = setTimeout(() => svg.classList.remove('is-moving'), 160);
+      }
+      const canZoomIn = v.zoom < MAX_ZOOM - 0.01;
+      const canZoomOut = v.zoom > MIN_ZOOM + 0.01;
+      setZoomFlags((f) => (f.canZoomIn === canZoomIn && f.canZoomOut === canZoomOut ? f : { canZoomIn, canZoomOut }));
     },
-    [bounds.width, bounds.height]
+    [clampView, writeViewBox]
+  );
+
+  // New board size (e.g. switching map): keep the view inside it
+  useEffect(() => {
+    boundsRef.current = bounds;
+    setView(viewRef.current);
+  }, [bounds, setView]);
+
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(frame.current);
+      clearTimeout(movingTimer.current);
+    },
+    []
   );
 
   // Screen point → board coordinates (handles letterboxing of "meet")
   const toBoard = useCallback((clientX, clientY) => {
-    const svg = svgRef.current;
+    const svg = svgEl.current;
     const ctm = svg?.getScreenCTM();
     if (!ctm) return null;
     const pt = svg.createSVGPoint();
@@ -45,42 +96,52 @@ export function useBoardZoom(bounds) {
     return pt.matrixTransform(ctm.inverse());
   }, []);
 
-  const boardCenter = useCallback(
-    () => ({ x: bounds.minX + bounds.width / 2, y: bounds.minY + bounds.height / 2 }),
-    [bounds.minX, bounds.minY, bounds.width, bounds.height]
-  );
-
   // Zoom keeping the board point p fixed on screen
-  const zoomAt = useCallback(
-    (from, newZoom, p) => {
-      const c = boardCenter();
-      const z = clamp(newZoom, MIN_ZOOM, MAX_ZOOM);
-      if (!p) return clampView({ ...from, zoom: z });
-      const cx = c.x + from.x;
-      const cy = c.y + from.y;
-      const k = from.zoom / z;
-      return clampView({ zoom: z, x: p.x + (cx - p.x) * k - c.x, y: p.y + (cy - p.y) * k - c.y });
-    },
-    [boardCenter, clampView]
-  );
+  const zoomAt = useCallback((from, newZoom, p) => {
+    const b = boundsRef.current;
+    const c = { x: b.minX + b.width / 2, y: b.minY + b.height / 2 };
+    const z = clamp(newZoom, MIN_ZOOM, MAX_ZOOM);
+    if (!p) return { ...from, zoom: z };
+    const cx = c.x + from.x;
+    const cy = c.y + from.y;
+    const k = from.zoom / z;
+    return { zoom: z, x: p.x + (cx - p.x) * k - c.x, y: p.y + (cy - p.y) * k - c.y };
+  }, []);
 
   // Wheel needs a non-passive listener to stop the page from scrolling
-  useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return undefined;
-    const onWheel = (e) => {
+  const onWheel = useCallback(
+    (e) => {
       e.preventDefault();
+      // The CTM still reflects the last painted viewBox: flush a pending frame first
+      if (frame.current) {
+        cancelAnimationFrame(frame.current);
+        writeViewBox();
+      }
       const p = toBoard(e.clientX, e.clientY);
-      const factor = Math.exp(-e.deltaY * 0.0015);
+      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      const factor = Math.exp(-clamp(dy, -240, 240) * 0.0015);
       setView((v) => zoomAt(v, v.zoom * factor, p));
-    };
-    svg.addEventListener('wheel', onWheel, { passive: false });
-    return () => svg.removeEventListener('wheel', onWheel);
-  }, [toBoard, zoomAt]);
+    },
+    [toBoard, zoomAt, setView, writeViewBox]
+  );
+
+  // Callback ref: the <svg> appears only once the board exists
+  const svgRef = useCallback(
+    (node) => {
+      const prev = svgEl.current;
+      if (prev) prev.removeEventListener('wheel', onWheel);
+      svgEl.current = node;
+      if (node) {
+        node.addEventListener('wheel', onWheel, { passive: false });
+        node.setAttribute('viewBox', viewBoxOf(viewRef.current));
+      }
+    },
+    [onWheel, viewBoxOf]
+  );
 
   const startGesture = () => {
     const pts = [...pointers.current.values()];
-    const svg = svgRef.current;
+    const svg = svgEl.current;
     const ctm = svg?.getScreenCTM();
     const unitsPerPx = ctm ? 1 / ctm.a : 1;
     if (pts.length === 1) {
@@ -117,9 +178,9 @@ export function useBoardZoom(bounds) {
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX || viewRef.current.zoom <= MIN_ZOOM) return;
         g.dragging = true;
         swallowClick.current = true;
-        svgRef.current?.setPointerCapture?.(e.pointerId);
+        svgEl.current?.setPointerCapture?.(e.pointerId);
       }
-      setView(clampView({ zoom: g.from.zoom, x: g.from.x - dx * g.unitsPerPx, y: g.from.y - dy * g.unitsPerPx }));
+      setView({ zoom: g.from.zoom, x: g.from.x - dx * g.unitsPerPx, y: g.from.y - dy * g.unitsPerPx });
     } else if (g.type === 'pinch') {
       const [a, b] = [...pointers.current.values()];
       if (!b) return;
@@ -154,17 +215,10 @@ export function useBoardZoom(bounds) {
   const zoomBy = (factor) => setView((v) => zoomAt(v, v.zoom * factor, null));
   const reset = () => setView({ zoom: 1, x: 0, y: 0 });
 
-  const c = boardCenter();
-  const w = bounds.width / view.zoom;
-  const h = bounds.height / view.zoom;
-  const viewBox = `${c.x + view.x - w / 2} ${c.y + view.y - h / 2} ${w} ${h}`;
-
   return {
     svgRef,
-    viewBox,
-    zoom: view.zoom,
-    canZoomIn: view.zoom < MAX_ZOOM - 0.01,
-    canZoomOut: view.zoom > MIN_ZOOM + 0.01,
+    canZoomIn: zoomFlags.canZoomIn,
+    canZoomOut: zoomFlags.canZoomOut,
     zoomIn: () => zoomBy(1.35),
     zoomOut: () => zoomBy(1 / 1.35),
     reset,

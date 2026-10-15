@@ -5,14 +5,11 @@
 // sealed cliffs, sand domes) is drawn per tile by TerrainArt.jsx.
 // Patterns use userSpaceOnUse so the ground flows seamlessly across tiles.
 
-const TERRAIN_BASE = {
-  forest: '#3b6a3c',
-  hills: '#ad512c',
-  pasture: '#93b45b',
-  fields: '#d7a63c',
-  mountains: '#75808d',
-  desert: '#d9c08a',
-};
+import { TERRAIN_BASE } from '../../utils/theme';
+
+// Static noise tile (rasterised once by the browser, then reused)
+const GRAIN_URI =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.6' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.16  0 0 0 0 0.13  0 0 0 0 0.1  0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E";
 
 // Enlarges the ground texture drawn inside each land tile
 const TILE_ART_SCALE = 1.7;
@@ -97,16 +94,13 @@ export function TerrainDefs() {
         <stop offset="100%" stopColor="#120d08" stopOpacity="0.3" />
       </radialGradient>
 
-      {/* Washi grain overlay */}
-      <filter id="board-grain" x="0" y="0" width="100%" height="100%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.9 0.6" numOctaves="2" seed="3" />
-        <feColorMatrix values="0 0 0 0 0.16  0 0 0 0 0.13  0 0 0 0 0.1  0 0 0 0.5 0" />
-      </filter>
-
-      {/* Soft drop shadow for pieces and tokens */}
-      <filter id="piece-shadow" x="-40%" y="-40%" width="180%" height="190%">
-        <feDropShadow dx="0.6" dy="1.8" stdDeviation="1.1" floodColor="#07090f" floodOpacity="0.6" />
-      </filter>
+      {/* Washi grain: a pre-rendered noise tile used as a pattern. (A live
+          feTurbulence filter + mix-blend-mode over the whole board was
+          re-rasterised in tiles on every zoom step, which showed up as darker
+          bands/seams and made zooming stutter.) */}
+      <pattern id="pat-grain" width="160" height="160" patternUnits="userSpaceOnUse">
+        <image href={GRAIN_URI} width="160" height="160" />
+      </pattern>
     </defs>
   );
 }

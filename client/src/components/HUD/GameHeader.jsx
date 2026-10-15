@@ -19,7 +19,7 @@ function useCountdown(deadline, serverOffset) {
     };
   }, [deadline]);
   if (!deadline) return null;
-  return Math.max(0, Math.ceil((deadline - (now + serverOffset)) / 1000));
+  return Math.max(0, deadline - (now + serverOffset));
 }
 
 function formatSeconds(total) {
@@ -30,8 +30,11 @@ function formatSeconds(total) {
 
 export function GameHeader() {
   const { gameState, myPlayerId, isMyTurn, isSpecialBuild, isMySpecialBuild, setActiveModal, serverOffset } = useGame();
-  const secondsLeft = useCountdown(gameState?.turnDeadline, serverOffset);
+  const msLeft = useCountdown(gameState?.turnDeadline, serverOffset);
+  const secondsLeft = msLeft === null ? null : Math.ceil(msLeft / 1000);
   const lowTime = secondsLeft !== null && secondsLeft <= 10;
+  const limitMs = (gameState?.turnTimeLimit || 0) * 1000;
+  const timeFraction = msLeft === null || !limitMs ? null : Math.max(0, Math.min(1, msLeft / limitMs));
   const isDiscardPhase = gameState?.phase === 'robberDiscard';
   const { connected } = useSocket();
 
@@ -58,11 +61,25 @@ export function GameHeader() {
       <div className="absolute inset-x-0 bottom-0 h-[3px] bg-chakra" aria-hidden="true" />
       <div className="absolute inset-x-0 bottom-[3px] h-px bg-black/70" aria-hidden="true" />
 
+      {/* Turn timer: a slim bar everyone can read, red in the last 10 s */}
+      {timeFraction !== null && (
+        <div className="timer-track" aria-hidden="true">
+          <div
+            className={`timer-fill ${lowTime ? 'is-low' : ''}`}
+            style={{
+              transform: `scaleX(${timeFraction})`,
+              backgroundColor: lowTime ? 'var(--color-shu-light)' : turnColor,
+              boxShadow: lowTime ? '0 0 8px rgba(212, 73, 47, 0.9)' : undefined,
+            }}
+          />
+        </div>
+      )}
+
       {/* Brand & Room Info */}
       <div className="flex items-center gap-3 sm:gap-4 min-w-0">
         <div className="flex items-center gap-2.5 shrink-0">
           <BrandPlate className="w-9 h-6" />
-          <span className="font-display text-[22px] leading-none text-paper-light whitespace-nowrap">
+          <span className="hidden min-[440px]:inline font-display text-[22px] leading-none text-paper-light whitespace-nowrap">
             Catán <span className="text-chakra-light">Shinobi</span>
           </span>
         </div>
@@ -81,29 +98,32 @@ export function GameHeader() {
             title={isSpecialBuild ? 'Fase especial de construcción' : undefined}
             className={`flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border min-w-0 transition-colors ${
               pillMine
-                ? 'bg-paper text-ink border-chakra animate-turn-pulse'
+                ? 'pill-mine bg-gradient-to-b from-chakra-light to-chakra text-ink border-paper-light'
                 : 'bg-black/30 text-paper/85 border-paper/15'
             }`}
           >
             <span
-              className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 shadow-[inset_0_-2px_0_rgba(0,0,0,0.3)] ring-1 ring-black/40"
+              className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 shadow-[inset_0_-2px_0_rgba(0,0,0,0.3)] ring-1 ${
+                pillMine ? 'ring-ink/70' : 'ring-black/40'
+              }`}
               style={{ backgroundColor: turnColor }}
             >
               <SettlementIcon className="w-3.5 h-3.5 text-paper-light" />
             </span>
-            <span className="text-[13px] font-bold truncate">
+            <span className={`text-[13px] truncate ${pillMine ? 'font-extrabold sm:uppercase sm:tracking-[0.06em]' : 'font-bold'}`}>
               {pillText}
             </span>
             {secondsLeft !== null && (
               <span
-                className={`flex items-center gap-1 pl-2 border-l font-serif font-extrabold text-[13px] tabular-nums shrink-0 ${
-                  pillMine ? 'border-ink/20' : 'border-paper/20'
+                className={`flex items-center gap-1 pl-2 border-l font-serif font-extrabold text-[15px] tabular-nums shrink-0 ${
+                  pillMine ? 'border-ink/30' : 'border-paper/20'
                 } ${
                   lowTime
-                    ? `${pillMine ? 'text-shu' : 'text-shu-light'} animate-pulse`
-                    : pillMine ? 'text-ink-soft' : 'text-paper/70'
+                    ? `${pillMine ? 'text-shu-dark' : 'text-shu-light'} animate-pulse`
+                    : pillMine ? 'text-ink' : 'text-paper-light'
                 }`}
                 title={isDiscardPhase ? 'Tiempo para descartar' : 'Tiempo restante del turno'}
+                role="timer"
                 aria-label={`Tiempo restante: ${secondsLeft} segundos`}
               >
                 <HourglassIcon className="w-3.5 h-3.5" />

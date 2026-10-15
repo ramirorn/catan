@@ -13,7 +13,9 @@ export function NumberToken({ number, x, y }) {
 
   return (
     <g transform={`translate(${x}, ${y})`} className="number-token">
-      <circle r={19.5} fill="#f4ecda" filter="url(#piece-shadow)" />
+      {/* Manual drop shadow (SVG filters re-rasterise on every zoom frame) */}
+      <circle cx={0.6} cy={1.8} r={20.2} fill="#07090f" opacity="0.45" />
+      <circle r={19.5} fill="#f4ecda" />
       <circle r={19.5} fill="none" stroke="#1f1b17" strokeWidth="1.3" />
       <circle
         r={16.4}

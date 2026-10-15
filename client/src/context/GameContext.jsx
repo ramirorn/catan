@@ -82,6 +82,9 @@ export function GameProvider({ children }) {
       } else {
         if (activeModal === 'discard') setActiveModal(null);
       }
+    } else if (activeModal === 'discard') {
+      // Discard was resolved elsewhere (time ran out, another tab…)
+      setActiveModal(null);
     }
   }, [gameState?.phase, gameState?.mustDiscard, gameState?.discardedPlayers, myPlayerId, activeModal]);
 

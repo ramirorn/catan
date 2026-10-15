@@ -95,29 +95,33 @@ export function ScoreBoard() {
 
       {/* What's left in the bank (19 of each resource, 24 in the 5–6 player extension) */}
       {gameState.bank && (
-        <div className="mt-2.5 flex items-center justify-between gap-2" aria-label="Cartas que quedan en el banco">
-          <span className="label-caps !text-[10px] shrink-0">Banco</span>
-          <ul className="flex items-center gap-2">
+        <div className="mt-2.5 flex items-center gap-2" aria-label="Cartas que quedan en el banco">
+          <span className="label-caps !text-[10px] !tracking-[0.1em] shrink-0">Banco</span>
+          <ul className="flex-1 min-w-0 flex flex-wrap items-center justify-end gap-x-1 gap-y-1">
             {BANK_ORDER.map((r) => {
               const left = gameState.bank[r] ?? 0;
               const low = left <= 3;
               return (
                 <li
                   key={r}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-0.5"
                   title={`${RESOURCE_NAMES[r]}: quedan ${left} en el banco`}
                 >
                   <ResourceChip type={r} className="w-4 h-4" iconClassName="w-3 h-3" />
-                  <span className={`font-serif font-extrabold text-[13px] tabular-nums ${left === 0 ? 'text-shu line-through' : low ? 'text-shu' : 'text-ink'}`}>
+                  <span className={`font-serif font-extrabold text-[12.5px] tabular-nums min-w-[2ch] ${left === 0 ? 'text-shu line-through' : low ? 'text-shu' : 'text-ink'}`}>
                     {left}
                   </span>
                 </li>
               );
             })}
             {gameState.devCardsRemaining !== undefined && (
-              <li className="flex items-center gap-1 pl-2 border-l border-ink/20" title={`Cartas de desarrollo: quedan ${gameState.devCardsRemaining}`}>
-                <CardsIcon className="w-4 h-4 text-ink-soft" />
-                <span className="font-serif font-extrabold text-[13px] tabular-nums text-ink">{gameState.devCardsRemaining}</span>
+              <li
+                className="flex items-center gap-0.5 pl-1 border-l border-ink/20"
+                title={`Cartas de desarrollo: quedan ${gameState.devCardsRemaining}`}
+                aria-label={`Cartas de desarrollo: quedan ${gameState.devCardsRemaining}`}
+              >
+                <CardsIcon className="w-4 h-4 text-ink-soft shrink-0" />
+                <span className="font-serif font-extrabold text-[12.5px] tabular-nums min-w-[2ch] text-ink">{gameState.devCardsRemaining}</span>
               </li>
             )}
           </ul>

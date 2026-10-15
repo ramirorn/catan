@@ -1,8 +1,9 @@
+import { memo } from 'react';
 import { useGame } from '../../context/GameContext';
 import { PHASE } from '../../utils/constants';
 import { pieceColor, shade } from '../../utils/theme';
 
-export function Edge({ edge }) {
+export const Edge = memo(function Edge({ edge }) {
   const {
     gameState,
     isMyTurn,
@@ -72,19 +73,22 @@ export function Edge({ edge }) {
         </g>
       )}
 
-      {/* Built road: a plank bridge painted in the player's colour */}
+      {/* Built road: a plank bridge painted in the player's colour, with a
+          light rim + ink edges so it reads on any terrain */}
       {road && (
         // No SVG filter here: a filter on a perfectly vertical/horizontal line
         // has a zero-size bounding box, so the browser drops the whole road.
+        // The shadow is a plain offset line instead.
         <g className="road-built">
-          <line x1={rx1 + 0.6} y1={ry1 + 1.8} x2={rx2 + 0.6} y2={ry2 + 1.8} stroke="#07090f" strokeOpacity="0.5" strokeWidth="12" strokeLinecap="round" />
-          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke={shade(playerColor, -0.55)} strokeWidth="11" strokeLinecap="round" />
-          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke={playerColor} strokeWidth="8" strokeLinecap="round" />
+          <line x1={rx1 + 1.6} y1={ry1 + 3.2} x2={rx2 + 1.6} y2={ry2 + 3.2} stroke="#05070c" strokeOpacity="0.5" strokeWidth="14" strokeLinecap="round" />
+          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke="#fff4dc" strokeWidth="15.5" strokeLinecap="round" />
+          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke="#120e0b" strokeWidth="12.5" strokeLinecap="round" />
+          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke={playerColor} strokeWidth="8.6" strokeLinecap="round" />
           {/* Gaps between the planks */}
-          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke={shade(playerColor, -0.5)} strokeOpacity="0.7" strokeWidth="8" strokeDasharray="1 3.6" />
-          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke={shade(playerColor, 0.4)} strokeOpacity="0.55" strokeWidth="1.6" strokeLinecap="round" />
+          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke={shade(playerColor, -0.45)} strokeWidth="8.6" strokeDasharray="1.2 4.2" strokeDashoffset="-2" />
+          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke={shade(playerColor, 0.5)} strokeOpacity="0.7" strokeWidth="1.8" strokeLinecap="round" />
         </g>
       )}
     </g>
   );
-}
+});

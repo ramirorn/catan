@@ -1,13 +1,13 @@
 // Presentation helpers: maps the server's flat player colours to
-// lacquered tones that sit well on washi and ink, plus small colour math.
+// saturated lacquer tones that read on washi, ink and the terrain art, plus small colour math.
 
 const PIECE_TONES = {
-  '#e74c3c': '#b23a2a', // rojo  -> lacquered red
-  '#3498db': '#2f5f8f', // azul  -> indigo
-  '#f39c12': '#e07a22', // naranja -> chakra orange
-  '#2ecc71': '#4c7a3a', // verde -> leaf
-  '#9b59b6': '#6d4a80', // morado -> plum
-  '#1abc9c': '#2d7c72', // turquesa -> verdigris
+  '#e74c3c': '#d23a26', // rojo  -> lacquered vermilion
+  '#3498db': '#2a6fd0', // azul  -> bright indigo
+  '#f39c12': '#f08a16', // naranja -> chakra orange
+  '#2ecc71': '#2fa84a', // verde -> leaf
+  '#9b59b6': '#8e4bbd', // morado -> plum
+  '#1abc9c': '#14a796', // turquesa -> verdigris
 };
 
 export function pieceColor(color) {
@@ -47,4 +47,14 @@ export const RESOURCE_KANJI = {
   sheep: '羊',
   wheat: '麦',
   ore: '石',
+};
+
+// Ground colour of each land terrain (board patterns + the wash over tile art)
+export const TERRAIN_BASE = {
+  forest: '#3b6a3c',
+  hills: '#ad512c',
+  pasture: '#93b45b',
+  fields: '#d7a63c',
+  mountains: '#75808d',
+  desert: '#d9c08a',
 };
