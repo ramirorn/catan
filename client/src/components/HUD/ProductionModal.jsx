@@ -83,7 +83,7 @@ export function ProductionModal() {
       title="Recursos recibidos"
       maxWidth="max-w-md"
       actions={
-        <button type="button" className="btn btn-primary px-5 py-1.5" onClick={close} autoFocus>
+        <button type="button" className="btn btn-primary min-h-[42px] px-5 py-1.5" onClick={close} autoFocus>
           Aceptar
         </button>
       }
@@ -93,7 +93,7 @@ export function ProductionModal() {
           ? 'Tu segundo poblado te da sus primeros recursos.'
           : <>Salió un <strong className="text-ink">{shown.roll}</strong>. Te toca{total === 1 ? '' : 'n'} {total} carta{total === 1 ? '' : 's'}:</>}
       </p>
-      <div className="flex flex-wrap justify-center gap-4 pb-2">
+      <div className="flex flex-wrap justify-center gap-3 min-[360px]:gap-4 pt-2 pb-2">
         {entries.map(([type, n], i) => (
           <div key={type} className="animate-card-in" style={{ animationDelay: `${i * 110}ms` }}>
             <ResourceCard type={type} count={n} size="lg" />

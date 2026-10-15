@@ -29,12 +29,12 @@ export function ResourceBar() {
         <span className="font-serif font-extrabold text-[24px] text-paper-light mt-1">{totalCards}</span>
       </div>
 
-      <div className="flex items-end gap-1.5 sm:gap-2.5 pt-2 pr-2">
+      <div className="hud-hand-cards flex-1 min-w-0" aria-label={`Tu mano: ${totalCards} cartas`}>
         {resourceKeys.map((resKey) => {
           const count = resources[resKey] || 0;
           return (
-            <div key={`${resKey}-${count}`} className={count > 0 ? 'animate-res-bump' : ''}>
-              <ResourceCard type={resKey} count={count} size="md" />
+            <div key={`${resKey}-${count}`} className={`min-w-0 ${count > 0 ? 'animate-res-bump' : ''}`}>
+              <ResourceCard type={resKey} count={count} size="hand" />
             </div>
           );
         })}

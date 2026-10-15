@@ -30,7 +30,7 @@ export function StealModal({ isOpen, onClose }) {
               <button
                 type="button"
                 onClick={() => stealCard(pid)}
-                className="w-full flex items-center justify-between gap-3 py-3 px-1 hover:bg-ink/5 transition-colors cursor-pointer group"
+                className="w-full min-h-[52px] flex items-center justify-between gap-2 min-[360px]:gap-3 py-2.5 px-1 hover:bg-ink/5 transition-colors cursor-pointer group"
               >
                 <span className="flex items-center gap-3 min-w-0">
                   <span
@@ -41,10 +41,10 @@ export function StealModal({ isOpen, onClose }) {
                   </span>
                   <span className="font-bold text-[15px] text-ink truncate">{player.name}</span>
                 </span>
-                <span className="flex items-center gap-3 shrink-0">
+                <span className="flex items-center gap-2 min-[360px]:gap-3 shrink-0">
                   <span className="inline-flex items-center gap-1 text-[13px] text-ink-faint">
                     <CardsIcon className="w-4 h-4" />
-                    {totalCards} cartas
+                    {totalCards}<span className="max-[359px]:sr-only"> cartas</span>
                   </span>
                   <span className="btn btn-primary px-3 py-1 text-[13px]">Robar</span>
                 </span>

@@ -145,52 +145,93 @@ export function TradeModal({ isOpen, onClose }) {
     );
   };
 
+  const renderStepper = (col, res) => (
+    <span className="flex items-center gap-1 min-[360px]:gap-1.5 shrink-0">
+      <button
+        type="button"
+        onClick={() => col.onChange(res, -1)}
+        className="stepper"
+        aria-label={`${col.title}: menos ${RESOURCE_NAMES[res]}`}
+      >
+        <MinusIcon className="w-3.5 h-3.5" />
+      </button>
+      <span className="font-serif font-extrabold text-lg w-6 text-center text-ink tabular-nums">{col.values[res] || 0}</span>
+      <button
+        type="button"
+        onClick={() => col.onChange(res, 1)}
+        className="stepper"
+        aria-label={`${col.title}: más ${RESOURCE_NAMES[res]}`}
+      >
+        <PlusIcon className="w-3.5 h-3.5" />
+      </button>
+    </span>
+  );
+
   const renderSteppers = (cols) => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-5">
+    <>
+      {/* Phones: one row per resource, both sides next to each other */}
+      <table className="sm:hidden w-full mb-1 border-collapse">
+        <thead>
+          <tr>
+            <th className="w-full" />
             {cols.map((col) => (
-              <div key={col.title}>
-                <div className="label-caps mb-1">{col.title}</div>
-                <ul className="border-t border-ink/15">
-                  {resourceList.map((res) => (
-                    <li key={res} className="flex items-center justify-between gap-2 py-1.5 border-b border-ink/15">
-                      <span className="flex items-center gap-2 text-[14px] font-semibold">
-                        <ResourceChip type={res} />
-                        <span>{RESOURCE_NAMES[res]}</span>
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => col.onChange(res, -1)}
-                          className="stepper !w-7 !h-7"
-                          aria-label={`Menos ${RESOURCE_NAMES[res]}`}
-                        >
-                          <MinusIcon className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="font-serif font-extrabold text-lg w-6 text-center text-ink">{col.values[res] || 0}</span>
-                        <button
-                          type="button"
-                          onClick={() => col.onChange(res, 1)}
-                          className="stepper !w-7 !h-7"
-                          aria-label={`Más ${RESOURCE_NAMES[res]}`}
-                        >
-                          <PlusIcon className="w-3.5 h-3.5" />
-                        </button>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <th key={col.title} className="label-caps !text-[10px] text-center pb-1 pl-1.5 min-[360px]:pl-2.5 whitespace-nowrap font-bold">
+                {col.title}
+              </th>
             ))}
+          </tr>
+        </thead>
+        <tbody>
+          {resourceList.map((res) => (
+            <tr key={res} className="border-t border-ink/15">
+              <td className="py-1.5 pr-1">
+                <span className="flex items-center gap-1.5 text-[13px] font-semibold min-w-0">
+                  <ResourceChip type={res} className="w-6 h-6" iconClassName="w-4 h-4" />
+                  <span className="max-[359px]:sr-only truncate">{RESOURCE_NAMES[res]}</span>
+                </span>
+              </td>
+              {cols.map((col, i) => (
+                <td
+                  key={col.title}
+                  className={`py-1.5 pl-1.5 min-[360px]:pl-2.5 ${i > 0 ? 'border-l border-dashed border-ink/20' : ''}`}
+                >
+                  {renderStepper(col, res)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Wider screens: one list per side */}
+      <div className="hidden sm:grid grid-cols-2 gap-6 mb-5">
+        {cols.map((col) => (
+          <div key={col.title}>
+            <div className="label-caps mb-1">{col.title}</div>
+            <ul className="border-t border-ink/15">
+              {resourceList.map((res) => (
+                <li key={res} className="flex items-center justify-between gap-2 py-1.5 border-b border-ink/15">
+                  <span className="flex items-center gap-2 text-[14px] font-semibold">
+                    <ResourceChip type={res} />
+                    <span>{RESOURCE_NAMES[res]}</span>
+                  </span>
+                  {renderStepper(col, res)}
+                </li>
+              ))}
+            </ul>
           </div>
+        ))}
+      </div>
+    </>
   );
 
   const tabClass = (isActive) =>
-    `flex-1 flex items-center justify-center gap-2 py-2.5 text-[14px] font-bold border-b-2 transition-colors cursor-pointer ${
+    `flex-1 flex items-center justify-center gap-1.5 sm:gap-2 min-h-[44px] py-2 text-[13px] min-[360px]:text-[14px] font-bold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
       isActive ? 'border-chakra text-ink' : 'border-transparent text-ink-faint hover:text-ink-soft'
     }`;
 
   const optionRow = (isSelected, extra = '') =>
-    `w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-[3px] border text-[14px] font-semibold transition-colors cursor-pointer ${extra} ${
+    `w-full min-h-[40px] flex items-center justify-between gap-2 px-2.5 py-1.5 sm:py-2 rounded-[3px] border text-[14px] font-semibold transition-colors cursor-pointer ${extra} ${
       isSelected
         ? 'bg-paper-light border-shu text-ink shadow-[0_0_0_1px_var(--color-shu)]'
         : 'bg-transparent border-ink/20 text-ink-soft hover:border-ink/40 hover:bg-paper-light/60'
@@ -210,7 +251,7 @@ export function TradeModal({ isOpen, onClose }) {
     >
       {/* Active Trade Banner */}
       {activeTrade && activeTrade.status === 'pending' && (
-        <div className="paper-inset p-4 mb-5 border-l-4 !border-l-chakra">
+        <div className="paper-inset p-3 sm:p-4 mb-4 sm:mb-5 border-l-4 !border-l-chakra">
           <div className="label-caps !text-ink-soft mb-3">
             {isTradeProposer ? 'Tu propuesta activa' : `Propuesta de ${activeTrade.proposerName}`}
           </div>
@@ -259,7 +300,7 @@ export function TradeModal({ isOpen, onClose }) {
                           type="button"
                           disabled={!iCanPay}
                           onClick={() => acceptTrade(pid)}
-                          className="btn btn-primary px-3 py-1 text-[13px]"
+                          className="btn btn-primary min-h-[40px] px-3 py-1 text-[13px]"
                         >
                           {iCanPay ? 'Aceptar contraoferta' : 'No tienes esos recursos'}
                         </button>
@@ -269,7 +310,7 @@ export function TradeModal({ isOpen, onClose }) {
                   return (
                     <li
                       key={pid}
-                      className="flex items-center justify-between gap-2 py-2 border-b border-ink/15 text-[14px]"
+                      className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-ink/15 text-[14px]"
                     >
                       <span>
                         {pName}:{' '}
@@ -281,7 +322,7 @@ export function TradeModal({ isOpen, onClose }) {
                         <button
                           type="button"
                           onClick={() => acceptTrade(pid)}
-                          className="btn btn-leaf px-3 py-1 text-[13px]"
+                          className="btn btn-leaf min-h-[40px] px-3 py-1 text-[13px]"
                         >
                           Comerciar con {pName}
                         </button>
@@ -291,7 +332,7 @@ export function TradeModal({ isOpen, onClose }) {
                 })}
               </ul>
 
-              <button type="button" onClick={cancelTrade} className="btn btn-ghost px-3 py-1.5 text-[13px] !text-shu !border-shu/50">
+              <button type="button" onClick={cancelTrade} className="btn btn-ghost min-h-[40px] px-3 py-1.5 text-[13px] !text-shu !border-shu/50">
                 Cancelar propuesta
               </button>
             </div>
@@ -316,26 +357,26 @@ export function TradeModal({ isOpen, onClose }) {
                     { title: 'Tú das', values: counterGive, onChange: changeCounterGive },
                     { title: 'Tú pides', values: counterGet, onChange: changeCounterGet },
                   ])}
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" disabled={!canSendCounter} onClick={sendCounter} className="btn btn-primary px-4 py-2 text-[14px]">
+                  <div className="inset-sticky flex gap-2">
+                    <button type="button" disabled={!canSendCounter} onClick={sendCounter} className="btn btn-primary flex-1 sm:flex-none min-h-[44px] px-3 min-[360px]:px-4 py-2 text-[13px] min-[360px]:text-[14px]">
                       Enviar contraoferta
                     </button>
-                    <button type="button" onClick={() => setCounterOpen(false)} className="btn btn-ghost px-4 py-2 text-[14px]">
+                    <button type="button" onClick={() => setCounterOpen(false)} className="btn btn-ghost min-h-[44px] px-3 min-[360px]:px-4 py-2 text-[13px] min-[360px]:text-[14px]">
                       Volver
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => respondToTrade('accept')} className="btn btn-leaf px-4 py-2 text-[14px]">
+                  <button type="button" onClick={() => respondToTrade('accept')} className="btn btn-leaf min-h-[44px] px-4 py-2 text-[14px]">
                     <CheckIcon className="w-4 h-4" />
                     Aceptar e intercambiar
                   </button>
-                  <button type="button" onClick={() => respondToTrade('reject')} className="btn btn-ghost px-4 py-2 text-[14px]">
+                  <button type="button" onClick={() => respondToTrade('reject')} className="btn btn-ghost min-h-[44px] px-4 py-2 text-[14px]">
                     <CloseIcon className="w-4 h-4" />
                     Rechazar
                   </button>
-                  <button type="button" onClick={openCounter} className="btn btn-ghost px-4 py-2 text-[14px]">
+                  <button type="button" onClick={openCounter} className="btn btn-ghost min-h-[44px] px-4 py-2 text-[14px]">
                     <TradeIcon className="w-4 h-4" />
                     {myResponse === 'counter' ? 'Cambiar contraoferta' : 'Contraoferta'}
                   </button>
@@ -349,7 +390,7 @@ export function TradeModal({ isOpen, onClose }) {
       )}
 
       {/* Tabs */}
-      <div className="flex mb-5 border-b border-ink/15" role="tablist">
+      <div className="flex mb-4 sm:mb-5 border-b border-ink/15" role="tablist">
         <button
           type="button"
           role="tab"
@@ -374,7 +415,7 @@ export function TradeModal({ isOpen, onClose }) {
 
       {tradeType === 'bank' ? (
         <div>
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-4 mb-5 items-start">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-4 mb-1 sm:mb-5 items-start">
             {/* Give */}
             <div>
               <div className="label-caps mb-2">Entregas (según tu puerto)</div>
@@ -440,6 +481,7 @@ export function TradeModal({ isOpen, onClose }) {
             </div>
           </div>
 
+          <div className="sheet-sticky">
           <button
             type="button"
             disabled={!canAffordBankTrade}
@@ -450,6 +492,7 @@ export function TradeModal({ isOpen, onClose }) {
               ? `Intercambiar ${giveRatio} ${RESOURCE_NAMES[bankGive]} por 1 ${RESOURCE_NAMES[bankReceive]}`
               : `Necesitas ${giveRatio} ${RESOURCE_NAMES[bankGive]} (tienes ${myResources[bankGive] || 0})`}
           </button>
+          </div>
         </div>
       ) : (
         /* Player to Player Trade */
@@ -459,6 +502,7 @@ export function TradeModal({ isOpen, onClose }) {
             { title: 'Tú pides', values: requesting, onChange: handleRequestChange },
           ])}
 
+          <div className="sheet-sticky">
           <button
             type="button"
             disabled={!canPropose}
@@ -467,6 +511,7 @@ export function TradeModal({ isOpen, onClose }) {
           >
             {canPropose ? 'Enviar propuesta a los ninjas' : 'Selecciona recursos para ofrecer y pedir'}
           </button>
+          </div>
         </div>
       )}
     </Modal>

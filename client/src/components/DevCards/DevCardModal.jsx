@@ -81,7 +81,7 @@ export function DevCardModal({ isOpen, onClose }) {
       }
     >
       {/* Buy card */}
-      <div className="paper-inset flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3.5 mb-5">
+      <div className="paper-inset flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 min-[360px]:p-3.5 mb-4 sm:mb-5">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="relative w-11 h-14 shrink-0 rounded-[3px] bg-ink border border-ink shadow-[2px_2px_0_#c4aa7e] flex items-center justify-center">
             <div className="absolute inset-1 border border-chakra/60 rounded-[2px]" />
@@ -102,7 +102,7 @@ export function DevCardModal({ isOpen, onClose }) {
           disabled={!canBuyNow || !canAffordBuy || cardsInDeck === 0}
           title={!canBuyNow && gameState?.phase === 'rollDice' ? 'Primero tira los dados para comprar' : undefined}
           onClick={buyDevCard}
-          className="btn btn-primary px-4 py-2.5 text-[13px] shrink-0"
+          className="btn btn-primary min-h-[44px] px-4 py-2.5 text-[13px] shrink-0"
         >
           {canAffordBuy ? 'Comprar carta' : 'Recursos insuficientes'}
         </button>
@@ -136,7 +136,7 @@ export function DevCardModal({ isOpen, onClose }) {
                 <div
                   key={`${card}-${idx}`}
                   onClick={() => setSelectedCard(isSelected ? null : idx)}
-                  className={`relative flex gap-3 p-3 rounded-[4px] border bg-paper-light cursor-pointer transition-all ${
+                  className={`relative flex gap-2.5 min-[360px]:gap-3 p-2.5 min-[360px]:p-3 rounded-[4px] border bg-paper-light cursor-pointer transition-all ${
                     isSelected
                       ? 'border-shu shadow-[0_0_0_1px_var(--color-shu),0_6px_14px_-6px_rgba(0,0,0,0.4)]'
                       : 'border-paper-edge shadow-[0_2px_0_rgba(196,170,126,0.8)] hover:-translate-y-0.5'
@@ -218,7 +218,7 @@ export function DevCardModal({ isOpen, onClose }) {
                             e.stopPropagation();
                             handlePlay(card);
                           }}
-                          className="btn btn-primary w-full py-1.5 text-[13px]"
+                          className="btn btn-primary w-full min-h-[42px] py-1.5 text-[13px]"
                         >
                           Jugar carta ahora
                         </button>

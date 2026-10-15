@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SocketProvider } from './context/SocketContext';
 import { GameProvider, useGame } from './context/GameContext';
 import { PHASE } from './utils/constants';
@@ -22,11 +22,49 @@ import { GameOverModal } from './components/GameOver/GameOverModal';
 import { ProductionModal } from './components/HUD/ProductionModal';
 import { EndGameModal } from './components/HUD/EndGameModal';
 import { ToastContainer } from './components/Shared/Toast';
+import { PwaLayer } from './components/Shared/Pwa';
 import { CloseIcon, ScrollIcon } from './components/Shared/Icons';
+
+/**
+ * Keeps two CSS variables in sync with the part of the page that is really
+ * visible (iOS shrinks it when the keyboard opens), so the phone drawer and
+ * its chat box stay above the keyboard; html[data-kb] marks an open keyboard.
+ * Also blocks Safari's page pinch-zoom on the game screen (the board has its
+ * own zoom).
+ */
+function useGameViewport(active) {
+  useEffect(() => {
+    if (!active) return undefined;
+    const root = document.documentElement;
+    const vv = window.visualViewport;
+    const update = () => {
+      if (!vv) return;
+      root.style.setProperty('--vv-h', `${Math.round(vv.height)}px`);
+      root.style.setProperty('--vv-top', `${Math.round(vv.offsetTop)}px`);
+      const keyboard = vv.scale < 1.05 && window.innerHeight - vv.height > 140;
+      root.toggleAttribute('data-kb', keyboard);
+    };
+    const stopZoom = (e) => e.preventDefault();
+    update();
+    vv?.addEventListener('resize', update);
+    vv?.addEventListener('scroll', update);
+    document.addEventListener('gesturestart', stopZoom);
+    return () => {
+      vv?.removeEventListener('resize', update);
+      vv?.removeEventListener('scroll', update);
+      document.removeEventListener('gesturestart', stopZoom);
+      root.style.removeProperty('--vv-h');
+      root.style.removeProperty('--vv-top');
+      root.removeAttribute('data-kb');
+    };
+  }, [active]);
+}
 
 function GameContent() {
   const { gameState, activeModal, setActiveModal } = useGame();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const inGame = !!gameState && gameState.phase !== PHASE.LOBBY;
+  useGameViewport(inGame);
 
   // If not joined any room yet
   if (!gameState) {
@@ -40,14 +78,14 @@ function GameContent() {
 
   // Active game (Setup, Main, Robber, Game Over)
   return (
-    <div className="night-surface relative h-dvh w-screen flex flex-col overflow-hidden text-ink font-sans">
+    <div className="game-ui game-shell night-surface relative h-dvh w-full overflow-hidden text-ink font-sans">
       {/* Top Header */}
       <GameHeader />
 
       {/* Main Content Area */}
-      <div className="relative flex-1 flex overflow-hidden min-h-0">
+      <div className="hud-main relative flex overflow-hidden min-h-0 min-w-0">
         {/* Center SVG Board Area */}
-        <main className="relative flex-1 h-full w-full flex items-center justify-center overflow-hidden">
+        <main className="relative flex-1 h-full w-full min-w-0 flex items-center justify-center overflow-hidden">
           <BoardView />
           {/* Dice throw seen by every player (over the 2D or 3D board, never clickable) */}
           <DiceOverlay />
@@ -56,8 +94,9 @@ function GameContent() {
           <button
             type="button"
             onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-            className="md:hidden absolute top-3 right-3 z-20 btn paper px-2.5 py-1.5 text-xs border border-ink/70 shadow-[0_4px_10px_rgba(0,0,0,0.45)]"
+            className="hidden compact:inline-flex absolute top-2 sm:top-3 right-[max(0.5rem,env(safe-area-inset-right))] sm:right-[max(0.75rem,env(safe-area-inset-right))] z-20 btn paper min-h-[40px] px-2.5 py-1.5 text-xs border border-ink/70 shadow-[0_4px_10px_rgba(0,0,0,0.45)]"
             aria-expanded={mobileSidebarOpen}
+            aria-controls="game-sidebar"
           >
             {mobileSidebarOpen ? <CloseIcon className="w-4 h-4" /> : <ScrollIcon className="w-4 h-4" />}
             <span>{mobileSidebarOpen ? 'Cerrar' : 'Registro'}</span>
@@ -67,7 +106,7 @@ function GameContent() {
         {/* Mobile scrim */}
         {mobileSidebarOpen && (
           <div
-            className="md:hidden fixed inset-0 top-14 z-20 bg-night-dark/50 animate-fade-in"
+            className="hidden compact:block fixed inset-0 z-40 bg-night-dark/55 animate-fade-in"
             onClick={() => setMobileSidebarOpen(false)}
             aria-hidden="true"
           />
@@ -75,14 +114,15 @@ function GameContent() {
 
         {/* Right Sidebar: Standings & Live Log/Chat */}
         <aside
-          className={`paper fixed top-14 bottom-0 right-0 z-30 md:static md:inset-auto w-80 max-w-[88vw] flex flex-col border-l-[3px] border-ink shadow-[-10px_0_24px_-10px_rgba(0,0,0,0.7)] transition-transform duration-300 ease-out ${
-            mobileSidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
+          id="game-sidebar"
+          className={`hud-drawer paper relative z-30 w-80 shrink-0 flex flex-col border-l-[3px] border-ink shadow-[-10px_0_24px_-10px_rgba(0,0,0,0.7)] ${
+            mobileSidebarOpen ? 'is-open' : ''
           }`}
         >
           <button
             type="button"
             onClick={() => setMobileSidebarOpen(false)}
-            className="md:hidden absolute top-3 right-3 z-10 p-1.5 rounded-full text-ink-faint hover:text-ink hover:bg-ink/5"
+            className="hidden compact:flex absolute top-[calc(env(safe-area-inset-top)+0.4rem)] right-[calc(env(safe-area-inset-right)+0.4rem)] z-10 w-10 h-10 items-center justify-center rounded-full text-ink-faint hover:text-ink hover:bg-ink/5"
             aria-label="Cerrar"
           >
             <CloseIcon className="w-5 h-5" />
@@ -93,15 +133,17 @@ function GameContent() {
       </div>
 
       {/* Bottom rail: hand of cards, dice, build actions */}
-      <footer className="night-rail relative z-20 shrink-0 shadow-[0_-8px_20px_-8px_rgba(0,0,0,0.8)] px-3 sm:px-5 pt-3.5 pb-[max(0.6rem,env(safe-area-inset-bottom))] md:pt-3 md:pb-2.5">
-        <div className="absolute inset-x-0 top-0 h-[3px] bg-chakra" aria-hidden="true" />
-        <div className="absolute inset-x-0 top-[3px] h-px bg-black/70" aria-hidden="true" />
-        <div className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-2.5 md:gap-4">
-          <div className="flex-1 min-w-0">
+      <footer className="hud-foot night-rail safe-x [--pad-x:0.5rem] min-[360px]:[--pad-x:0.75rem] sm:[--pad-x:1.25rem] relative z-20 min-w-0 shadow-[0_-8px_20px_-8px_rgba(0,0,0,0.8)] pt-2.5 pb-[max(0.6rem,env(safe-area-inset-bottom))] md:pt-3 md:pb-[max(0.6rem,env(safe-area-inset-bottom))]">
+        <div className="hud-foot-stripe absolute inset-x-0 top-0 h-[3px] bg-chakra" aria-hidden="true" />
+        <div className="hud-foot-stripe hud-foot-stripe-line absolute inset-x-0 top-[3px] h-px bg-black/70" aria-hidden="true" />
+        <div className="hud-foot-grid">
+          <div className="hud-hand">
             <ResourceBar />
           </div>
-          <DiceRoll />
-          <div className="w-full md:w-auto overflow-x-auto md:overflow-visible">
+          <div className="hud-dice">
+            <DiceRoll />
+          </div>
+          <div className="hud-actions">
             <ActionPanel />
           </div>
         </div>
@@ -143,6 +185,7 @@ export default function App() {
       <GameProvider>
         <GameContent />
         <ToastContainer />
+        <PwaLayer />
       </GameProvider>
     </SocketProvider>
   );

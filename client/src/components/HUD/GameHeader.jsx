@@ -56,7 +56,7 @@ export function GameHeader() {
   const endVotePending = endVotes.length > 0 && !iVotedEnd;
 
   return (
-    <header className="night-rail relative h-14 px-3 sm:px-5 flex items-center justify-between gap-3 z-20 shrink-0 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.8)]">
+    <header className="hud-head night-rail safe-x [--pad-x:0.6rem] min-[360px]:[--pad-x:0.75rem] sm:[--pad-x:1.25rem] relative h-[calc(3rem+env(safe-area-inset-top))] sm:h-[calc(3.5rem+env(safe-area-inset-top))] phland:h-[calc(2.75rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] flex items-center justify-between gap-2 sm:gap-3 z-20 shrink-0 min-w-0 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.8)]">
       {/* Headband stripe */}
       <div className="absolute inset-x-0 bottom-0 h-[3px] bg-chakra" aria-hidden="true" />
       <div className="absolute inset-x-0 bottom-[3px] h-px bg-black/70" aria-hidden="true" />
@@ -76,10 +76,10 @@ export function GameHeader() {
       )}
 
       {/* Brand & Room Info */}
-      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0 shrink-0">
         <div className="flex items-center gap-2.5 shrink-0">
-          <BrandPlate className="w-9 h-6" />
-          <span className="hidden min-[440px]:inline font-display text-[22px] leading-none text-paper-light whitespace-nowrap">
+          <BrandPlate className="w-8 h-[21px] sm:w-9 sm:h-6" />
+          <span className="hidden min-[440px]:inline phland:hidden lg:inline font-display text-[22px] leading-none text-paper-light whitespace-nowrap">
             Catán <span className="text-chakra-light">Shinobi</span>
           </span>
         </div>
@@ -92,11 +92,11 @@ export function GameHeader() {
       </div>
 
       {/* Turn & Status info */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="flex items-center justify-end gap-1.5 min-[360px]:gap-2 sm:gap-3 min-w-0">
         {pillPlayer && (
           <div
             title={isSpecialBuild ? 'Fase especial de construcción' : undefined}
-            className={`flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border min-w-0 transition-colors ${
+            className={`flex items-center gap-1.5 min-[360px]:gap-2 pl-1 pr-2.5 min-[360px]:pr-3 py-1 phland:py-0.5 rounded-full border min-w-0 transition-colors ${
               pillMine
                 ? 'pill-mine bg-gradient-to-b from-chakra-light to-chakra text-ink border-paper-light'
                 : 'bg-black/30 text-paper/85 border-paper/15'
@@ -115,7 +115,7 @@ export function GameHeader() {
             </span>
             {secondsLeft !== null && (
               <span
-                className={`flex items-center gap-1 pl-2 border-l font-serif font-extrabold text-[15px] tabular-nums shrink-0 ${
+                className={`flex items-center gap-1 pl-1.5 min-[360px]:pl-2 border-l font-serif font-extrabold text-[15px] tabular-nums shrink-0 ${
                   pillMine ? 'border-ink/30' : 'border-paper/20'
                 } ${
                   lowTime
@@ -143,7 +143,7 @@ export function GameHeader() {
         <button
           type="button"
           onClick={() => setActiveModal('endGame')}
-          className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-[3px] border text-[12px] font-bold transition-colors cursor-pointer ${
+          className={`flex items-center justify-center gap-1.5 min-h-[36px] min-w-[36px] shrink-0 px-2 sm:px-2.5 py-1 rounded-[3px] border text-[12px] font-bold transition-colors cursor-pointer ${
             endVotePending
               ? 'border-chakra bg-chakra/20 text-chakra-light animate-turn-pulse'
               : 'border-paper/20 text-paper/70 hover:text-paper-light hover:border-paper/45'
@@ -160,8 +160,10 @@ export function GameHeader() {
 
         {/* Connection status */}
         <div
-          className="flex items-center gap-1.5 text-xs"
+          className="flex items-center gap-1.5 text-xs shrink-0"
           title={connected ? 'Conectado al servidor' : 'Desconectado'}
+          role="status"
+          aria-label={connected ? 'Conectado al servidor' : 'Desconectado'}
         >
           <span
             className={`w-2 h-2 rounded-full ring-2 ring-black/40 ${

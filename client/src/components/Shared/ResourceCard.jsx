@@ -6,6 +6,8 @@ const SIZES = {
   lg: { card: 'w-[60px] h-[84px]', icon: 'w-8 h-8', name: 'text-[10px] tracking-[0.08em]' },
   md: { card: 'w-[44px] h-[62px] sm:w-[52px] sm:h-[72px]', icon: 'w-6 h-6 sm:w-7 sm:h-7', name: 'text-[8px] sm:text-[9px] tracking-[0.02em] sm:tracking-[0.08em]' },
   sm: { card: 'w-[38px] h-[52px]', icon: 'w-5 h-5', name: 'text-[8px] tracking-[0.02em]' },
+  // Hand in the HUD: sized by CSS (index.css) so it can shrink to fit any phone
+  hand: { card: 'res-card-hand', icon: 'w-[clamp(18px,6vw,28px)] h-[clamp(18px,6vw,28px)]', name: 'text-[clamp(7.5px,2.2vw,9px)] tracking-[0.02em] sm:tracking-[0.08em]' },
 };
 
 /**
@@ -22,11 +24,11 @@ export function ResourceCard({ type, count, size = 'md', showName = true, classN
     >
       <div className={`res-card-art res-bg-${type}`}>
         {size !== 'sm' && <span className="res-kanji" aria-hidden="true">{RESOURCE_KANJI[type]}</span>}
-        <ResourceIcon type={type} className={`${s.icon} relative drop-shadow-[0_1px_0_rgba(0,0,0,0.35)]`} />
+        <ResourceIcon type={type} className={`res-card-icon ${s.icon} relative drop-shadow-[0_1px_0_rgba(0,0,0,0.35)]`} />
       </div>
       {showName && (
         <div
-          className={`${s.name} pt-[3px] pb-[1px] text-center font-bold uppercase text-ink leading-none overflow-hidden whitespace-nowrap`}
+          className={`res-card-name ${s.name} pt-[3px] pb-[1px] text-center font-bold uppercase text-ink leading-none overflow-hidden whitespace-nowrap`}
         >
           {RESOURCE_NAMES[type]}
         </div>

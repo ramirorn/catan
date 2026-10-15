@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="44%" r="70%">
+      <stop offset="0" stop-color="#24314b"/>
+      <stop offset="0.55" stop-color="#141c2c"/>
+      <stop offset="1" stop-color="#0b101b"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#e2711d" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#e2711d" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="disc" cx="40%" cy="35%" r="75%">
+      <stop offset="0" stop-color="#f6a04b"/>
+      <stop offset="0.6" stop-color="#e2711d"/>
+      <stop offset="1" stop-color="#a94f0c"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#sky)"/>
+  <circle cx="256" cy="256" r="243.6" fill="url(#glow)"/>
+  <circle cx="256" cy="256" r="178" fill="none" stroke="#f1e9d6" stroke-opacity="0.18" stroke-width="3"/>
+  <circle cx="256" cy="256" r="168" fill="url(#disc)" stroke="#1f1b17" stroke-width="9"/>
+  <g transform="rotate(20 256 256)">
+    <polygon points="256.00,111.52 279.76,232.24 400.48,256.00 279.76,279.76 256.00,400.48 232.24,279.76 111.52,256.00 232.24,232.24" fill="#1f1b17"/>
+  </g>
+  <circle cx="256" cy="256" r="28.560000000000002" fill="#e2711d" stroke="#1f1b17" stroke-width="4"/>
+  <circle cx="256" cy="256" r="11.760000000000002" fill="#1f1b17"/>
+  <g transform="rotate(-8 360.15999999999997 360.15999999999997)">
+    <rect x="314.15999999999997" y="314.15999999999997" width="92" height="92" rx="10" fill="#b6331f" stroke="#1f1b17" stroke-width="5"/>
+    <rect x="323.15999999999997" y="323.15999999999997" width="74" height="74" rx="4" fill="none" stroke="#f1e9d6" stroke-width="4"/>
+    <path d="M339.91999999999996 349.11999999999995 H380.4 M360.15999999999997 338.08 V382.23999999999995 M341.76 371.2 L378.55999999999995 371.2" stroke="#f1e9d6" stroke-width="7" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

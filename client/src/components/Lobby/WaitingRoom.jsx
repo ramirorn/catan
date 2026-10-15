@@ -25,39 +25,39 @@ export function WaitingRoom() {
 
   return (
     <div className="night-surface relative h-dvh w-full overflow-hidden">
-      <div className="h-full w-full flex flex-col items-center justify-center px-4 py-4 sm:py-6">
-        <div className="flex items-center gap-3 mb-3 sm:mb-4 shrink-0">
-          <BrandPlate className="w-12 h-8" />
-          <span className="font-display text-[30px] sm:text-[36px] leading-none text-paper-light drop-shadow-[0_2px_0_rgba(0,0,0,0.5)]">
+      <div className="h-full w-full flex flex-col items-center justify-center safe-x [--pad-x:0.75rem] min-[360px]:[--pad-x:1rem] pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-[max(1.5rem,env(safe-area-inset-top))] sm:pb-[max(1.5rem,env(safe-area-inset-bottom))] phland:pt-[max(0.6rem,env(safe-area-inset-top))] phland:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex items-center gap-3 mb-3 sm:mb-4 shrink-0 tiny:mb-2 phland:hidden">
+          <BrandPlate className="w-12 h-8 tiny:w-10 tiny:h-[27px]" />
+          <span className="font-display text-[30px] tiny:text-[26px] sm:text-[36px] leading-none text-paper-light drop-shadow-[0_2px_0_rgba(0,0,0,0.5)]">
             Catán <span className="text-chakra">Shinobi</span>
           </span>
         </div>
 
-        <ScrollPanel className="animate-modal-pop w-full max-w-lg md:max-w-3xl min-h-0 flex flex-col" bodyClassName="px-5 sm:px-8 pt-5 pb-5 min-h-0 flex flex-col md:grid md:grid-cols-2 md:grid-rows-[auto_1fr] md:gap-x-8">
-          <div className="shrink-0 md:col-start-1 md:row-start-1">
+        <ScrollPanel className="animate-modal-pop w-full max-w-lg md:max-w-3xl phland:max-w-3xl min-h-0 flex flex-col" bodyClassName="px-4 min-[360px]:px-5 sm:px-8 pt-5 tiny:pt-4 pb-5 tiny:pb-4 phland:pt-3 phland:pb-3.5 min-h-0 overflow-y-auto flex flex-col md:grid md:grid-cols-2 md:grid-rows-[auto_1fr] md:gap-x-8 phland:grid phland:grid-cols-2 phland:grid-rows-[auto_1fr] phland:gap-x-6">
+          <div className="shrink-0 md:col-start-1 md:row-start-1 phland:col-start-1 phland:row-start-1">
           <p className="label-caps">Sala de reunión</p>
-          <h2 className="font-display text-[26px] sm:text-[30px] leading-tight text-ink mt-0.5">
+          <h2 className="font-display text-[23px] min-[360px]:text-[26px] sm:text-[30px] tiny:text-[22px] phland:text-[22px] leading-tight text-ink mt-0.5">
             Reuniendo al escuadrón
           </h2>
 
           {/* Room Code */}
-          <div className="mt-3 mb-4 flex items-center justify-between gap-4 px-4 py-2.5 shrink-0 border-y-2 border-double border-ink/40 bg-paper-deep/30">
-            <div>
+          <div className="mt-3 mb-4 tiny:mt-2 tiny:mb-3 phland:mt-2 phland:mb-2.5 flex items-center justify-between gap-2 min-[360px]:gap-4 px-3 min-[360px]:px-4 py-2.5 tiny:py-2 phland:py-1.5 shrink-0 border-y-2 border-double border-ink/40 bg-paper-deep/30">
+            <div className="min-w-0">
               <div className="text-[12px] text-ink-faint">Comparte este código de sala</div>
-              <div className="inline-block font-serif font-extrabold text-[28px] sm:text-[32px] leading-none tracking-[0.22em] text-shu mt-1.5 px-2 py-1 border-2 border-shu rounded-[3px] -rotate-1">
+              <div className="inline-block font-serif font-extrabold text-[24px] min-[360px]:text-[28px] sm:text-[32px] phland:text-[26px] leading-none tracking-[0.16em] min-[360px]:tracking-[0.22em] text-shu mt-1.5 px-2 py-1 border-2 border-shu rounded-[3px] -rotate-1">
                 {gameState.roomId}
               </div>
             </div>
-            <button type="button" onClick={copyRoomCode} className="btn btn-ghost px-3 py-2 text-[13px] shrink-0">
+            <button type="button" onClick={copyRoomCode} className="btn btn-ghost min-h-[44px] min-w-[44px] px-3 py-2 text-[13px] shrink-0" title="Copiar código" aria-label="Copiar código de sala">
               <CopyIcon className="w-4 h-4" />
-              <span>Copiar</span>
+              <span className="max-[359px]:hidden phland:max-[760px]:hidden">Copiar</span>
             </button>
           </div>
 
           {/* Room rules: the host can still change them; the others see them */}
           <RoomRules
             idPrefix="room"
-            className="mb-4"
+            className="mb-4 tiny:mb-3 phland:mb-2"
             readOnly={!isHost}
             vpToWin={gameState.vpToWin}
             turnTimeLimit={gameState.turnTimeLimit}
@@ -66,7 +66,7 @@ export function WaitingRoom() {
           </div>
 
           {/* Settlers List */}
-          <div className="mb-4 md:mb-0 min-h-0 flex flex-col md:col-start-2 md:row-start-1 md:row-span-2 md:pt-1">
+          <div className="mb-4 tiny:mb-3 md:mb-0 phland:mb-0 min-h-[7.5rem] flex flex-col md:col-start-2 md:row-start-1 md:row-span-2 md:pt-1 phland:col-start-2 phland:row-start-1 phland:row-span-2 phland:min-h-0">
             <div className="flex items-baseline justify-between mb-1 shrink-0">
               <span className="label-caps">Ninjas conectados</span>
               <span className="font-serif font-extrabold text-lg text-ink">
@@ -81,7 +81,7 @@ export function WaitingRoom() {
                 const isMe = p.id === myPlayerId;
 
                 return (
-                  <li key={p.id} className="flex items-center justify-between gap-3 py-2 border-b border-ink/15">
+                  <li key={p.id} className="flex items-center justify-between gap-3 py-2 short:py-1.5 phland:py-1.5 border-b border-ink/15">
                     <div className="flex items-center gap-3 min-w-0">
                       <span
                         className="w-7 h-7 rounded-[3px] flex items-center justify-center shrink-0 shadow-[inset_0_-2px_0_rgba(0,0,0,0.25)]"
@@ -105,7 +105,7 @@ export function WaitingRoom() {
                 );
               })}
               {Array.from({ length: emptySlots }, (_, i) => (
-                <li key={`empty-${i}`} className="flex items-center gap-3 py-2 border-b border-ink/15">
+                <li key={`empty-${i}`} className="flex items-center gap-3 py-2 short:py-1.5 phland:py-1.5 border-b border-ink/15">
                   <span className="w-7 h-7 rounded-[3px] border border-dashed border-ink/30 shrink-0" />
                   <span className="text-[14px] italic text-ink-faint">Plaza libre</span>
                 </li>
@@ -115,23 +115,23 @@ export function WaitingRoom() {
 
           {/* Start / Waiting Action */}
           {isHost ? (
-            <div className="shrink-0 md:col-start-1 md:row-start-2 md:self-end">
+            <div className="shrink-0 md:col-start-1 md:row-start-2 md:self-end phland:col-start-1 phland:row-start-2 phland:self-end">
               <button
                 type="button"
                 onClick={startGame}
                 disabled={!canStart}
-                className="btn btn-primary w-full py-3 text-[15px]"
+                className="btn btn-primary w-full min-h-[44px] py-3 phland:py-2.5 text-[15px]"
               >
                 {canStart ? 'Comenzar la misión' : 'Esperando más ninjas (mínimo 2)…'}
               </button>
               {!canStart && (
-                <p className="text-center text-[13px] italic text-ink-faint mt-2">
+                <p className="text-center text-[13px] italic text-ink-faint mt-2 tiny:hidden phland:text-[12px] phland:mt-1.5">
                   ¡Comparte el código con un amigo o abre otra ventana del navegador para jugar!
                 </p>
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-2 py-2 text-[14px] italic text-ink-soft shrink-0 md:col-start-1 md:row-start-2 md:self-end">
+            <div className="flex items-center justify-center gap-2 py-2 text-[14px] italic text-ink-soft shrink-0 md:col-start-1 md:row-start-2 md:self-end phland:col-start-1 phland:row-start-2 phland:self-end">
               <HourglassIcon className="w-4 h-4 text-chakra" />
               <span>Esperando a que el anfitrión inicie la partida…</span>
             </div>

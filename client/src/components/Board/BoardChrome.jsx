@@ -102,17 +102,17 @@ export function BoardBanner() {
 
   return (
     <>
-      <div className="absolute top-3 sm:top-4 left-3 md:left-1/2 md:-translate-x-1/2 z-10 pointer-events-none w-max max-w-[calc(100%-8.5rem)] md:max-w-[calc(100%-2rem)]">
+      <div className="absolute top-2 sm:top-4 left-[max(0.5rem,env(safe-area-inset-left))] sm:left-3 md:left-1/2 md:-translate-x-1/2 compact:left-[max(0.5rem,env(safe-area-inset-left))] compact:translate-x-0 sm:compact:left-3 z-10 pointer-events-none w-max max-w-[calc(100%-7.5rem)] md:max-w-[calc(100%-2rem)] compact:max-w-[calc(100%-7.5rem)] phland:top-2 phland:max-w-[max(11rem,calc(50%-10rem))]">
         <div
           key={bannerText}
-          className="paper animate-fade-in flex items-stretch rounded-[1px] border border-ink/70 shadow-[0_6px_14px_-4px_rgba(0,0,0,0.7)] text-ink text-[13px] sm:text-sm leading-snug overflow-hidden"
+          className="paper animate-fade-in flex items-stretch rounded-[1px] border border-ink/70 shadow-[0_6px_14px_-4px_rgba(0,0,0,0.7)] text-ink text-[12.5px] sm:text-sm phland:text-[12px] leading-snug overflow-hidden"
         >
           <span
             className="w-2 shrink-0 border-r border-ink/40"
             style={{ backgroundColor: turnColor }}
             aria-hidden="true"
           />
-          <span className="flex items-center gap-2 pl-2.5 pr-3.5 py-1.5">
+          <span className="flex items-center gap-2 pl-2 sm:pl-2.5 pr-2.5 sm:pr-3.5 py-1 sm:py-1.5">
             <KunaiIcon className={`w-4 h-4 shrink-0 ${bannerMine ? 'text-shu' : 'text-ink-faint'}`} />
             <span className={bannerMine ? 'font-bold' : 'font-medium text-ink-soft'}>{bannerText}</span>
           </span>
@@ -125,7 +125,7 @@ export function BoardBanner() {
 }
 
 const ZOOM_BTN =
-  'p-2 text-ink hover:bg-chakra/20 hover:text-shu disabled:opacity-35 cursor-pointer disabled:cursor-default';
+  'p-2 coarse:p-2.5 phland:p-2 text-ink hover:bg-chakra/20 hover:text-shu disabled:opacity-35 cursor-pointer disabled:cursor-default';
 
 /** "2D / 3D" switch: the active mode is inked, the other one faint */
 function ViewModeToggle() {
@@ -142,7 +142,7 @@ function ViewModeToggle() {
       type="button"
       onClick={view.toggle}
       disabled={!view.webgl}
-      className="px-1.5 py-1.5 text-[11px] font-black leading-none tracking-tight text-ink hover:bg-chakra/20 disabled:opacity-35 cursor-pointer disabled:cursor-not-allowed border-b border-ink/40 flex flex-col items-center gap-0.5"
+      className="px-1.5 py-1.5 coarse:py-2 phland:py-1.5 text-[11px] font-black leading-none tracking-tight text-ink hover:bg-chakra/20 disabled:opacity-35 cursor-pointer disabled:cursor-not-allowed border-b border-ink/40 flex flex-col items-center gap-0.5"
       title={title}
       aria-label={title}
       aria-pressed={is3D}
@@ -157,7 +157,7 @@ function ViewModeToggle() {
 /** Bottom-right column: [2D/3D] + zoom in / out / fit */
 export function ZoomControls({ zoomIn, zoomOut, reset, canZoomIn = true, canZoomOut = true, canReset = canZoomOut }) {
   return (
-    <div className="absolute bottom-3 right-3 z-10 flex flex-col paper border border-ink/70 rounded-[2px] shadow-[0_4px_10px_rgba(0,0,0,0.55)] overflow-hidden">
+    <div className="absolute bottom-3 right-[max(0.75rem,env(safe-area-inset-right))] phland:bottom-[max(0.5rem,env(safe-area-inset-bottom))] phland:right-[max(0.5rem,env(safe-area-inset-right))] z-10 flex flex-col paper border border-ink/70 rounded-[2px] shadow-[0_4px_10px_rgba(0,0,0,0.55)] overflow-hidden">
       <ViewModeToggle />
       <button type="button" onClick={zoomIn} disabled={!canZoomIn} className={ZOOM_BTN} title="Acercar" aria-label="Acercar">
         <ZoomInIcon className="w-4 h-4" />

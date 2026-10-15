@@ -22,15 +22,15 @@ export function EndGameModal({ isOpen, onClose }) {
       maxWidth="max-w-md"
       actions={
         <>
-          <button type="button" className="btn btn-ghost px-4 py-1.5" onClick={onClose}>
+          <button type="button" className="btn btn-ghost min-h-[42px] px-4 py-1.5" onClick={onClose}>
             Volver
           </button>
           {iVoted ? (
-            <button type="button" className="btn btn-ghost px-4 py-1.5" onClick={() => voteEndGame(false)}>
+            <button type="button" className="btn btn-ghost min-h-[42px] px-4 py-1.5" onClick={() => voteEndGame(false)}>
               Retirar mi voto
             </button>
           ) : (
-            <button type="button" className="btn btn-primary px-4 py-1.5" onClick={() => voteEndGame(true)}>
+            <button type="button" className="btn btn-primary min-h-[42px] px-4 py-1.5" onClick={() => voteEndGame(true)}>
               Votar para terminar
             </button>
           )}
@@ -70,7 +70,7 @@ export function EndGameModal({ isOpen, onClose }) {
               </span>
               {voted ? (
                 <span className="inline-flex items-center gap-1 text-[13px] font-bold text-leaf shrink-0">
-                  <CheckIcon className="w-4 h-4" /> Quiere terminar
+                  <CheckIcon className="w-4 h-4" /> <span className="max-[359px]:hidden">Quiere terminar</span><span className="min-[360px]:hidden">Sí</span>
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[13px] italic text-ink-faint shrink-0">

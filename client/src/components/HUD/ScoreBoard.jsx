@@ -15,10 +15,16 @@ export function ScoreBoard() {
   const players = playerOrder.map((pid) => gameState.players[pid]).filter(Boolean);
 
   return (
-    <section className="px-4 pt-4 pb-3 shrink-0">
-      <div className="flex items-baseline justify-between mb-2 pr-9 md:pr-0">
+    <section className="hud-score px-4 pt-4 phland:pt-3 pb-3 shrink-0">
+      <div className="flex items-baseline justify-between gap-2 mb-2 compact:pr-10">
         <h2 className="font-display text-[23px] leading-none text-ink">Ninjas</h2>
-        <span className="label-caps !text-[10px]">{gameState.vpToWin ?? 10} PV para ganar</span>
+        <span className="label-caps !text-[10px] text-right">
+          {gameState.vpToWin ?? 10} PV para ganar
+          {/* The header hides the room code on phones: show it here */}
+          <span className="hidden compact:block mt-1 !tracking-[0.14em]">
+            Sala <span className="font-serif text-ink">{gameState.roomId}</span>
+          </span>
+        </span>
       </div>
       <hr className="brush-rule mb-1" />
 

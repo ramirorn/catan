@@ -107,14 +107,23 @@ export function CameraRig({ rigRef, center, outline, extent, onFlags, touch }) {
     }
   };
 
-  // New size / board: refit, unless the player has moved the camera
+  // New size / board: refit. If the player has moved the camera, keep their
+  // angle and target but scale the distance with the new fit, so resizing the
+  // window never leaves the board cropped.
+  const prevFit = useRef(fit);
   useEffect(() => {
     const c = controls.current;
     if (!c) return;
     if (!moved.current) {
       camera.position.copy(homePos);
       c.target.copy(homeTarget);
+    } else if (prevFit.current && prevFit.current !== fit) {
+      const offset = camera.position.clone().sub(c.target);
+      const d = THREE.MathUtils.clamp(offset.length() * (fit / prevFit.current), fit * 0.32, fit * 1.3);
+      camera.position.copy(c.target.clone().add(offset.setLength(d)));
     }
+    prevFit.current = fit;
+    anim.current = null;
     camera.near = fit * 0.05;
     camera.far = fit * 6;
     camera.updateProjectionMatrix();

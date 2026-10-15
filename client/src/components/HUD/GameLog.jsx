@@ -17,6 +17,16 @@ export function GameLog() {
     }
   }, [logs, chatMessages, activeTab]);
 
+  // iOS: once the keyboard is up, bring the box into view; on close, undo any
+  // page shift Safari left behind
+  const handleChatFocus = (e) => {
+    const input = e.currentTarget;
+    setTimeout(() => input.scrollIntoView({ block: 'nearest' }), 320);
+  };
+  const handleChatBlur = () => {
+    if (window.scrollY || document.documentElement.scrollTop) window.scrollTo(0, 0);
+  };
+
   const handleSendChat = (e) => {
     e.preventDefault();
     if (!text.trim()) return;
@@ -25,12 +35,12 @@ export function GameLog() {
   };
 
   const tabClass = (isActive) =>
-    `flex-1 flex items-center justify-center gap-1.5 py-2 text-[13px] font-bold border-b-2 transition-colors cursor-pointer ${
+    `flex-1 flex items-center justify-center gap-1.5 min-h-[42px] py-2 text-[13px] font-bold border-b-2 transition-colors cursor-pointer ${
       isActive ? 'border-chakra text-ink' : 'border-transparent text-ink-faint hover:text-ink-soft'
     }`;
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden min-h-0 border-t border-paper-edge">
+    <div className="hud-log flex flex-col flex-1 overflow-hidden min-h-0 border-t border-paper-edge">
       {/* Tab Header */}
       <div className="flex px-3 shrink-0 border-b border-ink/15" role="tablist">
         <button
@@ -100,17 +110,21 @@ export function GameLog() {
       {activeTab === 'chat' && (
         <form
           onSubmit={handleSendChat}
-          className="flex items-center gap-2 px-3 py-2.5 border-t border-paper-edge shrink-0 bg-paper-deep/40"
+          className="flex items-center gap-2 px-3 py-2.5 compact:pb-[max(0.6rem,env(safe-area-inset-bottom))] border-t border-paper-edge shrink-0 bg-paper-deep/40"
         >
           <input
             type="text"
-            className="field !py-1.5 !text-[13px] flex-1"
+            className="field !py-1.5 !text-[13px] coarse:!text-[16px] flex-1 min-w-0"
             placeholder="Escribe un mensaje a los demás ninjas…"
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onFocus={handleChatFocus}
+            onBlur={handleChatBlur}
             maxLength={500}
+            enterKeyHint="send"
+            autoComplete="off"
           />
-          <button type="submit" className="btn btn-primary px-3 py-1.5 text-[13px] shrink-0">
+          <button type="submit" className="btn btn-primary min-h-[40px] px-3 py-1.5 text-[13px] shrink-0">
             Enviar
           </button>
         </form>

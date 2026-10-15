@@ -49,14 +49,16 @@ export function ActionPanel() {
   };
 
   return (
-    <div className="flex items-stretch justify-between md:justify-start gap-1 sm:gap-2 shrink-0 min-w-max">
+    <div className="hud-actions-row">
       <ActionButton
         disabled={!(canBuild || canLayFreeRoads) || !canAffordRoad}
         onClick={() => handleToggleBuild('road')}
         title="Camino: 1 Madera, 1 Arcilla"
         active={buildMode === 'road'}
         icon={<RoadIcon className="w-5 h-5" />}
-        label={`Camino${freeRoads > 0 ? ` (${freeRoads})` : ''}`}
+        label="Camino"
+        badge={freeRoads > 0 ? freeRoads : null}
+        badgeTitle="Caminos gratis"
         cost={freeRoads > 0 ? null : BUILD_COSTS.road}
       />
       <ActionButton
@@ -78,7 +80,7 @@ export function ActionPanel() {
         cost={BUILD_COSTS.city}
       />
 
-      <span className="hidden sm:block w-px self-stretch my-1 bg-paper/15 mx-0.5" aria-hidden="true" />
+      <span className="hud-sep hidden sm:block w-px self-stretch my-1 bg-paper/15 mx-0.5" aria-hidden="true" />
 
       <ActionButton
         disabled={!isMainPhase}
@@ -92,7 +94,9 @@ export function ActionPanel() {
         onClick={() => setActiveModal('devCard')}
         title="Cartas de Desarrollo"
         icon={<CardsIcon className="w-5 h-5" />}
-        label={`Cartas${myPlayer?.devCards?.length ? ` (${myPlayer.devCards.length})` : ''}`}
+        label="Cartas"
+        badge={myPlayer?.devCards?.length || null}
+        badgeTitle="Cartas de desarrollo en mano"
       />
 
       {/* Pasar Turno button */}
@@ -100,10 +104,11 @@ export function ActionPanel() {
         <button
           type="button"
           onClick={endTurn}
-          className="btn btn-primary ml-1 sm:ml-2 px-3 sm:px-4 text-sm whitespace-nowrap"
+          className="btn btn-primary hud-cta ml-1 sm:ml-2 px-3 sm:px-4 text-sm whitespace-nowrap"
+          title="Pasar turno"
         >
-          <span className="sm:hidden">Pasar</span>
-          <span className="hidden sm:inline">Pasar turno</span>
+          <span className="sm:hidden phland:inline">Pasar</span>
+          <span className="hidden sm:inline phland:hidden">Pasar turno</span>
           <ArrowRightIcon className="w-4 h-4" />
         </button>
       )}
@@ -113,11 +118,11 @@ export function ActionPanel() {
         <button
           type="button"
           onClick={endTurn}
-          className="btn btn-primary ml-1 sm:ml-2 px-3 sm:px-4 text-sm whitespace-nowrap"
+          className="btn btn-primary hud-cta ml-1 sm:ml-2 px-3 sm:px-4 text-sm whitespace-nowrap"
           title="Termina tu fase especial de construcción"
         >
-          <span className="sm:hidden">Listo</span>
-          <span className="hidden sm:inline">Terminar construcción</span>
+          <span className="sm:hidden phland:inline">Listo</span>
+          <span className="hidden sm:inline phland:hidden">Terminar construcción</span>
           <ArrowRightIcon className="w-4 h-4" />
         </button>
       )}
@@ -125,7 +130,7 @@ export function ActionPanel() {
   );
 }
 
-function ActionButton({ disabled, onClick, title, active = false, icon, label, cost }) {
+function ActionButton({ disabled, onClick, title, active = false, icon, label, cost, badge = null, badgeTitle }) {
   return (
     <button
       type="button"
@@ -133,7 +138,7 @@ function ActionButton({ disabled, onClick, title, active = false, icon, label, c
       onClick={onClick}
       title={title}
       aria-pressed={active}
-      className={`group relative flex flex-col items-center justify-center gap-0.5 min-w-[46px] sm:min-w-[64px] px-1 sm:px-2 pt-1.5 pb-1 rounded-[2px] border text-[10px] sm:text-[11px] font-bold leading-none transition-all duration-150 cursor-pointer disabled:cursor-not-allowed ${
+      className={`hud-btn group relative flex flex-col items-center justify-center gap-0.5 px-1 sm:px-2 pt-1.5 pb-1 rounded-[2px] border text-[clamp(9.5px,2.8vw,11px)] font-bold leading-none transition-all duration-150 cursor-pointer disabled:cursor-not-allowed ${
         active
           ? 'bg-chakra text-ink border-chakra-light shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),0_0_0_2px_rgba(246,160,75,0.4)]'
           : disabled
@@ -143,8 +148,17 @@ function ActionButton({ disabled, onClick, title, active = false, icon, label, c
     >
       {icon}
       <span className="whitespace-nowrap mt-0.5">{label}</span>
+      {badge !== null && (
+        <span
+          className="hanko absolute -top-1.5 -right-1 min-w-[18px] h-[18px] px-1 font-serif font-extrabold text-[11px] leading-none"
+          title={badgeTitle}
+          aria-label={`${badgeTitle}: ${badge}`}
+        >
+          {badge}
+        </span>
+      )}
       {cost && (
-        <span className={`hidden sm:block mt-0.5 ${disabled && !active ? 'opacity-40' : ''}`}>
+        <span className={`hidden sm:block phland:hidden mt-0.5 ${disabled && !active ? 'opacity-40' : ''}`}>
           <ResourceBundle bundle={cost} chipClassName="w-2.5 h-2.5" iconClassName="hidden" />
         </span>
       )}

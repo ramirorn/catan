@@ -71,7 +71,7 @@ export function DiscardModal({ isOpen }) {
   return (
     <Modal isOpen={isOpen} title="¡Emboscada del renegado!" maxWidth="max-w-md">
       {/* Alert banner */}
-      <div className="flex items-start gap-3 p-3 mb-4 border-l-4 border-shu bg-shu/8 text-[14px] leading-relaxed text-ink">
+      <div className="flex items-start gap-3 p-3 phland:py-2 mb-3 sm:mb-4 phland:mb-2 border-l-4 border-shu bg-shu/8 text-[14px] phland:text-[13px] leading-relaxed phland:leading-snug text-ink">
         <AlertIcon className="w-5 h-5 text-shu shrink-0 mt-0.5" />
         <p>
           ¡Salió un <strong>7</strong>! Como tu mano supera las 7 cartas ({totalCards} cartas),
@@ -79,7 +79,7 @@ export function DiscardModal({ isOpen }) {
         </p>
       </div>
 
-      <div className="mb-5">
+      <div className="mb-1 sm:mb-5">
         <div className="flex items-center justify-between mb-1">
           <span className="label-caps">Cartas a descartar</span>
           <span className="font-serif font-extrabold text-xl text-ink">
@@ -96,8 +96,8 @@ export function DiscardModal({ isOpen }) {
             if (available === 0) return null;
 
             return (
-              <li key={res} className="flex items-center justify-between gap-3 py-2 border-b border-ink/15">
-                <div className="flex items-center gap-3">
+              <li key={res} className="flex items-center justify-between gap-2 min-[360px]:gap-3 py-1.5 sm:py-2 border-b border-ink/15">
+                <div className="flex items-center gap-2.5 min-[360px]:gap-3 min-w-0">
                   <ResourceCard type={res} size="sm" showName={false} />
                   <span className="leading-tight">
                     <span className="block font-bold text-ink">{RESOURCE_NAMES[res]}</span>
@@ -132,6 +132,7 @@ export function DiscardModal({ isOpen }) {
         </ul>
       </div>
 
+      <div className="sheet-sticky">
       <button
         type="button"
         disabled={!isComplete}
@@ -142,6 +143,7 @@ export function DiscardModal({ isOpen }) {
           ? `Confirmar descarte de ${targetToDiscard} cartas`
           : `Selecciona ${targetToDiscard - currentDiscardCount} carta(s) más`}
       </button>
+      </div>
     </Modal>
   );
 }

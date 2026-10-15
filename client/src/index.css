@@ -1,5 +1,40 @@
 @import "tailwindcss";
 
+/* ─── Layout variants for small screens ───
+   phland  : a phone held sideways (short and not too wide)
+   compact : sidebar becomes a drawer (phones in any orientation) */
+@custom-variant compact {
+  @media (max-width: 767px), (orientation: landscape) and (max-height: 540px) and (max-width: 1000px) {
+    @slot;
+  }
+}
+@custom-variant coarse {
+  @media (pointer: coarse) {
+    @slot;
+  }
+}
+/* short / tiny: phones in portrait with little height (Safari bars, SE) */
+@custom-variant short {
+  @media (max-width: 639px) and (max-height: 940px) {
+    @slot;
+  }
+}
+@custom-variant squat {
+  @media (max-width: 639px) and (max-height: 700px) {
+    @slot;
+  }
+}
+@custom-variant tiny {
+  @media (max-width: 639px) and (max-height: 620px) {
+    @slot;
+  }
+}
+@custom-variant phland {
+  @media (orientation: landscape) and (max-height: 540px) and (max-width: 1000px) {
+    @slot;
+  }
+}
+
 /* ───────────────────────────────────────────────────────────
    Catán Shinobi
    Night-indigo village sky, washi scroll paper, sumi ink,
@@ -58,6 +93,16 @@ html, body, #root {
   height: 100%;
   width: 100%;
   overflow: hidden;
+  /* no rubber-band bounce / pull-to-refresh on the page itself */
+  overscroll-behavior: none;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  /* no double-tap zoom: taps fire right away */
+  touch-action: manipulation;
 }
 
 body {
@@ -89,6 +134,271 @@ button { font-family: inherit; }
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover { background-color: rgba(75, 68, 60, 0.5); }
+
+/* Lists that scroll (log, chat, modal bodies…): momentum, and the scroll
+   never leaks to the page behind */
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+button,
+[role='button'],
+a { touch-action: manipulation; }
+
+/* Game screen: taps on the board / HUD never select text or open the
+   iOS callout; text fields still work normally */
+.game-ui {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.game-ui input,
+.game-ui textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* ─── Game shell: header / board / HUD ───
+   Portrait & desktop: header on top, board, HUD rail at the bottom.
+   Phone held sideways: header on top, HUD column on the left, board right. */
+.game-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: 'head' 'main' 'foot';
+}
+.game-shell > .hud-head { grid-area: head; }
+.game-shell > .hud-main { grid-area: main; }
+.game-shell > .hud-foot { grid-area: foot; }
+
+/* Horizontal padding that also clears the notch / rounded corners */
+.safe-x {
+  padding-left: max(var(--pad-x, 0.75rem), env(safe-area-inset-left));
+  padding-right: max(var(--pad-x, 0.75rem), env(safe-area-inset-right));
+}
+
+/* Bottom HUD: [hand] [dice] [actions] in one row on wide screens */
+.hud-foot-grid {
+  display: grid;
+  align-items: center;
+  column-gap: 1rem;
+  row-gap: 0.55rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: 'hand dice actions';
+}
+.hud-hand { grid-area: hand; min-width: 0; }
+.hud-dice { grid-area: dice; min-width: 0; }
+.hud-actions { grid-area: actions; min-width: 0; }
+
+/* Hand of cards */
+.hud-hand-cards {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  padding: 0.5rem 0.5rem 0 0;
+}
+.res-card-hand { width: 44px; height: 62px; }
+@media (min-width: 640px) {
+  .res-card-hand { width: 52px; height: 72px; }
+}
+
+/* Build / trade / cards buttons */
+.hud-actions-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+.hud-btn {
+  min-width: 64px;
+  min-height: 44px;
+}
+.hud-cta { min-height: 44px; }
+
+/* Two-row HUD (phones and tablets in portrait):
+   row 1 = hand + dice, row 2 = the action buttons, full width */
+@media (max-width: 1023px) and (orientation: portrait), (max-width: 1023px) and (min-height: 541px), (min-width: 1001px) and (max-width: 1023px) {
+  .hud-foot-grid {
+    column-gap: 0.6rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'hand dice' 'actions actions';
+  }
+  .hud-hand-cards {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 56px));
+    gap: clamp(4px, 1.6vw, 12px);
+    padding: 0.5rem 0.4rem 0 0;
+  }
+  .res-card-hand { width: 100%; height: auto; aspect-ratio: 52 / 72; }
+  .hud-actions-row {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: clamp(3px, 1.2vw, 8px);
+  }
+  .hud-btn { min-width: 0; }
+  .hud-sep { display: none; }
+  .hud-cta {
+    flex-direction: column-reverse;
+    gap: 0.15rem;
+    margin: 0;
+    padding: 0.3rem 0.25rem;
+    font-size: clamp(10px, 2.9vw, 13px);
+    line-height: 1;
+  }
+}
+
+/* Phone held sideways: the HUD becomes a column on the left */
+@media (orientation: landscape) and (max-height: 540px) and (max-width: 1000px) {
+  .game-shell {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas: 'head head' 'foot main';
+  }
+  .hud-foot {
+    width: calc(11.75rem + env(safe-area-inset-left));
+    padding: 0.55rem 0.6rem max(0.5rem, env(safe-area-inset-bottom)) max(0.6rem, env(safe-area-inset-left)) !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .hud-foot-stripe { top: 0 !important; bottom: 0; left: auto !important; right: 0 !important; width: 3px; height: auto !important; }
+  .hud-foot-stripe-line { right: 3px !important; width: 1px; }
+  .hud-foot-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'hand' 'dice' 'actions';
+    row-gap: 0.6rem;
+    justify-items: stretch;
+  }
+  .hud-dice { justify-self: center; }
+  .hud-hand-cards {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+    padding: 0.4rem 0.35rem 0 0;
+  }
+  .res-card-hand { width: 100%; height: auto; aspect-ratio: 3 / 4; }
+  .res-card-hand .res-card-name,
+  .res-card-hand .res-kanji { display: none; }
+  .res-card-hand .res-card-icon { width: 18px !important; height: 18px !important; }
+  .res-card-hand .hanko {
+    min-width: 18px !important;
+    height: 18px !important;
+    font-size: 11px !important;
+    top: -0.4rem !important;
+    right: -0.4rem !important;
+  }
+  .hud-actions-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .hud-btn { min-width: 0; }
+  .hud-sep { display: none; }
+  .hud-cta {
+    flex-direction: column-reverse;
+    gap: 0.15rem;
+    margin: 0;
+    padding: 0.3rem 0.2rem;
+    font-size: 11px;
+    line-height: 1;
+  }
+}
+
+/* Phone held sideways: shorter sheet buttons; the standings scroll on
+   their own so the log / chat box always keeps its room */
+@media (orientation: landscape) and (max-height: 540px) and (max-width: 1000px) {
+  .sheet-sticky { padding-top: 0.5rem; }
+  .sheet-sticky > .btn { padding-top: 0.55rem; padding-bottom: 0.55rem; }
+  .hud-drawer .hud-score { max-height: 46%; overflow-y: auto; overscroll-behavior: contain; }
+}
+
+/* Very narrow phones: slimmer buttons, cards without the name strip */
+@media (max-width: 359px) {
+  .res-card-hand .res-card-name { display: none; }
+  .hud-btn { padding-left: 1px; padding-right: 1px; }
+}
+
+/* ─── Modals: bottom sheet on phones, dialog elsewhere ─── */
+.modal-wrap {
+  padding: max(0.75rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right))
+    calc(env(safe-area-inset-bottom) + 1rem) max(0.5rem, env(safe-area-inset-left));
+}
+.modal-sheet {
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 3rem);
+}
+.modal-body { --sheet-pb: 1rem; }
+@media (min-width: 640px) {
+  .modal-wrap { padding: max(1.5rem, env(safe-area-inset-top)) 1.5rem max(1.5rem, env(safe-area-inset-bottom)); }
+  .modal-sheet { max-height: min(86dvh, calc(100dvh - 3.5rem)); }
+}
+@media (orientation: landscape) and (max-height: 540px) and (max-width: 1000px) {
+  .modal-wrap {
+    padding: max(0.6rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right))
+      max(0.85rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
+  }
+  .modal-sheet { max-height: calc(100dvh - max(0.6rem, env(safe-area-inset-top)) - max(0.85rem, env(safe-area-inset-bottom)) - 1.4rem); }
+  .modal-body { --sheet-pb: 0.75rem; }
+}
+
+/* Main button of a long sheet: stays in reach at the bottom while the
+   content above it scrolls */
+.sheet-sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0.5rem -1rem calc(-1 * var(--sheet-pb, 1rem));
+  padding: 0.75rem 1rem var(--sheet-pb, 1rem);
+  background: linear-gradient(180deg, rgba(241, 233, 214, 0) 0, var(--color-paper) 0.7rem);
+}
+/* Same, for buttons inside a tinted box (counter-offer), phones only */
+@media (max-width: 639px) {
+.inset-sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0.25rem -0.75rem -0.75rem;
+  padding: 0.6rem 0.75rem 0.75rem;
+  background: linear-gradient(180deg, rgba(233, 223, 201, 0) 0, rgb(233, 223, 201) 0.6rem);
+}
+}
+@media (pointer: coarse) and (max-width: 359px) {
+  .stepper { width: 32px; height: 32px; }
+}
+@media (min-width: 640px) {
+  .sheet-sticky { margin-left: -1.75rem; margin-right: -1.75rem; padding-left: 1.75rem; padding-right: 1.75rem; }
+}
+
+/* ─── Sidebar → drawer on phones ─── */
+@media (max-width: 767px), (orientation: landscape) and (max-height: 540px) and (max-width: 1000px) {
+  .hud-drawer {
+    position: fixed;
+    right: 0;
+    /* pinned to the visible area, also while the iOS keyboard is open */
+    top: var(--vv-top, 0px);
+    height: var(--vv-h, 100dvh);
+    z-index: 45;
+    width: min(20rem, 88vw);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-right: env(safe-area-inset-right);
+    transform: translateX(105%);
+    visibility: hidden;
+    transition: transform 0.28s ease-out, visibility 0s linear 0.28s;
+  }
+  .hud-drawer.is-open {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.28s ease-out;
+  }
+  /* Typing in the chat with the keyboard up: only the chat is shown */
+  html[data-kb] .hud-drawer .hud-score { display: none; }
+}
 
 @layer components {
 /* ─── Surfaces ─── */
@@ -504,6 +814,17 @@ button { font-family: inherit; }
   border: 1px solid #4b535c;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.4);
   color: #2c333b;
+}
+
+/* Touch screens: thumb-sized controls, and 16px text in fields so iOS
+   Safari never zooms the page when one is focused */
+@media (pointer: coarse) {
+  .field { font-size: 16px; }
+  .stepper { width: 36px; height: 36px; }
+  .dd-button { min-height: 42px; font-size: 15px; }
+  .dd-option { min-height: 42px; }
+  .seg-chip { min-height: 38px; }
+  .seg-chip.res-pick { min-width: 42px; min-height: 42px; }
 }
 }
 

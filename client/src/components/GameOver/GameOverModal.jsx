@@ -26,14 +26,14 @@ export function GameOverModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#070a12]/80 animate-fade-in">
-      <ScrollPanel as="div" className="animate-modal-pop max-w-md w-full" bodyClassName="px-6 sm:px-8 pt-7 pb-6 text-center max-h-[90dvh] overflow-y-auto">
+    <div className="modal-wrap fixed inset-0 z-50 flex items-center justify-center bg-[#070a12]/80 animate-fade-in">
+      <ScrollPanel as="div" className="animate-modal-pop max-w-md w-full" bodyClassName="modal-sheet px-5 sm:px-8 pt-7 phland:pt-4 pb-6 phland:pb-4 text-center overflow-y-auto">
         {/* Crest */}
-        <div className="mx-auto mb-3 w-16 h-16 flex hanko -rotate-6 !rounded-[10px] shadow-[inset_0_0_0_2px_rgba(251,241,224,0.6),0_3px_0_#5a140a]">
+        <div className="mx-auto mb-3 w-16 h-16 phland:w-12 phland:h-12 flex hanko -rotate-6 !rounded-[10px] shadow-[inset_0_0_0_2px_rgba(251,241,224,0.6),0_3px_0_#5a140a]">
           <CrownIcon className="w-9 h-9 text-paper-light" />
         </div>
 
-        <h1 className="font-display text-[30px] sm:text-[34px] leading-tight text-ink mb-1">
+        <h1 className="font-display text-[26px] min-[360px]:text-[30px] sm:text-[34px] phland:text-[26px] leading-tight text-ink mb-1">
           {gameState.endedByAgreement
             ? 'Misión terminada'
             : isMeWinner ? '¡La victoria es tuya!' : `¡${winner?.name || 'Un ninja'} se impone!`}
@@ -91,7 +91,7 @@ export function GameOverModal() {
           </ol>
         </div>
 
-        <button type="button" onClick={handlePlayAgain} className="btn btn-primary w-full py-3 text-[15px]">
+        <button type="button" onClick={handlePlayAgain} className="btn btn-primary w-full min-h-[44px] py-3 text-[15px]">
           Jugar una nueva partida
         </button>
       </ScrollPanel>

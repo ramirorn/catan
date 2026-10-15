@@ -98,7 +98,7 @@ export function HexBoard() {
 
   return (
     <div
-      className="board-tip-area relative flex-1 w-full h-full flex items-center justify-center overflow-hidden select-none pt-12 sm:pt-14 pb-2 px-2"
+      className="board-tip-area relative flex-1 w-full h-full flex items-center justify-center overflow-hidden select-none pt-12 sm:pt-14 phland:pt-1.5 pb-2 phland:pb-1.5 px-2"
       {...tipDomHandlers}
     >
       {/* Turn / Action Phase Banner + "your turn" cues */}

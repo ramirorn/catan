@@ -48,7 +48,7 @@ export function DiceRoll() {
       key={`${idx}-${val}-${lastRoll?.id ?? lastRoll?.total}-${tumbling}`}
       value={diceBusy ? null : val}
       label={!diceBusy}
-      className={`w-8 h-8 sm:w-10 sm:h-10 drop-shadow-[0_3px_3px_rgba(0,0,0,0.5)] ${
+      className={`w-[clamp(22px,7.2vw,34px)] h-[clamp(22px,7.2vw,34px)] sm:w-10 sm:h-10 phland:w-7 phland:h-7 drop-shadow-[0_3px_3px_rgba(0,0,0,0.5)] ${
         tumbling ? 'animate-dice-tumble' : 'animate-dice-settle'
       }`}
       style={tumbling && idx === 1 ? { animationDelay: '-0.2s' } : undefined}
@@ -59,13 +59,13 @@ export function DiceRoll() {
     <div className="flex items-center gap-2.5 shrink-0">
       {lastRoll && (
         <div
-          className={`${isRollPhase ? 'hidden sm:flex' : 'flex'} items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-[4px] bg-black/30 border border-paper/10 shadow-[inset_0_2px_6px_rgba(0,0,0,0.5)]`}
+          className={`${isRollPhase ? 'hidden sm:flex phland:hidden' : 'flex'} items-center gap-1 sm:gap-1.5 pl-1 sm:pl-1.5 pr-2 sm:pr-2.5 py-1 rounded-[4px] bg-black/30 border border-paper/10 shadow-[inset_0_2px_6px_rgba(0,0,0,0.5)]`}
           title={diceBusy ? 'Tirando…' : `Tirada Total: ${lastRoll.total}`}
         >
           {renderDie(lastRoll.die1, 0)}
           {renderDie(lastRoll.die2, 1)}
           <div
-            className={`pl-1 sm:pl-1.5 font-serif font-extrabold text-xl sm:text-2xl leading-none min-w-[1.6ch] text-center ${
+            className={`pl-1 sm:pl-1.5 font-serif font-extrabold text-xl sm:text-2xl phland:text-xl leading-none min-w-[1.6ch] text-center ${
               lastRoll.total === 7 && !diceBusy ? 'text-shu-light' : 'text-paper-light'
             }`}
           >
@@ -79,10 +79,17 @@ export function DiceRoll() {
           type="button"
           onClick={rollDice}
           disabled={isRolling}
-          className={`btn btn-primary px-3 sm:px-5 py-2.5 text-sm sm:text-[15px] whitespace-nowrap ${isRolling ? '' : 'btn-cta'}`}
+          className={`btn btn-primary min-h-[44px] px-3 sm:px-5 py-2.5 text-sm sm:text-[15px] whitespace-nowrap ${isRolling ? '' : 'btn-cta'}`}
         >
           <DiceIcon className={`w-5 h-5 ${isRolling ? 'animate-dice-tumble' : ''}`} />
-          <span>{isRolling ? 'Tirando…' : 'Lanzar dados'}</span>
+          {isRolling ? (
+            <span>Tirando…</span>
+          ) : (
+            <>
+              <span className="hidden min-[400px]:inline">Lanzar dados</span>
+              <span className="min-[400px]:hidden">Lanzar</span>
+            </>
+          )}
         </button>
       )}
     </div>

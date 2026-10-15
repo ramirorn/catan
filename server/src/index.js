@@ -36,9 +36,27 @@ registerSocketHandlers(io, lobbyManager);
 // Serve the built client (client/dist) when it exists, e.g. on Render
 const clientDist = join(dirname(fileURLToPath(import.meta.url)), '../../client/dist');
 if (existsSync(clientDist)) {
-  app.use(express.static(clientDist));
+  // Hashed build files (assets/*) never change: cache them for a year.
+  // index.html, the service worker and the manifest must always be
+  // revalidated so a new deploy is picked up.
+  const noCache = /(?:^|[\\/])(?:index\.html|sw\.js|workbox-[\w-]+\.js|manifest\.webmanifest)$/;
+  app.use(
+    express.static(clientDist, {
+      setHeaders(res, filePath) {
+        if (noCache.test(filePath)) {
+          res.setHeader('Cache-Control', 'no-cache');
+        } else if (/[\\/]assets[\\/]/.test(filePath)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+        if (filePath.endsWith('.webmanifest')) {
+          res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+        }
+      },
+    }),
+  );
   // Any other GET falls back to the app shell
   app.get(/^\/(?!socket\.io|health).*/, (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(join(clientDist, 'index.html'));
   });
   console.log(`Serving client from ${clientDist}`);
