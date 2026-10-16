@@ -7,9 +7,10 @@ import { BrandPlate } from '../Shared/Brand';
 import { RoomRules } from './RoomRules';
 import { InstallAppButton } from '../Shared/Pwa';
 import { DEFAULT_VP_TO_WIN } from '../../utils/constants';
+import { EyeIcon } from '../Shared/Icons';
 
 export function LobbyScreen() {
-  const { createRoom, joinRoom, playerName, setPlayerName } = useGame();
+  const { createRoom, joinRoom, spectateRoom, playerName, setPlayerName } = useGame();
   const { socket, connected } = useSocket();
   const [tab, setTab] = useState('create');
   const [name, setName] = useState(playerName);
@@ -17,8 +18,9 @@ export function LobbyScreen() {
   const [boardType, setBoardType] = useState('standard');
   const [rules, setRules] = useState({ vpToWin: DEFAULT_VP_TO_WIN, turnTimeLimit: 90 });
   const [publicRooms, setPublicRooms] = useState([]);
-  // Only rooms still waiting for players and with a free seat
-  const openRooms = publicRooms.filter((r) => r.phase === 'lobby' && r.playerCount < r.maxPlayers);
+  // Rooms that can be joined (waiting with a free seat) or watched (any not finished)
+  const openRooms = publicRooms.filter((r) => r.phase !== 'gameOver');
+  const canSit = (r) => r.phase === 'lobby' && r.playerCount < r.maxPlayers;
 
   useEffect(() => {
     if (!socket) return;
@@ -46,6 +48,12 @@ export function LobbyScreen() {
     const code = codeToJoin || roomCode;
     if (!name.trim() || !code.trim()) return;
     joinRoom(code.trim(), name.trim());
+  };
+
+  const handleSpectate = (codeToWatch = null) => {
+    const code = codeToWatch || roomCode;
+    if (!name.trim() || !code.trim()) return;
+    spectateRoom(code.trim(), name.trim());
   };
 
   const tabClass = (isActive) =>
@@ -203,17 +211,29 @@ export function LobbyScreen() {
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={!connected || !name.trim() || !roomCode.trim()}
-                  className="btn btn-primary w-full py-3 text-[15px]"
-                >
-                  {connected ? 'Entrar a la sala' : 'Conectando al servidor…'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={!connected || !name.trim() || !roomCode.trim()}
+                    className="btn btn-primary flex-1 min-w-0 min-h-[44px] py-3 text-[15px]"
+                  >
+                    {connected ? 'Entrar a la sala' : 'Conectando…'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSpectate()}
+                    disabled={!connected || !name.trim() || !roomCode.trim()}
+                    className="btn btn-ghost min-h-[44px] px-3 py-3 text-[14px] shrink-0"
+                    title="Ver la partida sin jugar (también si ya empezó)"
+                  >
+                    <EyeIcon className="w-4 h-4" />
+                    Observar
+                  </button>
+                </div>
 
                 {openRooms.length > 0 && (
                   <div className="pt-1">
-                    <div className="label-caps mb-1">Salas públicas disponibles</div>
+                    <div className="label-caps mb-1">Salas públicas</div>
                     <ul className="max-h-32 overflow-y-auto border-t border-ink/15">
                       {openRooms.map((r) => (
                         <li
@@ -224,16 +244,33 @@ export function LobbyScreen() {
                             <span className="font-serif font-bold tracking-[0.15em] text-ink">{r.roomId}</span>
                             <span className="block text-[12px] text-ink-faint">
                               {r.playerCount}/{r.maxPlayers} ninjas · {r.boardType === 'extended' ? 'Extendida' : 'Estándar'}
+                              {r.phase !== 'lobby' ? ' · En curso' : r.playerCount >= r.maxPlayers ? ' · Llena' : ''}
+                              {r.spectatorCount > 0 ? ` · ${r.spectatorCount} observando` : ''}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleJoin(null, r.roomId)}
-                            disabled={!name.trim()}
-                            className="btn btn-ghost min-h-[38px] px-3 py-1 text-[13px] shrink-0"
-                          >
-                            Unirse
-                          </button>
+                          <span className="flex gap-1.5 shrink-0">
+                            {canSit(r) && (
+                              <button
+                                type="button"
+                                onClick={() => handleJoin(null, r.roomId)}
+                                disabled={!name.trim()}
+                                className="btn btn-ghost min-h-[38px] px-3 py-1 text-[13px]"
+                              >
+                                Unirse
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleSpectate(r.roomId)}
+                              disabled={!name.trim()}
+                              className="btn btn-ghost min-h-[38px] px-2.5 py-1 text-[13px]"
+                              title="Ver la partida sin jugar"
+                              aria-label={`Observar la sala ${r.roomId}`}
+                            >
+                              <EyeIcon className="w-4 h-4" />
+                              <span className="max-[359px]:hidden">Observar</span>
+                            </button>
+                          </span>
                         </li>
                       ))}
                     </ul>

@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { useShadersReady } from '../Effects/useShadersReady';
 
 /* ─── Shape ─── */
 
@@ -256,9 +257,35 @@ function paintFace(value, styleName, px) {
   return canvas;
 }
 
+// Painted faces are kept for the whole session (12 small canvases), so a
+// throw never repaints them; warmDice() paints them ahead, one per idle slot.
+const faceCanvases = new Map();
+function faceCanvas(value, styleName, px) {
+  const key = `${styleName}:${value}:${px}`;
+  let c = faceCanvases.get(key);
+  if (!c) {
+    c = paintFace(value, styleName, px);
+    faceCanvases.set(key, c);
+  }
+  return c;
+}
+
+/** Paints the dice faces in idle time, so the first throw starts without a stall */
+export function warmDice(lowPower) {
+  const px = lowPower ? 256 : 512;
+  const jobs = [];
+  for (const style of ['wood', 'lacquer']) for (const v of FACE_VALUES) jobs.push(() => faceCanvas(v, style, px));
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(() => fn({ timeRemaining: () => 8 }), 50));
+  const step = (deadline) => {
+    while (jobs.length && deadline.timeRemaining() > 4) jobs.shift()();
+    if (jobs.length) idle(step, { timeout: 2000 });
+  };
+  idle(step, { timeout: 2000 });
+}
+
 function makeFaceMaterials(styleName, px, lowPower, anisotropy) {
   return FACE_VALUES.map((value) => {
-    const tex = new THREE.CanvasTexture(paintFace(value, styleName, px));
+    const tex = new THREE.CanvasTexture(faceCanvas(value, styleName, px));
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = anisotropy;
     if (styleName === 'lacquer' && !lowPower) {
@@ -385,15 +412,25 @@ function RoomLight({ enabled }) {
   return null;
 }
 
-function Dice({ values, seed, lowPower, onStart, onSettled }) {
+/**
+ * The two dice and their effects, on a table plane at y = 0. Used by the
+ * overlay canvas below and, on the 3D board, inside the board scene itself
+ * (onTop: drawn over the board pieces instead of clipping into them).
+ */
+export function Dice({ values, seed, lowPower, onStart, onSettled, onTop = false, paused = false }) {
   const gl = useThree((s) => s.gl);
 
   const assets = useMemo(() => {
     const px = lowPower ? 256 : 512;
     const aniso = Math.min(4, gl.capabilities.getMaxAnisotropy());
+    const materials = [makeFaceMaterials('wood', px, lowPower, aniso), makeFaceMaterials('lacquer', px, lowPower, aniso)];
+    if (onTop) {
+      // A convex die with back faces culled needs no depth test against itself
+      for (const set of materials) for (const m of set) m.depthTest = false;
+    }
     return {
       geometry: createDieGeometry(),
-      materials: [makeFaceMaterials('wood', px, lowPower, aniso), makeFaceMaterials('lacquer', px, lowPower, aniso)],
+      materials,
       shadowTex: radialTexture([
         [0, 'rgba(0,0,0,0.85)'],
         [0.55, 'rgba(0,0,0,0.35)'],
@@ -410,7 +447,7 @@ function Dice({ values, seed, lowPower, onStart, onSettled }) {
         [1, 'rgba(255,255,255,0)'],
       ]),
     };
-  }, [gl, lowPower]);
+  }, [gl, lowPower, onTop]);
 
   const plans = useMemo(() => {
     const rnd = seededRandom(seed);
@@ -505,6 +542,8 @@ function Dice({ values, seed, lowPower, onStart, onSettled }) {
   );
 
   useFrame((_, delta) => {
+    // waits (invisible) until its shaders are linked
+    if (paused) return;
     const c = clock.current;
     if (!c.started) {
       c.started = true;
@@ -610,6 +649,7 @@ function Dice({ values, seed, lowPower, onStart, onSettled }) {
           geometry={assets.geometry}
           material={assets.materials[k]}
           position={plan.start}
+          renderOrder={onTop ? 20 : 0}
           visible={false}
         />
       ))}
@@ -617,7 +657,43 @@ function Dice({ values, seed, lowPower, onStart, onSettled }) {
   );
 }
 
-export default function DiceScene({ die1, die2, seed, lowPower, onStart, onSettled }) {
+/**
+ * 2D board: keep the dice on the board. anchor() returns how far (px) the
+ * board point under the overlay centre moved since the throw and how much
+ * the board zoom changed; the view is shifted / scaled to match, so the
+ * dice ride along with the map instead of sticking to the screen.
+ */
+function AnchorView({ anchor }) {
+  const camera = useThree((s) => s.camera);
+  const size = useThree((s) => s.size);
+  const last = useRef({ dx: 0, dy: 0, k: 1, on: false });
+  useFrame(() => {
+    const a = anchor?.();
+    const l = last.current;
+    if (!a) {
+      if (l.on) {
+        camera.clearViewOffset();
+        camera.zoom = 1;
+        camera.updateProjectionMatrix();
+        l.on = false;
+      }
+      return;
+    }
+    if (l.on && Math.abs(a.dx - l.dx) < 0.05 && Math.abs(a.dy - l.dy) < 0.05 && Math.abs(a.k - l.k) < 1e-4) return;
+    camera.zoom = a.k;
+    camera.setViewOffset(size.width, size.height, -a.dx, -a.dy, size.width, size.height);
+    Object.assign(l, { dx: a.dx, dy: a.dy, k: a.k, on: true });
+  });
+  return null;
+}
+
+/** The dice start only once their shaders are linked (no stall mid-throw) */
+export function GatedDice(props) {
+  const ready = useShadersReady();
+  return <Dice {...props} paused={!ready} />;
+}
+
+export default function DiceScene({ die1, die2, seed, lowPower, onStart, onSettled, anchor }) {
   const values = useMemo(() => [die1, die2], [die1, die2]);
   return (
     <Canvas
@@ -632,11 +708,12 @@ export default function DiceScene({ die1, die2, seed, lowPower, onStart, onSettl
       frameloop="always"
     >
       <CameraFit />
+      {anchor && <AnchorView anchor={anchor} />}
       <RoomLight enabled={!lowPower} />
       <hemisphereLight args={['#fff1dc', '#3a2414', 1.1]} />
       <directionalLight position={[-3.5, 10, 4]} intensity={2.3} color="#fff6e8" />
       <pointLight position={[3.2, 2.2, 2.6]} intensity={9} distance={11} decay={2} color="#e2711d" />
-      <Dice values={values} seed={seed} lowPower={lowPower} onStart={onStart} onSettled={onSettled} />
+      <GatedDice values={values} seed={seed} lowPower={lowPower} onStart={onStart} onSettled={onSettled} />
     </Canvas>
   );
 }

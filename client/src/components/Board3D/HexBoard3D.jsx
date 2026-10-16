@@ -13,6 +13,7 @@ import { BoardResources, PX } from './resources';
 import { Board3D } from './Scene3D';
 import { SceneContext } from './sceneContext';
 import { CameraRig } from './CameraRig';
+import { BoardBridge3D } from './BoardBridge3D';
 import * as THREE from 'three';
 
 const EMPTY = {};
@@ -44,13 +45,7 @@ export default function HexBoard3D() {
         radius = Math.max(radius, Math.hypot(x - center.x, z - center.z));
       }
     }
-    const xs = hexGeom.map((h) => h.x * PX);
-    const zs = hexGeom.map((h) => h.y * PX);
-    const extent = {
-      x: Math.max(1, (Math.max(...xs) - Math.min(...xs)) / 2),
-      z: Math.max(1, (Math.max(...zs) - Math.min(...zs)) / 2),
-    };
-    return { hexGeom, bounds, center, outline, radius, extent };
+    return { hexGeom, bounds, center, outline, radius };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hexGeomKey]);
 
@@ -189,7 +184,6 @@ export default function HexBoard3D() {
                 rigRef={rig}
                 center={layout.center}
                 outline={layout.outline}
-                extent={layout.extent}
                 onFlags={onFlags}
                 touch={touch}
               />
@@ -201,6 +195,7 @@ export default function HexBoard3D() {
                 shadows={shadows}
                 lowPower={lowPower}
               />
+              <BoardBridge3D rig={rig} />
             </SceneContext.Provider>
           </Canvas>
         ) : (

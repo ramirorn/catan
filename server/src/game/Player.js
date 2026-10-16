@@ -7,6 +7,8 @@ export class Player {
     this.color = color;
     this.index = index;
     this.connected = true;
+    this.left = false;    // left the game in progress (seat kept, played by the server)
+    this.kicked = false;  // removed by the host
 
     // Resources
     this.resources = {
@@ -112,6 +114,7 @@ export class Player {
       color: this.color,
       index: this.index,
       connected: this.connected,
+      left: this.left,
       roadsBuilt: this.roadsBuilt,
       settlementsBuilt: this.settlementsBuilt,
       citiesBuilt: this.citiesBuilt,

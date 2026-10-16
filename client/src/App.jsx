@@ -7,6 +7,7 @@ import { LobbyScreen } from './components/Lobby/LobbyScreen';
 import { WaitingRoom } from './components/Lobby/WaitingRoom';
 import { BoardView } from './components/Board/BoardView';
 import { DiceOverlay } from './components/Dice3D/DiceOverlay';
+import { FxOverlay } from './components/Effects/FxOverlay';
 import { GameHeader } from './components/HUD/GameHeader';
 import { ResourceBar } from './components/HUD/ResourceBar';
 import { ActionPanel } from './components/HUD/ActionPanel';
@@ -21,9 +22,10 @@ import { StealModal } from './components/Robber/StealModal';
 import { GameOverModal } from './components/GameOver/GameOverModal';
 import { ProductionModal } from './components/HUD/ProductionModal';
 import { EndGameModal } from './components/HUD/EndGameModal';
+import { RoomMenuModal } from './components/HUD/RoomMenuModal';
 import { ToastContainer } from './components/Shared/Toast';
 import { PwaLayer } from './components/Shared/Pwa';
-import { CloseIcon, ScrollIcon } from './components/Shared/Icons';
+import { CloseIcon, ScrollIcon, EyeIcon } from './components/Shared/Icons';
 
 /**
  * Keeps two CSS variables in sync with the part of the page that is really
@@ -61,7 +63,7 @@ function useGameViewport(active) {
 }
 
 function GameContent() {
-  const { gameState, activeModal, setActiveModal } = useGame();
+  const { gameState, activeModal, setActiveModal, isSpectator } = useGame();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const inGame = !!gameState && gameState.phase !== PHASE.LOBBY;
   useGameViewport(inGame);
@@ -89,6 +91,8 @@ function GameContent() {
           <BoardView />
           {/* Dice throw seen by every player (over the 2D or 3D board, never clickable) */}
           <DiceOverlay />
+          {/* City upgrade, robber, steal, dev cards, near win: same for everyone */}
+          <FxOverlay />
 
           {/* Mobile sidebar toggle button */}
           <button
@@ -138,14 +142,27 @@ function GameContent() {
         <div className="hud-foot-stripe hud-foot-stripe-line absolute inset-x-0 top-[3px] h-px bg-black/70" aria-hidden="true" />
         <div className="hud-foot-grid">
           <div className="hud-hand">
-            <ResourceBar />
+            {isSpectator ? (
+              // Spectators hold no cards and cannot act
+              <p className="flex items-center gap-2 min-h-[44px] text-[13px] sm:text-[14px] text-paper/80">
+                <EyeIcon className="w-5 h-5 text-chakra-light shrink-0" />
+                <span>
+                  <strong className="text-paper-light">Observando</strong>
+                  <span className="hidden min-[400px]:inline"> · no ves las cartas de nadie ni puedes jugar</span>
+                </span>
+              </p>
+            ) : (
+              <ResourceBar />
+            )}
           </div>
           <div className="hud-dice">
             <DiceRoll />
           </div>
-          <div className="hud-actions">
-            <ActionPanel />
-          </div>
+          {!isSpectator && (
+            <div className="hud-actions">
+              <ActionPanel />
+            </div>
+          )}
         </div>
       </footer>
 
@@ -170,9 +187,13 @@ function GameContent() {
       <ProductionModal />
 
       <EndGameModal
-        isOpen={activeModal === 'endGame'}
+        isOpen={activeModal === 'endGame' && !isSpectator}
         onClose={() => setActiveModal(null)}
       />
+
+      {activeModal === 'roomMenu' && (
+        <RoomMenuModal isOpen onClose={() => setActiveModal(null)} />
+      )}
 
       <GameOverModal />
     </div>

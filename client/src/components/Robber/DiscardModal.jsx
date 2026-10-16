@@ -4,9 +4,12 @@ import { Modal } from '../Shared/Modal';
 import { RESOURCE, RESOURCE_NAMES } from '../../utils/constants';
 import { ResourceCard } from '../Shared/ResourceCard';
 import { AlertIcon, PlusIcon, MinusIcon } from '../Shared/Icons';
+import { useStageReady } from '../Effects/fxSignal';
 
-export function DiscardModal({ isOpen }) {
+export function DiscardModal({ isOpen: wantOpen }) {
   const { myPlayer, discardCards } = useGame();
+  // On a 7 the dice throw plays first; the modal opens once it is over
+  const isOpen = useStageReady(wantOpen);
 
   const myResources = myPlayer?.resources || {
     [RESOURCE.WOOD]: 0,

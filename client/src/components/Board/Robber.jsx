@@ -1,3 +1,5 @@
+import { useFxHidden } from '../Effects/fxSignal';
+
 /** A small red cloud, outlined in white, printed on the rogue's cloak */
 function Cloud({ x, y, s = 1 }) {
   return (
@@ -14,6 +16,9 @@ function Cloud({ x, y, s = 1 }) {
 
 // The robber: a rogue ninja in a dark high-collared cloak and a straw hat.
 export function Robber({ x, y }) {
+  // Hidden while the leap animation carries the rogue to this hex
+  const hidden = useFxHidden('robber');
+  if (hidden) return null;
   return (
     <g transform={`translate(${x}, ${y - 4}) scale(1.3)`} pointerEvents="none">
       <ellipse cx="0" cy="16" rx="12" ry="3.6" fill="#07090f" opacity="0.45" />

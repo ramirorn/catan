@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { setBoardBridge } from '../Effects/fxSignal';
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 3.5;
 const DRAG_THRESHOLD_PX = 5;
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /**
  * Zoom (wheel, pinch, buttons) and pan (drag) for the board SVG, done by
@@ -37,10 +39,13 @@ export function useBoardZoom(bounds) {
     return `${cx + v.x - w / 2} ${cy + v.y - h / 2} ${w} ${h}`;
   }, []);
 
+  // Camera fly in progress (see focus): the viewBox stays put meanwhile
+  const cine = useRef(null);
+
   const writeViewBox = useCallback(() => {
     frame.current = 0;
     const svg = svgEl.current;
-    if (svg) svg.setAttribute('viewBox', viewBoxOf(viewRef.current));
+    if (svg && !cine.current) svg.setAttribute('viewBox', viewBoxOf(viewRef.current));
   }, [viewBoxOf]);
 
   const clampView = useCallback(({ zoom, x, y }) => {
@@ -77,12 +82,141 @@ export function useBoardZoom(bounds) {
     setView(viewRef.current);
   }, [bounds, setView]);
 
+  // Camera move played for everyone (e.g. a city upgrade): fly to a board
+  // point and back. Any gesture / zoom button cancels it and keeps the view
+  // where it is, so it never fights the player.
+  const stopCine = useCallback(() => {
+    const c = cine.current;
+    if (!c) return;
+    cancelAnimationFrame(c.raf);
+    cine.current = null;
+    const svg = svgEl.current;
+    if (svg) {
+      // Commit wherever the fly got to as the real view (one repaint)
+      svg.style.transform = '';
+      svg.style.transformOrigin = '';
+      svg.style.willChange = '';
+      svg.classList.remove('is-moving');
+      const vb = viewBoxOf(viewRef.current);
+      if (svg.getAttribute('viewBox') !== vb) svg.setAttribute('viewBox', vb);
+    }
+    const v = viewRef.current;
+    const canZoomIn = v.zoom < MAX_ZOOM - 0.01;
+    const canZoomOut = v.zoom > MIN_ZOOM + 0.01;
+    setZoomFlags((f) => (f.canZoomIn === canZoomIn && f.canZoomOut === canZoomOut ? f : { canZoomIn, canZoomOut }));
+  }, [viewBoxOf]);
+
   useEffect(
     () => () => {
       cancelAnimationFrame(frame.current);
       clearTimeout(movingTimer.current);
+      if (cine.current) cancelAnimationFrame(cine.current.raf);
     },
     []
+  );
+
+  // Board point (SVG units) → client px, from the view in the ref (not the
+  // painted attribute), so overlays anchored to the board never lag a frame
+  const rectCache = useRef({ at: -1, rect: null });
+  const screenOf = useCallback((v, rect, bx, by) => {
+    const b = boundsRef.current;
+    const vw = b.width / v.zoom;
+    const vh = b.height / v.zoom;
+    const vx = b.minX + b.width / 2 + v.x - vw / 2;
+    const vy = b.minY + b.height / 2 + v.y - vh / 2;
+    const s = Math.min(rect.width / vw, rect.height / vh);
+    const ox = rect.left + (rect.width - vw * s) / 2;
+    const oy = rect.top + (rect.height - vh * s) / 2;
+    return { x: ox + (bx - vx) * s, y: oy + (by - vy) * s, s };
+  }, []);
+
+  const project = useCallback(
+    (bx, by) => {
+      const svg = svgEl.current;
+      if (!svg) return null;
+      // During a fly the element is transformed: use its rect from before
+      let rect = cine.current?.rect;
+      if (!rect) {
+        const now = performance.now();
+        const cache = rectCache.current;
+        if (now - cache.at > 8 || !cache.rect) {
+          cache.rect = svg.getBoundingClientRect();
+          cache.at = now;
+        }
+        rect = cache.rect;
+      }
+      if (!rect.width || !rect.height) return null;
+      return screenOf(viewRef.current, rect, bx, by);
+    },
+    [screenOf]
+  );
+
+  const unproject = useCallback((clientX, clientY) => {
+    const p0 = project(0, 0);
+    if (!p0) return null;
+    return { x: (clientX - p0.x) / p0.s, y: (clientY - p0.y) / p0.s };
+  }, [project]);
+
+  const focus = useCallback(
+    (bx, by, { inMs = 450, holdMs = 600, outMs = 450, zoom = 2.3 } = {}) => {
+      stopCine();
+      const b = boundsRef.current;
+      const from = { ...viewRef.current };
+      const to = clampView({
+        zoom: Math.max(from.zoom, Math.min(MAX_ZOOM, zoom)),
+        x: bx - (b.minX + b.width / 2),
+        y: by - (b.minY + b.height / 2),
+      });
+      const svg = svgEl.current;
+      if (!svg) return () => {};
+      const rect = svg.getBoundingClientRect();
+      if (!rect.width || !rect.height) return () => {};
+      const t0 = performance.now();
+      const total = inMs + holdMs + outMs;
+      const lz0 = Math.log(from.zoom);
+      const lz1 = Math.log(to.zoom);
+      // The fly is a composited transform of the SVG as painted for `from`
+      // (no re-rasterising of the terrain art every frame); the view math is
+      // the same as the viewBox's, so anchored overlays line up exactly
+      const base = screenOf(from, rect, 0, 0);
+      svg.classList.add('is-moving');
+      svg.style.transformOrigin = '0 0';
+      svg.style.willChange = 'transform';
+      const paint = () => {
+        const p = screenOf(viewRef.current, rect, 0, 0);
+        const k = p.s / base.s;
+        const tx = p.x - rect.left - k * (base.x - rect.left);
+        const ty = p.y - rect.top - k * (base.y - rect.top);
+        svg.style.transform = `translate(${tx.toFixed(2)}px, ${ty.toFixed(2)}px) scale(${k.toFixed(4)})`;
+      };
+      const step = () => {
+        const t = performance.now() - t0;
+        let k = 1;
+        if (t < inMs) k = easeInOut(t / inMs);
+        else if (t > inMs + holdMs) k = 1 - easeInOut(Math.min(1, (t - inMs - holdMs) / outMs));
+        viewRef.current = clampView({
+          zoom: Math.exp(lz0 + (lz1 - lz0) * k),
+          x: from.x + (to.x - from.x) * k,
+          y: from.y + (to.y - from.y) * k,
+        });
+        if (t >= total) {
+          viewRef.current = clampView(from);
+          stopCine();
+          return;
+        }
+        paint();
+        cine.current.raf = requestAnimationFrame(step);
+      };
+      cine.current = { raf: requestAnimationFrame(step), rect };
+      return stopCine;
+    },
+    [clampView, stopCine, screenOf]
+  );
+
+  // Let the board animations anchor to / fly over this board
+  useEffect(
+    () => setBoardBridge({ mode: '2d', project, toBoard: unproject, focus }),
+    [project, unproject, focus]
   );
 
   // Screen point → board coordinates (handles letterboxing of "meet")
@@ -112,6 +246,7 @@ export function useBoardZoom(bounds) {
   const onWheel = useCallback(
     (e) => {
       e.preventDefault();
+      stopCine();
       // The CTM still reflects the last painted viewBox: flush a pending frame first
       if (frame.current) {
         cancelAnimationFrame(frame.current);
@@ -122,7 +257,7 @@ export function useBoardZoom(bounds) {
       const factor = Math.exp(-clamp(dy, -240, 240) * 0.0015);
       setView((v) => zoomAt(v, v.zoom * factor, p));
     },
-    [toBoard, zoomAt, setView, writeViewBox]
+    [toBoard, zoomAt, setView, writeViewBox, stopCine]
   );
 
   // Callback ref: the <svg> appears only once the board exists
@@ -161,6 +296,7 @@ export function useBoardZoom(bounds) {
 
   const onPointerDown = (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    stopCine();
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     startGesture();
   };
@@ -212,8 +348,14 @@ export function useBoardZoom(bounds) {
     }
   };
 
-  const zoomBy = (factor) => setView((v) => zoomAt(v, v.zoom * factor, null));
-  const reset = () => setView({ zoom: 1, x: 0, y: 0 });
+  const zoomBy = (factor) => {
+    stopCine();
+    setView((v) => zoomAt(v, v.zoom * factor, null));
+  };
+  const reset = () => {
+    stopCine();
+    setView({ zoom: 1, x: 0, y: 0 });
+  };
 
   return {
     svgRef,

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { useSocket } from '../../context/SocketContext';
 import { pieceColor } from '../../utils/theme';
-import { SettlementIcon, FlagIcon, HourglassIcon } from '../Shared/Icons';
+import { SettlementIcon, FlagIcon, HourglassIcon, EyeIcon, MenuIcon } from '../Shared/Icons';
+import { formatDuration, useGameElapsed } from '../../utils/gameClock';
 import { BrandPlate } from '../Shared/Brand';
 
 // Seconds left until the server's turn deadline (null when there is no limit)
@@ -29,7 +30,12 @@ function formatSeconds(total) {
 }
 
 export function GameHeader() {
-  const { gameState, myPlayerId, isMyTurn, isSpecialBuild, isMySpecialBuild, setActiveModal, serverOffset } = useGame();
+  const {
+    gameState, myPlayerId, isMyTurn, isSpecialBuild, isMySpecialBuild, setActiveModal, serverOffset,
+    isSpectator, spectators,
+  } = useGame();
+  const elapsed = useGameElapsed(gameState?.startedAt, gameState?.endedAt, serverOffset);
+  const gameOver = gameState?.phase === 'gameOver';
   const msLeft = useCountdown(gameState?.turnDeadline, serverOffset);
   const secondsLeft = msLeft === null ? null : Math.ceil(msLeft / 1000);
   const lowTime = secondsLeft !== null && secondsLeft <= 10;
@@ -50,7 +56,8 @@ export function GameHeader() {
   const turnColor = pieceColor(pillPlayer?.color);
 
   const endVotes = gameState?.endVotes || [];
-  const totalPlayers = gameState?.playerOrder?.length || 0;
+  // Players who left the game don't vote
+  const totalPlayers = (gameState?.playerOrder || []).filter((pid) => !gameState?.players?.[pid]?.left).length;
   const iVotedEnd = endVotes.includes(myPlayerId);
   // Someone wants to end and is waiting on me
   const endVotePending = endVotes.length > 0 && !iVotedEnd;
@@ -139,11 +146,46 @@ export function GameHeader() {
           <span className="font-serif font-extrabold text-paper/90 text-sm">{gameState?.turnNumber || 1}</span>
         </div>
 
-        {/* End game by unanimous vote */}
+        {/* Game clock (everyone, spectators too); stops at game over */}
+        {elapsed !== null && (
+          <span
+            className={`shrink-0 font-serif font-extrabold text-[12px] sm:text-[13px] tabular-nums leading-none ${gameOver ? 'text-paper/45' : 'text-paper/75'}`}
+            title={gameOver ? 'Duración de la partida' : 'Tiempo de partida'}
+            aria-label={`Duración de la partida: ${formatDuration(elapsed)}`}
+            role="timer"
+          >
+            {formatDuration(elapsed)}
+          </span>
+        )}
+
+        {/* Spectators: badge for them, eye + count for the players */}
+        {isSpectator ? (
+          <span
+            className="flex items-center gap-1 shrink-0 px-1.5 sm:px-2 py-1 rounded-[3px] border border-chakra/70 bg-chakra/15 text-chakra-light text-[11px] sm:text-[12px] font-bold uppercase tracking-[0.06em]"
+            title="Estás observando la partida"
+          >
+            <EyeIcon className="w-4 h-4" />
+            <span className="hidden min-[440px]:inline">Observando</span>
+          </span>
+        ) : spectators.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setActiveModal('roomMenu')}
+            className="hidden min-[360px]:flex items-center gap-1 shrink-0 text-paper/70 hover:text-paper-light text-[12px] font-bold tabular-nums cursor-pointer"
+            title={`Observando: ${spectators.map((sp) => sp.name).join(', ')}`}
+            aria-label={`${spectators.length} espectadores`}
+          >
+            <EyeIcon className="w-4 h-4" />
+            {spectators.length}
+          </button>
+        )}
+
+        {/* End game by unanimous vote (also in the menu; on narrow phones only while a vote is open) */}
+        {!isSpectator && (
         <button
           type="button"
           onClick={() => setActiveModal('endGame')}
-          className={`flex items-center justify-center gap-1.5 min-h-[36px] min-w-[36px] shrink-0 px-2 sm:px-2.5 py-1 rounded-[3px] border text-[12px] font-bold transition-colors cursor-pointer ${
+          className={`${endVotePending ? 'flex' : 'hidden min-[400px]:flex'} items-center justify-center gap-1.5 min-h-[36px] min-w-[36px] shrink-0 px-2 sm:px-2.5 py-1 rounded-[3px] border text-[12px] font-bold transition-colors cursor-pointer ${
             endVotePending
               ? 'border-chakra bg-chakra/20 text-chakra-light animate-turn-pulse'
               : 'border-paper/20 text-paper/70 hover:text-paper-light hover:border-paper/45'
@@ -156,6 +198,18 @@ export function GameHeader() {
           {endVotes.length > 0 && (
             <span className="font-serif">{endVotes.length}/{totalPlayers}</span>
           )}
+        </button>
+        )}
+
+        {/* Room menu: players & spectators, kick (host), leave */}
+        <button
+          type="button"
+          onClick={() => setActiveModal('roomMenu')}
+          className="flex items-center justify-center min-h-[36px] min-w-[36px] shrink-0 px-1.5 rounded-[3px] border border-paper/20 text-paper/70 hover:text-paper-light hover:border-paper/45 cursor-pointer"
+          title="Menú de la sala"
+          aria-label="Menú de la sala"
+        >
+          <MenuIcon className="w-4.5 h-4.5" />
         </button>
 
         {/* Connection status */}

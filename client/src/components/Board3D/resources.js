@@ -92,42 +92,52 @@ function settlementGeometry() {
   ]);
 }
 
-/** City: a two-storey pagoda tower */
+/**
+ * City: a three-tier pagoda on a wide, stepped stone plinth with a ring
+ * around it, crowned by a ringed spire. Taller (≈1.7×) and wider than the
+ * settlement, so the two read apart at a glance from any angle.
+ */
 function cityGeometry() {
+  const tier = (half, y0, h, roofHalf, roofTop, tone = 1) => [
+    part(new THREE.BoxGeometry(half * 2, h, half * 2), tone, [0, y0 + h / 2, 0]),
+    // window strip on the front
+    part(new THREE.BoxGeometry(half * 0.9, h * 0.38, 0.012), 0.12, [0, y0 + h * 0.55, half + 0.004]),
+    part(new THREE.BoxGeometry(roofHalf * 2 + 0.04, 0.012, roofHalf * 2 + 0.04), 0.35, [0, y0 + h + 0.004, 0]),
+    part(
+      curvedRoof([
+        [roofHalf, y0 + h],
+        [roofHalf * 0.8, y0 + h + 0.022],
+        [roofHalf * 0.6, y0 + h + 0.05],
+        [half * 0.7, roofTop],
+      ]),
+      0.68
+    ),
+  ];
   return merge([
-    part(new THREE.CylinderGeometry(0.24, 0.255, 0.035, 8), 0.6, [0, 0.0175, 0]),
-    // ground floor
-    part(new THREE.BoxGeometry(0.27, 0.17, 0.27), 1, [0, 0.12, 0]),
-    part(new THREE.BoxGeometry(0.075, 0.105, 0.012), 0.1, [0, 0.087, 0.136]),
-    part(new THREE.BoxGeometry(0.045, 0.045, 0.012), 0.16, [-0.085, 0.13, 0.136]),
-    part(new THREE.BoxGeometry(0.045, 0.045, 0.012), 0.16, [0.085, 0.13, 0.136]),
-    part(new THREE.BoxGeometry(0.38, 0.012, 0.38), 0.35, [0, 0.206, 0]),
+    // stepped stone plinth + a lighter ring around it
+    part(new THREE.CylinderGeometry(0.31, 0.33, 0.035, 10), 0.55, [0, 0.0175, 0]),
+    part(new THREE.TorusGeometry(0.3, 0.018, 6, 30).rotateX(Math.PI / 2), 1.15, [0, 0.038, 0]),
+    part(new THREE.CylinderGeometry(0.24, 0.26, 0.03, 10), 0.7, [0, 0.05, 0]),
+    // ground floor with a door
+    ...tier(0.15, 0.065, 0.17, 0.235, 0.29),
+    part(new THREE.BoxGeometry(0.08, 0.11, 0.012), 0.08, [0, 0.12, 0.155]),
+    // middle and top floors, each narrower
+    ...tier(0.11, 0.285, 0.12, 0.185, 0.45, 0.94),
+    ...tier(0.075, 0.445, 0.1, 0.14, 0.6, 0.9),
     part(
       curvedRoof([
-        [0.205, 0.2],
-        [0.165, 0.222],
-        [0.12, 0.257],
-        [0.095, 0.278],
+        [0.1, 0.6],
+        [0.06, 0.64],
+        [0.025, 0.68],
+        [0, 0.69],
       ]),
       0.68
     ),
-    // upper floor
-    part(new THREE.BoxGeometry(0.17, 0.13, 0.17), 0.92, [0, 0.335, 0]),
-    part(new THREE.BoxGeometry(0.06, 0.05, 0.012), 0.12, [0, 0.34, 0.086]),
-    part(new THREE.BoxGeometry(0.29, 0.012, 0.29), 0.35, [0, 0.401, 0]),
-    part(
-      curvedRoof([
-        [0.155, 0.396],
-        [0.12, 0.418],
-        [0.075, 0.462],
-        [0.035, 0.515],
-        [0.01, 0.55],
-        [0, 0.556],
-      ]),
-      0.68
-    ),
-    part(new THREE.CylinderGeometry(0.011, 0.011, 0.09, 6), 0.25, [0, 0.585, 0]),
-    part(new THREE.SphereGeometry(0.022, 8, 6), 0.9, [0, 0.635, 0]),
+    // spire with rings (sorin)
+    part(new THREE.CylinderGeometry(0.01, 0.012, 0.16, 6), 0.3, [0, 0.76, 0]),
+    part(new THREE.TorusGeometry(0.028, 0.007, 4, 12).rotateX(Math.PI / 2), 1.2, [0, 0.73, 0]),
+    part(new THREE.TorusGeometry(0.022, 0.007, 4, 12).rotateX(Math.PI / 2), 1.2, [0, 0.765, 0]),
+    part(new THREE.SphereGeometry(0.024, 8, 6), 1.2, [0, 0.85, 0]),
   ]);
 }
 

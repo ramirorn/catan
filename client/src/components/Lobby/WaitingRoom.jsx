@@ -1,18 +1,22 @@
+import { useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { pieceColor } from '../../utils/theme';
-import { SettlementIcon, CrownIcon, CopyIcon, HourglassIcon } from '../Shared/Icons';
+import { SettlementIcon, CrownIcon, CopyIcon, HourglassIcon, EyeIcon, ExitIcon } from '../Shared/Icons';
+import { ConfirmDialog } from '../Shared/ConfirmDialog';
 import { ScrollPanel } from '../Shared/ScrollPanel';
 import { BrandPlate } from '../Shared/Brand';
 import { RoomRules } from './RoomRules';
 
 export function WaitingRoom() {
-  const { gameState, myPlayerId, startGame, addToast, updateRoomSettings } = useGame();
+  const {
+    gameState, myPlayerId, startGame, addToast, updateRoomSettings,
+    hostId, isHost, isSpectator, spectators, leaveRoom, kickPlayer,
+  } = useGame();
+  const [confirm, setConfirm] = useState(null); // { kind: 'leave' } | { kind: 'kick', id, name }
 
   if (!gameState) return null;
 
-  const players = Object.values(gameState.players || {});
-  const hostId = gameState.playerOrder?.[0];
-  const isHost = hostId === myPlayerId;
+  const players = (gameState.playerOrder || []).map((pid) => gameState.players?.[pid]).filter(Boolean);
   const canStart = players.length >= 2;
 
   const copyRoomCode = () => {
@@ -95,12 +99,23 @@ export function WaitingRoom() {
                       </span>
                     </div>
 
-                    {isThisHost && (
-                      <span className="inline-flex items-center gap-1 text-[12px] font-bold text-chakra shrink-0">
-                        <CrownIcon className="w-4 h-4" />
-                        Anfitrión
-                      </span>
-                    )}
+                    <span className="flex items-center gap-2 shrink-0">
+                      {isThisHost && (
+                        <span className="inline-flex items-center gap-1 text-[12px] font-bold text-chakra shrink-0">
+                          <CrownIcon className="w-4 h-4" />
+                          <span className="max-[359px]:hidden">Anfitrión</span>
+                        </span>
+                      )}
+                      {isHost && !isMe && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost min-h-[34px] px-2.5 py-1 text-[12px]"
+                          onClick={() => setConfirm({ kind: 'kick', id: p.id, name: p.name })}
+                        >
+                          Expulsar
+                        </button>
+                      )}
+                    </span>
                   </li>
                 );
               })}
@@ -111,11 +126,48 @@ export function WaitingRoom() {
                 </li>
               ))}
             </ul>
+
+            {/* Spectators (anyone can watch, also once the game is running) */}
+            {spectators.length > 0 && (
+              <div className="mt-3 shrink-0">
+                <div className="flex items-baseline justify-between mb-1">
+                  <span className="label-caps flex items-center gap-1.5">
+                    <EyeIcon className="w-3.5 h-3.5" /> Espectadores
+                  </span>
+                  <span className="font-serif font-extrabold text-ink">{spectators.length}</span>
+                </div>
+                <ul className="border-t border-ink/15 max-h-28 overflow-y-auto">
+                  {spectators.map((sp) => (
+                    <li key={sp.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-ink/15">
+                      <span className="text-[14px] text-ink truncate">
+                        {sp.name}
+                        {sp.id === myPlayerId && <span className="ml-1.5 italic text-ink-faint text-[13px]">(tú)</span>}
+                      </span>
+                      {isHost && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost min-h-[34px] px-2.5 py-1 text-[12px] shrink-0"
+                          onClick={() => setConfirm({ kind: 'kick', id: sp.id, name: sp.name })}
+                        >
+                          Expulsar
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {/* Start / Waiting Action */}
-          {isHost ? (
-            <div className="shrink-0 md:col-start-1 md:row-start-2 md:self-end phland:col-start-1 phland:row-start-2 phland:self-end">
+          <div className="shrink-0 md:col-start-1 md:row-start-2 md:self-end phland:col-start-1 phland:row-start-2 phland:self-end">
+          {isSpectator ? (
+            <div className="flex items-center justify-center gap-2 py-2 text-[14px] italic text-ink-soft">
+              <EyeIcon className="w-4 h-4 text-chakra" />
+              <span>Estás observando. La partida se verá aquí cuando empiece.</span>
+            </div>
+          ) : isHost ? (
+            <div>
               <button
                 type="button"
                 onClick={startGame}
@@ -131,12 +183,40 @@ export function WaitingRoom() {
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-2 py-2 text-[14px] italic text-ink-soft shrink-0 md:col-start-1 md:row-start-2 md:self-end phland:col-start-1 phland:row-start-2 phland:self-end">
+            <div className="flex items-center justify-center gap-2 py-2 text-[14px] italic text-ink-soft">
               <HourglassIcon className="w-4 h-4 text-chakra" />
               <span>Esperando a que el anfitrión inicie la partida…</span>
             </div>
           )}
+            <button
+              type="button"
+              onClick={() => setConfirm({ kind: 'leave' })}
+              className="btn btn-ghost w-full min-h-[40px] mt-2 py-2 text-[14px]"
+            >
+              <ExitIcon className="w-4 h-4" />
+              {isSpectator ? 'Dejar de observar' : 'Salir de la sala'}
+            </button>
+          </div>
         </ScrollPanel>
+
+        <ConfirmDialog
+          isOpen={!!confirm}
+          title={confirm?.kind === 'kick' ? '¿Expulsar de la sala?' : isSpectator ? '¿Dejar de observar?' : '¿Salir de la sala?'}
+          confirmLabel={confirm?.kind === 'kick' ? 'Expulsar' : 'Salir'}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => {
+            const c = confirm;
+            setConfirm(null);
+            if (c?.kind === 'kick') kickPlayer(c.id);
+            else leaveRoom();
+          }}
+        >
+          {confirm?.kind === 'kick' ? (
+            <p><strong className="text-ink">{confirm.name}</strong> volverá al menú principal y no podrá entrar otra vez a esta sala.</p>
+          ) : (
+            <p>Volverás al menú principal.{isHost && players.length > 1 ? ' Otro ninja pasará a ser el anfitrión.' : ''}</p>
+          )}
+        </ConfirmDialog>
       </div>
     </div>
   );

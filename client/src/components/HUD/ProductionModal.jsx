@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { Modal } from '../Shared/Modal';
 import { ResourceCard } from '../Shared/ResourceCard';
-import { whenDiceIdle } from '../Dice3D/diceSignal';
+import { whenStageIdle } from '../Effects/fxSignal';
 
 // Second setup settlement: a short beat after the piece lands
 const SHOW_DELAY_MS = 700;
@@ -57,7 +57,8 @@ export function ProductionModal() {
     let after = null;
     let cancelWait = () => {};
     const start = setTimeout(() => {
-      cancelWait = whenDiceIdle(() => {
+      // Dice first, then any board animation queued behind them
+      cancelWait = whenStageIdle(() => {
         after = setTimeout(show, AFTER_DICE_MS);
       });
     }, ROLL_START_MS);

@@ -2,9 +2,12 @@ import { useGame } from '../../context/GameContext';
 import { Modal } from '../Shared/Modal';
 import { pieceColor } from '../../utils/theme';
 import { RobberIcon, SettlementIcon, CardsIcon } from '../Shared/Icons';
+import { useStageReady } from '../Effects/fxSignal';
 
-export function StealModal({ isOpen, onClose }) {
+export function StealModal({ isOpen: wantOpen, onClose }) {
   const { gameState, robberVictims, stealCard } = useGame();
+  // Wait for the dice / the renegade's leap (or a Knight) before asking
+  const isOpen = useStageReady(wantOpen);
 
   if (!isOpen || !robberVictims || robberVictims.length === 0) return null;
 

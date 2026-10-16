@@ -1,6 +1,6 @@
 import { ROBBER_HAND_LIMIT } from './constants.js';
 
-const RESOURCE_ES = { wood: 'madera', brick: 'arcilla', sheep: 'oveja', wheat: 'trigo', ore: 'mineral' };
+const RESOURCE_ES = { wood: 'madera', brick: 'arcilla', sheep: 'oveja', wheat: 'trigo', ore: 'piedra' };
 
 export class Robber {
   constructor() {

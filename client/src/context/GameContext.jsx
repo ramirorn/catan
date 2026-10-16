@@ -1,8 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { whenStageIdle } from '../components/Effects/fxSignal';
 import { useSocket } from './SocketContext';
-import { PHASE } from '../utils/constants';
+import { PHASE, RESOURCE_NAMES } from '../utils/constants';
 
 const GameContext = createContext(null);
+const NO_SPECTATORS = [];
 
 export function GameProvider({ children }) {
   const { socket, connected, playerId } = useSocket();
@@ -18,12 +20,22 @@ export function GameProvider({ children }) {
   // Server clock minus local clock (ms), so countdowns follow the server's deadline
   const [serverOffset, setServerOffset] = useState(0);
 
-  const addToast = useCallback((text, type = 'info') => {
+  const addToast = useCallback((text, type = 'info', duration = 3000) => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, text, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3000);
+    }, duration);
+  }, []);
+
+  // Back to the main menu (left the room, kicked, room closed)
+  const resetToMenu = useCallback(() => {
+    setGameState(null);
+    setRoomId('');
+    setChatMessages([]);
+    setBuildMode(null);
+    setActiveModal(null);
+    setRobberVictims([]);
   }, []);
 
   // Listen to socket events
@@ -53,21 +65,48 @@ export function GameProvider({ children }) {
       });
     };
 
+    // Only the spectator list changed (someone started / stopped watching)
+    const handleRoomSpectators = ({ roomId: rid, spectators } = {}) => {
+      if (!Array.isArray(spectators)) return;
+      setGameState((prev) => (prev && (!rid || prev.roomId === rid) ? { ...prev, spectators } : prev));
+    };
+
+    // The host removed us, or the room no longer exists
+    const handleKicked = ({ message } = {}) => {
+      resetToMenu();
+      addToast(message || 'El anfitrión te expulsó de la sala', 'error', 6000);
+    };
+    const handleRoomClosed = ({ message } = {}) => {
+      resetToMenu();
+      addToast(message || 'La sala se cerró', 'info', 5000);
+    };
+
     socket.on('gameState', handleGameState);
     socket.on('chatMessage', handleChatMessage);
     socket.on('chatHistory', handleChatHistory);
+    socket.on('roomSpectators', handleRoomSpectators);
+    socket.on('kicked', handleKicked);
+    socket.on('roomClosed', handleRoomClosed);
 
     return () => {
       socket.off('gameState', handleGameState);
       socket.off('chatMessage', handleChatMessage);
       socket.off('chatHistory', handleChatHistory);
+      socket.off('roomSpectators', handleRoomSpectators);
+      socket.off('kicked', handleKicked);
+      socket.off('roomClosed', handleRoomClosed);
     };
-  }, [socket]);
+  }, [socket, resetToMenu, addToast]);
 
   // Persistent player id (not socket.id, which changes on every reconnect)
   const myPlayerId = playerId;
   const myPlayer = gameState?.players ? gameState.players[myPlayerId] : null;
-  const isMyTurn = gameState?.currentPlayerId === myPlayerId;
+  // Watching a room (no seat): the server sends the public view only
+  const isSpectator = gameState?.spectator === true;
+  const spectators = gameState?.spectators || NO_SPECTATORS;
+  const hostId = gameState?.hostId ?? gameState?.playerOrder?.[0] ?? null;
+  const isHost = !isSpectator && !!myPlayerId && hostId === myPlayerId;
+  const isMyTurn = !isSpectator && gameState?.currentPlayerId === myPlayerId;
   // 5–6 player extension: after each turn the others build one by one
   const isSpecialBuild = gameState?.phase === PHASE.SPECIAL_BUILD;
   const isMySpecialBuild = isSpecialBuild && gameState?.specialBuilderId === myPlayerId;
@@ -103,19 +142,80 @@ export function GameProvider({ children }) {
   const activeTradeId = gameState?.activeTrade?.status === 'pending' ? gameState.activeTrade.id : null;
   const activeTradeProposer = gameState?.activeTrade?.proposerId;
   const myTradeResponse = gameState?.activeTrade?.responses?.[myPlayerId];
+  // Only pop the offer up when I can actually pay what it asks of me. Otherwise
+  // it just waits inside the Comercio window (where I can counter-offer). If I
+  // get the cards while it is still pending, it pops up then — once per offer.
+  const myRes = myPlayer?.resources;
+  const canPayActiveTrade = !!activeTradeId && !!myRes &&
+    Object.entries(gameState?.activeTrade?.requesting || {}).every(([r, n]) => (myRes[r] || 0) >= n);
   const autoOpenedTradeRef = useRef(null);
+  const notifiedTradeRef = useRef(null);
   useEffect(() => {
     if (
-      activeTradeId &&
-      autoOpenedTradeRef.current !== activeTradeId &&
-      activeTradeProposer !== myPlayerId &&
-      !myTradeResponse &&
-      activeModal === null
-    ) {
+      !activeTradeId ||
+      isSpectator ||
+      activeTradeProposer === myPlayerId ||
+      myTradeResponse ||
+      autoOpenedTradeRef.current === activeTradeId
+    ) return;
+    if (!canPayActiveTrade) {
+      if (notifiedTradeRef.current !== activeTradeId) {
+        notifiedTradeRef.current = activeTradeId; // one quiet heads-up per offer
+        const who = gameState?.activeTrade?.proposerName || 'Un ninja';
+        addToast(`${who} propone un comercio, pero no tienes lo que pide. Puedes contraofertar en Comercio.`, 'info', 5000);
+      }
+      return;
+    }
+    if (activeModal === null) {
       autoOpenedTradeRef.current = activeTradeId; // open once per offer, so it can be dismissed
       setActiveModal('trade');
     }
-  }, [activeTradeId, activeTradeProposer, myTradeResponse, myPlayerId, activeModal]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTradeId, activeTradeProposer, myTradeResponse, myPlayerId, activeModal, isSpectator, canPayActiveTrade]);
+
+  // Robber: the victim learns what was taken, the thief what they got.
+  // Everyone else only reads «le robó una carta» in the chronicle.
+  const stealId = gameState?.lastSteal?.id ?? null;
+  const seenStealRef = useRef(undefined);
+  useEffect(() => {
+    if (seenStealRef.current === undefined) {
+      seenStealRef.current = stealId; // a robbery from before we joined
+      return;
+    }
+    if (stealId === null || stealId === seenStealRef.current) return;
+    seenStealRef.current = stealId;
+    const steal = gameState?.lastSteal;
+    if (!steal?.resource) return;
+    const res = RESOURCE_NAMES[steal.resource] || steal.resource;
+    const thief = gameState?.players?.[steal.thiefId]?.name || 'Un ninja';
+    const victim = gameState?.players?.[steal.victimId]?.name || 'un ninja';
+    let message = null;
+    if (steal.victimId === myPlayerId) {
+      const who = steal.source === 'knight' ? `El Caballero de ${thief}` : `El renegado de ${thief}`;
+      message = [`${who} te robó 1 ${res}`, 'error', 6000];
+    } else if (steal.thiefId === myPlayerId) {
+      message = [`Le robaste 1 ${res} a ${victim}`, 'success', 5000];
+    }
+    if (!message) return;
+    // Tell it after the dice / robber / steal animations, so it isn't spoiled
+    let done = false;
+    const show = () => {
+      if (done) return;
+      done = true;
+      addToast(...message);
+    };
+    let cancelWait = () => {};
+    const start = setTimeout(() => {
+      cancelWait = whenStageIdle(show);
+    }, 150);
+    const cap = setTimeout(show, 7000);
+    return () => {
+      clearTimeout(start);
+      clearTimeout(cap);
+      cancelWait();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stealId]);
 
   // Proposer side: someone accepted our offer and the swap already happened
   const completedTradeId = gameState?.lastCompletedTrade?.id ?? null;
@@ -205,6 +305,44 @@ export function GameProvider({ children }) {
     });
   }, [socket, connected, addToast]);
 
+  // Watch a room (waiting or in progress) without a seat
+  const spectateRoom = useCallback((targetRoomId, name) => {
+    if (!socket || !connected) {
+      addToast('No hay conexión con el servidor', 'error');
+      return;
+    }
+    const cleanRoomId = targetRoomId.trim().toUpperCase();
+    localStorage.setItem('catan_player_name', name);
+    setPlayerName(name);
+    socket.emit('spectateRoom', { roomId: cleanRoomId, playerName: name }, (res) => {
+      if (res?.success) {
+        setRoomId(cleanRoomId);
+        addToast(`Observando la sala ${cleanRoomId}`, 'success');
+      } else {
+        addToast(res?.error || 'No se pudo observar la sala', 'error');
+      }
+    });
+  }, [socket, connected, addToast]);
+
+  // Leave the room / game (players and spectators) and go back to the menu
+  const leaveRoom = useCallback(() => {
+    if (!socket) return;
+    socket.emit('leaveRoom', {}, (res) => {
+      if (res?.success === false) {
+        addToast(res.error || 'No se pudo salir de la sala', 'error');
+        return;
+      }
+      resetToMenu();
+      addToast('Volviste al menú principal', 'info');
+    });
+  }, [socket, addToast, resetToMenu]);
+
+  // Host only (the server checks it): remove a player or a spectator
+  const kickPlayer = useCallback((targetId) => {
+    if (!socket) return;
+    socket.emit('kickPlayer', { targetId }, (res) => handleCallback(res, 'Expulsado de la sala'));
+  }, [socket, handleCallback]);
+
   // Host: change the room rules before starting (victory points, turn time)
   const updateRoomSettings = useCallback((settings) => {
     if (!socket) return;
@@ -289,7 +427,7 @@ export function GameProvider({ children }) {
           setRobberVictims(res.stealTargets.map((t) => t.id));
           setActiveModal('steal');
         } else if (res.fromPlayer) {
-          addToast('Ladrón reubicado. Robaste 1 carta.', 'success');
+          // «Le robaste 1 …» arrives with the new state (lastSteal)
         } else {
           addToast('Ladrón reubicado. No hay colonos para robar.', 'info');
         }
@@ -303,14 +441,14 @@ export function GameProvider({ children }) {
     if (!socket) return;
     socket.emit('stealCard', { victimId }, (res) => {
       if (res.success) {
-        addToast(res.message || '¡Recurso saqueado con éxito!', 'success');
+        // The stolen resource is announced from lastSteal
         setActiveModal(null);
         setRobberVictims([]);
       } else {
         handleCallback(res);
       }
     });
-  }, [socket, handleCallback, addToast]);
+  }, [socket, handleCallback]);
 
   const bankTrade = useCallback((give, receive) => {
     if (!socket) return;
@@ -360,11 +498,18 @@ export function GameProvider({ children }) {
     });
   }, [socket, handleCallback]);
 
+  // The phase the button was pressed in travels along, so a stale tap (e.g.
+  // «Terminar construcción» landing after the next turn began) is rejected
+  const phaseRef = useRef(null);
+  const currentPhase = gameState?.phase ?? null;
+  useEffect(() => {
+    phaseRef.current = currentPhase;
+  }, [currentPhase]);
   const endTurn = useCallback(() => {
     if (!socket) return;
     setBuildMode(null);
     setActiveModal(null);
-    socket.emit('endTurn', {}, (res) => handleCallback(res));
+    socket.emit('endTurn', { expectPhase: phaseRef.current }, (res) => handleCallback(res));
   }, [socket, handleCallback]);
 
   const sendChatMessage = useCallback((message) => {
@@ -382,6 +527,10 @@ export function GameProvider({ children }) {
     myPlayerId,
     myPlayer,
     isMyTurn,
+    isSpectator,
+    spectators,
+    hostId,
+    isHost,
     isSpecialBuild,
     isMySpecialBuild,
     canActOnBoard,
@@ -399,6 +548,9 @@ export function GameProvider({ children }) {
     createRoom,
     updateRoomSettings,
     joinRoom,
+    spectateRoom,
+    leaveRoom,
+    kickPlayer,
     startGame,
     rollDice,
     setupPlaceSettlement,
@@ -421,6 +573,7 @@ export function GameProvider({ children }) {
     sendChatMessage,
   }), [
     gameState, roomId, playerName, myPlayerId, myPlayer, isMyTurn,
+    isSpectator, spectators, hostId, isHost, spectateRoom, leaveRoom, kickPlayer,
     isSpecialBuild, isMySpecialBuild, canActOnBoard,
     buildMode, activeModal, toasts, addToast, chatMessages, robberVictims, isRolling,
     serverOffset, updateRoomSettings,

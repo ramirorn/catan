@@ -40,3 +40,6 @@ console.log('Placed setup road:', roadRes.success);
 const serialized = engine.serialize('player1');
 console.log('Serialized state keys:', Object.keys(serialized));
 console.log('ALL ENGINE TESTS PASSED SUCCESSFULLY! 🎉');
+
+// Engine rules (setup order, special build, steals, spectators, leaving…)
+await import('./tests/engine.test.js');

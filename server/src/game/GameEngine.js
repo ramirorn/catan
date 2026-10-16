@@ -11,6 +11,8 @@ import {
 } from './constants.js';
 
 const VALID_RESOURCES = Object.values(RESOURCE);
+// How many animation events the state carries (clients replay the new ones)
+const RECENT_EVENTS_MAX = 6;
 
 
 // Resource names for the game log (chronicle is shown in Spanish)
@@ -19,7 +21,7 @@ const RESOURCE_ES = {
   brick: 'arcilla',
   sheep: 'oveja',
   wheat: 'trigo',
-  ore: 'mineral',
+  ore: 'piedra',
 };
 
 export class GameEngine {
@@ -75,6 +77,47 @@ export class GameEngine {
     // socket layer's turn timer (null when no timer is running).
     this.turnDeadline = null;
     this.timedOutKey = null;  // timer key of the last turn that timed out
+
+    // Game clock: epoch ms when the setup began / when the game ended
+    this.startedAt = null;
+    this.endedAt = null;
+
+    // Last robbery (dice 7 or Knight). The resource is only serialized for the
+    // thief and the victim; everyone else just sees that a card was taken.
+    this.lastSteal = null;
+    this.stealCounter = 0;
+    this.robberSource = 'dice'; // 'dice' | 'knight'
+
+    // Public event feed for the client animations (city upgrade, robber,
+    // steal, dev card, near win): a short ring buffer with increasing ids,
+    // sent inside the state that is broadcast anyway. Nothing private here
+    // (a steal never says which resource was taken).
+    this.recentEvents = [];
+    this.eventCounter = 0;
+    this.nearWinAnnounced = new Set(); // players already announced at vpToWin - 2
+  }
+
+  // ─── Event feed (animations) ───
+  _pushEvent(type, data) {
+    this.eventCounter++;
+    this.recentEvents.push({ id: this.eventCounter, type, ...data });
+    if (this.recentEvents.length > RECENT_EVENTS_MAX) this.recentEvents.shift();
+  }
+
+  // A player whose PUBLIC points reach vpToWin - 2 (hidden VP cards are never
+  // used, so the feed can't leak them) is announced once per game
+  _checkNearWin() {
+    if (this.winner || this.phase === PHASE.GAME_OVER) return;
+    const threshold = this.vpToWin - 2;
+    for (const pid of this.playerOrder) {
+      const p = this.players[pid];
+      if (!p || this.nearWinAnnounced.has(pid)) continue;
+      p.calculateVP();
+      if (p.publicVP >= threshold && p.publicVP < this.vpToWin) {
+        this.nearWinAnnounced.add(pid);
+        this._pushEvent('nearWin', { playerId: pid, vpLeft: this.vpToWin - p.publicVP });
+      }
+    }
   }
 
   // ─── Room settings (host, before starting) ───
@@ -165,6 +208,75 @@ export class GameEngine {
     return false;
   }
 
+  // ─── Leaving a game in progress ───
+  // The player keeps their seat and pieces (the board stays coherent) but is
+  // marked as gone: the server plays their turns at once (autoPlayLeft) and
+  // they no longer count for the unanimous end vote.
+  markLeft(id, { kicked = false } = {}) {
+    const player = this.players[id];
+    if (!player) return false;
+    player.left = true;
+    player.kicked = player.kicked || kicked;
+    player.connected = false;
+    this.endVotes.delete(id);
+    this.log(`${player.name} ${kicked ? 'fue expulsado de la partida' : 'abandonó la partida'}`);
+    // Their pending trade offer (if any) dies with them
+    const active = this.trade.getActiveTrade();
+    if (active && active.proposerId === id) this.trade.cancelTrade();
+    this._checkEndVotes();
+    return true;
+  }
+
+  // A player who left (not kicked) comes back to their seat
+  rejoinPlayer(id) {
+    const player = this.players[id];
+    if (!player || player.kicked) return false;
+    if (player.left) this.log(`${player.name} volvió a la partida`);
+    player.left = false;
+    player.connected = true;
+    return true;
+  }
+
+  activePlayerIds() {
+    return this.playerOrder.filter((pid) => !this.players[pid]?.left);
+  }
+
+  _isAbsent(pid) {
+    const p = this.players[pid];
+    return !p || p.left;
+  }
+
+  // Plays at once for players who left, wherever the game waits on them, so a
+  // game without a turn limit never stalls on an empty seat. Cheap when nobody
+  // left (one pass over playerOrder).
+  autoPlayLeft() {
+    if (!this.playerOrder.some((pid) => this.players[pid]?.left)) return false;
+    let acted = false;
+    for (let step = 0; step < 40; step++) {
+      if (this.phase === PHASE.LOBBY || this.phase === PHASE.GAME_OVER) break;
+      if (this.activePlayerIds().length === 0) break;
+      if (this.phase === PHASE.ROBBER_DISCARD) {
+        const pending = this.robber.playersWhoMustDiscard
+          .filter((pid) => !this.robber.discardedPlayers.has(pid) && this._isAbsent(pid));
+        if (pending.length === 0) break;
+        for (const pid of pending) {
+          if (this.phase !== PHASE.ROBBER_DISCARD) break;
+          const player = this.players[pid];
+          this.discardCards(pid, this._randomCards(player, Math.floor(player.totalResources() / 2)));
+        }
+        acted = true;
+        continue;
+      }
+      const actor = this.getActingPlayerId();
+      if (!actor || !this._isAbsent(actor)) break;
+      const before = `${this.phase}:${actor}:${this.turnNumber}`;
+      this.handleTimeout({ silent: true });
+      acted = true;
+      if (`${this.phase}:${this.getActingPlayerId()}:${this.turnNumber}` === before) break; // no progress
+    }
+    return acted;
+  }
+
   getCurrentPlayer() {
     return this.players[this.playerOrder[this.currentPlayerIndex]];
   }
@@ -202,6 +314,8 @@ export class GameEngine {
     this.currentPlayerIndex = 0;
     this.phase = PHASE.SETUP_FORWARD;
     this.setupRound = 0;
+    this.startedAt = Date.now();
+    this.endedAt = null;
 
     this.log('¡Comienza la partida! Fase de colocación inicial.');
     this.log(`Turno de ${this.getCurrentPlayer().name} para colocar un poblado.`);
@@ -248,6 +362,7 @@ export class GameEngine {
     }
 
     this.log(`${player.name} colocó un poblado`);
+    this._checkNearWin();
     return { success: true, phase: this.phase };
   }
 
@@ -321,7 +436,8 @@ export class GameEngine {
     const die2 = Math.floor(Math.random() * 6) + 1;
     const roll = die1 + die2;
     this.diceRollCounter++;
-    this.lastDiceRoll = { id: this.diceRollCounter, die1, die2, total: roll };
+    // playerId: who rolled (the turn may already have passed when clients get it)
+    this.lastDiceRoll = { id: this.diceRollCounter, die1, die2, total: roll, playerId };
 
     this.log(`${this.getCurrentPlayer().name} sacó ${die1} + ${die2} = ${roll}`);
 
@@ -393,6 +509,7 @@ export class GameEngine {
 
   _handleRollSeven() {
     this.phaseAfterRobber = PHASE.MAIN;
+    this.robberSource = 'dice';
     const mustDiscard = this.robber.checkDiscards(this.players);
 
     if (mustDiscard.length > 0) {
@@ -452,7 +569,9 @@ export class GameEngine {
       return { success: false, error: 'Casilla no válida' };
     }
 
+    const fromHex = this.board.robberHex;
     this.board.moveRobber(hexId);
+    this._pushEvent('robberMoved', { playerId, fromHex, toHex: hexId });
     this.log(`${this.getCurrentPlayer().name} movió al ladrón`);
 
     // Check if there are players to steal from
@@ -467,6 +586,7 @@ export class GameEngine {
     if (adjacentPlayers.length === 1) {
       // Auto-steal
       const result = this.robber.stealCard(this.players[playerId], this.players[adjacentPlayers[0]]);
+      this._recordSteal(playerId, adjacentPlayers[0], result.resource);
       this.log(`${this.getCurrentPlayer().name} le robó una carta a ${this.players[adjacentPlayers[0]].name}`);
       this.phase = this.phaseAfterRobber;
       return { success: true, phase: this.phase, stolen: result, fromPlayer: adjacentPlayers[0], stealTargets: [] };
@@ -497,11 +617,34 @@ export class GameEngine {
     }
 
     const result = this.robber.stealCard(this.players[playerId], this.players[victimId]);
+    this._recordSteal(playerId, victimId, result.resource);
     this.log(`${this.getCurrentPlayer().name} le robó una carta a ${this.players[victimId].name}`);
     this.stealTargets = [];
     this.phase = this.phaseAfterRobber;
 
     return { success: true, phase: this.phase, stolen: result };
+  }
+
+  _recordSteal(thiefId, victimId, resource) {
+    if (!resource) return;
+    this.stealCounter++;
+    this.lastSteal = { id: this.stealCounter, thiefId, victimId, resource, source: this.robberSource };
+    // Public: who robbed whom, never what
+    this._pushEvent('steal', { thiefId, victimId });
+  }
+
+  // What a given viewer may know about the last robbery
+  _serializeSteal(forPlayerId) {
+    const s = this.lastSteal;
+    if (!s) return null;
+    const involved = forPlayerId && (forPlayerId === s.thiefId || forPlayerId === s.victimId);
+    return {
+      id: s.id,
+      thiefId: s.thiefId,
+      victimId: s.victimId,
+      source: s.source,
+      resource: involved ? s.resource : null,
+    };
   }
 
   // ─── Building Actions (Main Phase) ───
@@ -532,12 +675,14 @@ export class GameEngine {
 
       this.scoring.updateLongestRoad(this.players, this.board);
       this.log(`${player.name} colocó un camino gratis (Construcción de caminos)`);
+      const freeWinner = this._checkWin();
+      this._checkNearWin();
 
       return {
         success: true,
         freeRoadsRemaining: this.freeRoadsRemaining,
         scoring: this.scoring.serialize(),
-        winner: this._checkWin(),
+        winner: freeWinner,
       };
     }
 
@@ -557,8 +702,10 @@ export class GameEngine {
 
     this.scoring.updateLongestRoad(this.players, this.board);
     this.log(`${player.name} construyó un camino`);
+    const roadWinner = this._checkWin();
+    this._checkNearWin();
 
-    return { success: true, scoring: this.scoring.serialize(), winner: this._checkWin() };
+    return { success: true, scoring: this.scoring.serialize(), winner: roadWinner };
   }
 
   buildSettlement(playerId, vertexId) {
@@ -587,11 +734,13 @@ export class GameEngine {
     // Longest road might break (if settlement splits opponent's road)
     this.scoring.updateLongestRoad(this.players, this.board);
     this.log(`${player.name} construyó un poblado`);
+    const settlementWinner = this._checkWin();
+    this._checkNearWin();
 
     return {
       success: true,
       scoring: this.scoring.serialize(),
-      winner: this._checkWin(),
+      winner: settlementWinner,
     };
   }
 
@@ -620,11 +769,14 @@ export class GameEngine {
     player.citiesBuilt++;
 
     this.log(`${player.name} mejoró un poblado a ciudad`);
+    this._pushEvent('cityUpgrade', { playerId, vertexId });
+    const cityWinner = this._checkWin();
+    this._checkNearWin();
 
     return {
       success: true,
       scoring: this.scoring.serialize(),
-      winner: this._checkWin(),
+      winner: cityWinner,
     };
   }
 
@@ -670,10 +822,13 @@ export class GameEngine {
         if (result.success) {
           this.scoring.updateLargestArmy(this.players);
           this.log(`${player.name} jugó un Caballero`);
+          this._pushEvent('devCard', { playerId, cardType });
           const winner = this._checkWin();
+          this._checkNearWin();
           if (winner) return { ...result, scoring: this.scoring.serialize(), phase: this.phase, winner };
           // After moving the robber, return to where we were (roll dice if played before rolling)
           this.phaseAfterRobber = phaseBefore;
+          this.robberSource = 'knight';
           this.phase = PHASE.ROBBER_MOVE;
         }
         return { ...result, scoring: this.scoring.serialize(), phase: this.phase };
@@ -684,6 +839,7 @@ export class GameEngine {
         if (result.success) {
           this.freeRoadsRemaining = Math.max(0, Math.min(2, MAX_ROADS - player.roadsBuilt));
           this.log(`${player.name} jugó Construcción de caminos`);
+          this._pushEvent('devCard', { playerId, cardType });
         }
         return { ...result, freeRoadsRemaining: this.freeRoadsRemaining };
       }
@@ -701,6 +857,8 @@ export class GameEngine {
         const result = this.devCards.playYearOfPlenty(player, resource1, resource2);
         if (result.success) {
           this.log(`${player.name} jugó Año de la abundancia (${RESOURCE_ES[resource1] || resource1}, ${RESOURCE_ES[resource2] || resource2})`);
+          // The chosen resources are public (chronicle), so they can be shown
+          this._pushEvent('devCard', { playerId, cardType, resources: [resource1, resource2] });
         }
         return result;
       }
@@ -711,6 +869,7 @@ export class GameEngine {
         const result = this.devCards.playMonopoly(player, resource, allPlayers);
         if (result.success) {
           this.log(`${player.name} jugó Monopolio de ${RESOURCE_ES[resource] || resource} (se llevó ${result.totalStolen})`);
+          this._pushEvent('devCard', { playerId, cardType, resource, total: result.totalStolen });
         }
         return result;
       }
@@ -884,7 +1043,13 @@ export class GameEngine {
   }
 
   // ─── End Turn ───
-  endTurn(playerId) {
+  // expectPhase (optional): the phase the client saw when the button was
+  // pressed. A stale click (e.g. a second tap on «Terminar construcción» that
+  // lands once the next turn has begun) is rejected instead of ending a turn.
+  endTurn(playerId, expectPhase = null) {
+    if (expectPhase && expectPhase !== this.phase) {
+      return { success: false, error: 'La fase ya cambió; revisa el tablero' };
+    }
     // During the special building phase "ending the turn" means passing
     if (this.phase === PHASE.SPECIAL_BUILD) {
       return this.passSpecialBuild(playerId);
@@ -905,18 +1070,18 @@ export class GameEngine {
     player.hasPlayedDevCardThisTurn = false;
     this.freeRoadsRemaining = 0;
 
-    // 5–6 player extension: every other player, starting with the next one,
-    // may now build before the next turn begins
-    if (this.isExtended() && this.playerOrder.length > 1) {
-      const n = this.playerOrder.length;
-      this.specialBuildQueue = [];
-      for (let i = 1; i < n; i++) {
-        this.specialBuildQueue.push(this.playerOrder[(this.currentPlayerIndex + i) % n]);
+    // 5–6 player extension: special building phase. Only the OTHER players
+    // build, in turn order, and never the one whose turn comes next: that
+    // player builds in their own turn right after, which always begins by
+    // rolling the dice. Players who left or are offline are skipped.
+    if (this.isExtended()) {
+      this.specialBuildQueue = this._specialBuildOrder();
+      if (this.specialBuildQueue.length > 0) {
+        this.phase = PHASE.SPECIAL_BUILD;
+        this.log('Fase especial de construcción: los demás ninjas pueden construir por orden.');
+        this._nextSpecialBuilder();
+        return { success: true, phase: this.phase, specialBuilderId: this.specialBuilderId };
       }
-      this.phase = PHASE.SPECIAL_BUILD;
-      this.log('Fase especial de construcción: los demás ninjas pueden construir por orden.');
-      this._nextSpecialBuilder();
-      return { success: true, phase: this.phase, specialBuilderId: this.specialBuilderId };
     }
 
     return this._startNextTurn();
@@ -940,6 +1105,18 @@ export class GameEngine {
       return { success: true, phase: this.phase, specialBuilderId: this.specialBuilderId };
     }
     return this._startNextTurn();
+  }
+
+  // Players after the next one, ending with the one before the current player
+  _specialBuildOrder() {
+    const n = this.playerOrder.length;
+    const order = [];
+    for (let i = 2; i < n; i++) {
+      const pid = this.playerOrder[(this.currentPlayerIndex + i) % n];
+      const p = this.players[pid];
+      if (p && !p.left && p.connected !== false) order.push(pid);
+    }
+    return order;
   }
 
   _nextSpecialBuilder() {
@@ -972,6 +1149,11 @@ export class GameEngine {
     };
   }
 
+  _setGameOver() {
+    this.phase = PHASE.GAME_OVER;
+    if (!this.endedAt) this.endedAt = Date.now();
+  }
+
   // ─── End Game by Unanimous Vote ───
   voteEndGame(playerId, vote) {
     const player = this.players[playerId];
@@ -983,14 +1165,23 @@ export class GameEngine {
     const had = this.endVotes.has(playerId);
     if (vote && !had) {
       this.endVotes.add(playerId);
-      this.log(`${player.name} votó terminar la partida (${this.endVotes.size}/${this.playerOrder.length})`);
+      this.log(`${player.name} votó terminar la partida (${this.endVotes.size}/${this.activePlayerIds().length})`);
     } else if (!vote && had) {
       this.endVotes.delete(playerId);
       this.log(`${player.name} retiró su voto para terminar la partida`);
     }
 
-    if (this.playerOrder.every((pid) => this.endVotes.has(pid))) {
-      this.phase = PHASE.GAME_OVER;
+    this._checkEndVotes();
+
+    return { success: true, ended: this.endedByAgreement };
+  }
+
+  // Everyone still in the game (players who left don't count) agreed to end
+  _checkEndVotes() {
+    if (this.phase === PHASE.LOBBY || this.phase === PHASE.GAME_OVER) return;
+    const active = this.activePlayerIds();
+    if (this.endVotes.size > 0 && active.length > 0 && active.every((pid) => this.endVotes.has(pid))) {
+      this._setGameOver();
       this.endedByAgreement = true;
       this.freeRoadsRemaining = 0;
       this.specialBuilderId = null;
@@ -998,8 +1189,6 @@ export class GameEngine {
       this.trade.cancelTrade();
       this.log('La partida terminó por acuerdo unánime.');
     }
-
-    return { success: true, ended: this.endedByAgreement };
   }
 
   // ─── Turn time limit ───
@@ -1027,15 +1216,17 @@ export class GameEngine {
 
   // Time ran out: act minimally on behalf of whoever had to act, so the game
   // keeps moving (also covers disconnected players).
-  handleTimeout() {
+  // silent: acting for a player who left (no "time ran out" lines in the log)
+  handleTimeout({ silent = false } = {}) {
     const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const note = (msg) => { if (!silent) this.log(msg); };
 
     switch (this.phase) {
       case PHASE.SETUP_FORWARD:
       case PHASE.SETUP_REVERSE: {
         const pid = this.getCurrentPlayerId();
         const player = this.players[pid];
-        this.log(`Se acabó el tiempo de ${player.name}: se coloca al azar.`);
+        note(`Se acabó el tiempo de ${player.name}: se coloca al azar.`);
         if (player.lastSetupVertex === null) {
           const spots = this.getValidPlacements(pid).validSettlements;
           if (spots.length === 0) return { success: false, error: 'No hay sitio válido para un poblado' };
@@ -1051,7 +1242,7 @@ export class GameEngine {
         for (const pid of this.robber.playersWhoMustDiscard) {
           if (this.robber.discardedPlayers.has(pid) || this.phase !== PHASE.ROBBER_DISCARD) continue;
           const player = this.players[pid];
-          this.log(`Se acabó el tiempo de ${player.name}: descarta al azar.`);
+          note(`Se acabó el tiempo de ${player.name}: descarta al azar.`);
           this.discardCards(pid, this._randomCards(player, Math.floor(player.totalResources() / 2)));
         }
         return { success: true };
@@ -1059,7 +1250,7 @@ export class GameEngine {
 
       case PHASE.SPECIAL_BUILD: {
         const pid = this.specialBuilderId;
-        this.log(`Se acabó el tiempo de ${this.players[pid]?.name || 'un ninja'} (construcción especial).`);
+        note(`Se acabó el tiempo de ${this.players[pid]?.name || 'un ninja'} (construcción especial).`);
         return this.passSpecialBuild(pid);
       }
 
@@ -1068,7 +1259,7 @@ export class GameEngine {
       case PHASE.ROBBER_MOVE:
       case PHASE.ROBBER_STEAL: {
         const pid = this.getCurrentPlayerId();
-        this.log(`Se acabó el tiempo de ${this.players[pid].name}.`);
+        note(`Se acabó el tiempo de ${this.players[pid].name}.`);
         // Remembered so that, if this turn needs the player again later (e.g. the
         // robber after others discard), they only get a short grace period
         this.timedOutKey = this.getTimerKey();
@@ -1123,7 +1314,7 @@ export class GameEngine {
     if (this.phase === PHASE.SPECIAL_BUILD) return null;
     const winner = this.scoring.checkWinner(this.players, this.getCurrentPlayerId(), this.vpToWin);
     if (winner) {
-      this.phase = PHASE.GAME_OVER;
+      this._setGameOver();
       this.freeRoadsRemaining = 0;
       this.trade.cancelTrade();
       this.winner = {
@@ -1252,6 +1443,10 @@ export class GameEngine {
       vpToWin: this.vpToWin,
       turnTimeLimit: this.turnTimeLimit,
       turnDeadline: this.turnDeadline,
+      startedAt: this.startedAt,
+      endedAt: this.endedAt,
+      lastSteal: this._serializeSteal(forPlayerId),
+      recentEvents: this.recentEvents,
       serverNow: Date.now(),
     };
 
@@ -1261,7 +1456,7 @@ export class GameEngine {
     }
 
     // Add valid placements for the requesting player
-    if (forPlayerId && this.board) {
+    if (forPlayerId && this.players[forPlayerId] && this.board) {
       state.validPlacements = this.getValidPlacements(forPlayerId);
       state.portRatios = this.getPlayerPortRatios(forPlayerId);
     }

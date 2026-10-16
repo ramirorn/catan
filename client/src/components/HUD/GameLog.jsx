@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGame } from '../../context/GameContext';
 import { pieceColor, shade } from '../../utils/theme';
-import { ScrollIcon, ChatIcon } from '../Shared/Icons';
+import { ScrollIcon, ChatIcon, ChevronDownIcon } from '../Shared/Icons';
+import { useLogExpanded, setLogExpanded } from './logLayout';
 
 export function GameLog() {
   const { gameState, chatMessages, sendChatMessage } = useGame();
   const [activeTab, setActiveTab] = useState('log');
   const [text, setText] = useState('');
   const scrollRef = useRef(null);
+  const expanded = useLogExpanded();
 
   const logs = gameState?.gameLog || [];
 
@@ -15,7 +17,7 @@ export function GameLog() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [logs, chatMessages, activeTab]);
+  }, [logs, chatMessages, activeTab, expanded]);
 
   // iOS: once the keyboard is up, bring the box into view; on close, undo any
   // page shift Safari left behind
@@ -64,6 +66,17 @@ export function GameLog() {
           <ChatIcon className="w-4 h-4" />
           <span>Chat</span>
           <span className="font-normal text-ink-faint text-[11px]">{chatMessages.length}</span>
+        </button>
+        {/* Enlarge the log / chat over the standings (they shrink to a strip) */}
+        <button
+          type="button"
+          onClick={() => setLogExpanded(!expanded)}
+          className="shrink-0 w-10 flex items-center justify-center text-ink-faint hover:text-shu cursor-pointer border-b-2 border-transparent"
+          aria-pressed={expanded}
+          title={expanded ? 'Reducir y ver la clasificación' : 'Ampliar registro y chat'}
+          aria-label={expanded ? 'Reducir y ver la clasificación' : 'Ampliar registro y chat'}
+        >
+          <ChevronDownIcon className={`w-4 h-4 transition-transform ${expanded ? '' : 'rotate-180'}`} />
         </button>
       </div>
 

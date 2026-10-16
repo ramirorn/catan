@@ -24,7 +24,7 @@ Juego completo de **Los Colonos de Catán** para navegador con multijugador en r
 - **Construcción y Validación Geométrica**:
   - Caminos (1 Madera + 1 Arcilla) conectados a la red del jugador.
   - Poblados (1 Madera + 1 Arcilla + 1 Oveja + 1 Trigo) respetando la regla de distancia (al menos 2 aristas de separación).
-  - Ciudades (2 Trigo + 3 Mineral) mejorando poblados existentes para duplicar la producción.
+  - Ciudades (2 Trigo + 3 Piedra) mejorando poblados existentes para duplicar la producción.
 - **Mecánica del Ladrón (7)**:
   - Descarte obligatorio de la mitad de cartas para jugadores con más de 7 recursos.
   - Reubicación del ladrón en cualquier hexágono para bloquear su producción.
@@ -33,7 +33,7 @@ Juego completo de **Los Colonos de Catán** para navegador con multijugador en r
   - Comercio con el Banco (4:1 por defecto, o 3:1 / 2:1 mediante puertos controlados).
   - Comercio entre jugadores con propuestas de intercambio, negociación y aceptación/rechazo en tiempo real.
 - **Cartas de Desarrollo**:
-  - Compra de cartas (1 Oveja + 1 Trigo + 1 Mineral).
+  - Compra de cartas (1 Oveja + 1 Trigo + 1 Piedra).
   - Caballero (mueve el ladrón y roba).
   - Construcción de Caminos (2 caminos gratis).
   - Año de la Abundancia (toma 2 recursos cualquiera del banco).

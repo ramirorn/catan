@@ -19,6 +19,7 @@ import { PX, TILE_H, TILE_SCALE, INK } from './resources';
 
 import { SceneContext } from './sceneContext';
 import { tipHandlers3D } from '../Board/boardTip';
+import { useFxHidden } from '../Effects/fxSignal';
 const useScene = () => useContext(SceneContext);
 
 // drei <Outlines> thickness is in device pixels (constant on screen)
@@ -223,6 +224,12 @@ function Robber3D({ x, z }) {
   const ref = useRef(null);
   const anim = useRef(null);
   const last = useRef(null);
+  // While the leap animation (overlay) carries the rogue, the piece waits hidden
+  const hidden = useFxHidden('robber');
+  const hiddenRef = useRef(hidden);
+  useLayoutEffect(() => {
+    hiddenRef.current = hidden;
+  }, [hidden]);
 
   // Hop to the new hex when the robber moves
   useLayoutEffect(() => {
@@ -230,13 +237,19 @@ function Robber3D({ x, z }) {
     if (!g) return;
     const prev = last.current;
     last.current = [x, z];
-    if (!prev) {
+    if (!prev || hiddenRef.current) {
+      anim.current = null;
       g.position.set(x, TILE_H, z);
+      invalidate();
       return;
     }
     anim.current = { from: prev, to: [x, z], t0: performance.now() };
     invalidate();
   }, [x, z, invalidate]);
+
+  useLayoutEffect(() => {
+    invalidate();
+  }, [hidden, invalidate]);
 
   useFrame(() => {
     const a = anim.current;
@@ -253,7 +266,7 @@ function Robber3D({ x, z }) {
   });
 
   return (
-    <group ref={ref}>
+    <group ref={ref} visible={!hidden}>
       <group scale={1.2}>
         <mesh material={res.mat.cloak} castShadow>
           <latheGeometry args={[CLOAK_PROFILE, 28]} />
@@ -293,33 +306,70 @@ function Robber3D({ x, z }) {
 
 const easeOutBack = (t) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
 
-/** A building / road in a player's colour, with an ink outline; drops in when placed */
-const Piece = memo(function Piece({ geometry, color, tipId }) {
+/**
+ * A building / road in a player's colour, with an ink outline; drops in when
+ * placed. A city being upgraded waits hidden while the upgrade animation
+ * starts (fxKey), then rises out of the ground with a turn.
+ */
+const Piece = memo(function Piece({ geometry, color, tipId, fxKey = null, rise = false }) {
   const { res, bornAt } = useScene();
   const tip = tipId ? tipHandlers3D('vertex', tipId) : null;
   const dpr = useOutlinePx();
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef(null);
   const anim = useRef(null);
+  const hidden = useFxHidden(fxKey);
+  const wasHidden = useRef(hidden);
 
   useLayoutEffect(() => {
     // Pieces present when the board opens appear instantly
     if (performance.now() - bornAt < 1200) return;
-    anim.current = performance.now();
+    anim.current = { t0: performance.now(), dur: 380, rise: false };
     ref.current?.scale.setScalar(0.001);
     invalidate();
   }, [bornAt, invalidate]);
 
+  useLayoutEffect(() => {
+    const was = wasHidden.current;
+    wasHidden.current = hidden;
+    invalidate();
+    if (!was || hidden) return;
+    anim.current = { t0: performance.now(), dur: rise ? 650 : 380, rise };
+    ref.current?.scale.setScalar(0.001);
+  }, [hidden, rise, invalidate]);
+
   useFrame(() => {
-    if (anim.current === null || !ref.current) return;
-    const t = Math.min(1, (performance.now() - anim.current) / 380);
-    ref.current.scale.setScalar(Math.max(0.001, easeOutBack(t)));
-    if (t >= 1) anim.current = null;
+    const a = anim.current;
+    const m = ref.current;
+    if (a === null || !m) return;
+    const t = Math.min(1, (performance.now() - a.t0) / a.dur);
+    const k = Math.max(0.001, easeOutBack(t));
+    if (a.rise) {
+      // grows up from the plinth while turning into place
+      const wide = 0.7 + 0.3 * Math.min(1, t * 1.6);
+      m.scale.set(wide, k, wide);
+      m.rotation.y = (1 - t) * (1 - t) * Math.PI * 1.2;
+    } else {
+      m.scale.setScalar(k);
+    }
+    if (t >= 1) {
+      m.scale.setScalar(1);
+      m.rotation.y = 0;
+      anim.current = null;
+    }
     invalidate();
   });
 
   return (
-    <mesh ref={ref} geometry={geometry} material={res.pieceMaterial(color)} castShadow receiveShadow {...tip}>
+    <mesh
+      ref={ref}
+      geometry={geometry}
+      material={res.pieceMaterial(color)}
+      visible={!hidden}
+      castShadow
+      receiveShadow
+      {...tip}
+    >
       {/* ink line + a thin washi rim around it, like the 2D pieces */}
       <Outlines thickness={OUTLINE_PX * dpr} color={INK} />
       <Outlines thickness={RIM_PX * dpr} color="#fff4dc" />
@@ -537,6 +587,8 @@ export function Board3D({ board, bounds, center, radius, shadows, lowPower }) {
             geometry={v.building.type === 'city' ? res.geo.city : res.geo.settlement}
             color={colorOf(v.building.playerId)}
             tipId={v.id}
+            fxKey={`vertex:${v.id}`}
+            rise={v.building.type === 'city'}
           />
         )}
         {action && (

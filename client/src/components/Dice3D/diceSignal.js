@@ -22,6 +22,8 @@ function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
+export const subscribeDice = subscribe;
+
 export function useDiceBusy() {
   return useSyncExternalStore(subscribe, isDiceBusy, () => false);
 }

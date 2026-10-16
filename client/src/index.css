@@ -398,6 +398,9 @@ a { touch-action: manipulation; }
   }
   /* Typing in the chat with the keyboard up: only the chat is shown */
   html[data-kb] .hud-drawer .hud-score { display: none; }
+  /* The standings scroll on their own: the log / chat keeps most of the
+     drawer, even with 6 ninjas */
+  .hud-drawer .hud-score { max-height: 40%; overflow-y: auto; overscroll-behavior: contain; }
 }
 
 @layer components {
@@ -1034,6 +1037,18 @@ a { touch-action: manipulation; }
   animation: pieceDrop 0.38s cubic-bezier(0.3, 0.9, 0.4, 1) both;
 }
 
+/* A new city rising out of the ground at the end of its upgrade animation */
+.piece.piece-rise {
+  transform-origin: 50% 100%;
+  animation: pieceRise 0.62s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+@keyframes pieceRise {
+  0% { opacity: 0; transform: translateY(6px) scale(0.55, 0.2); }
+  35% { opacity: 1; }
+  70% { transform: translateY(-2px) scale(0.96, 1.12); }
+  100% { opacity: 1; transform: none; }
+}
+
 /* Edges / roads */
 .edge-spot { cursor: pointer; }
 .edge-spot .road-marker { animation: breathe 1.6s ease-in-out infinite; }
@@ -1164,6 +1179,75 @@ a { touch-action: manipulation; }
   0% { opacity: 0; transform: scale(2.1) rotate(-16deg); }
   55% { opacity: 1; transform: scale(0.92) rotate(-5deg); }
   100% { opacity: 1; transform: scale(1) rotate(-6deg); }
+}
+
+/* ─── Board animations overlay (city, robber, steal, dev cards, near win) ─── */
+.fx-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 56;
+  pointer-events: none;
+  overflow: hidden;
+  /* captions scale with the board area, not the window (phone drawer layouts) */
+  container-type: size;
+}
+.fx-overlay canvas { pointer-events: none !important; }
+.fx-overlay.is-idle { visibility: hidden; }
+.fx-caption {
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  max-width: calc(100% - 2rem);
+  padding: 0.3rem 1rem 0.4rem;
+  background: rgba(11, 16, 27, 0.84);
+  border-top: 3px solid var(--fx-color, var(--color-chakra));
+  border-bottom: 2px solid rgba(246, 160, 75, 0.55);
+  color: var(--color-paper-light);
+  text-align: center;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
+  animation: fxCaption var(--fx-dur, 1.6s) ease-out both;
+}
+.fx-caption-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.02rem, 3.2vw, 1.4rem);
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+}
+.fx-caption-sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: rgba(249, 244, 232, 0.86);
+}
+.fx-caption.is-big { top: auto; bottom: 6%; }
+.fx-caption.is-big .fx-caption-title {
+  font-size: clamp(1.05rem, min(5cqw, 7cqh), 2rem);
+  color: var(--color-chakra-light);
+}
+.fx-caption.is-hero .fx-caption-title {
+  color: #ffd08a;
+  text-shadow: 0 0 14px rgba(226, 113, 29, 0.85), 0 3px 0 var(--color-shu-dark);
+}
+.fx-caption.is-hero .fx-caption-sub { font-size: 15px; color: var(--fx-color); filter: brightness(1.35); }
+.fx-caption.is-static { top: 36%; bottom: auto; }
+@keyframes fxCaption {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.96); }
+  12% { opacity: 1; transform: translateX(-50%); }
+  84% { opacity: 1; transform: translateX(-50%); }
+  100% { opacity: 0; transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* the global rule would jump straight to the faded-out end */
+  .fx-caption { animation: none !important; opacity: 1; }
 }
 
 /* Board areas: a long press shows an info card, not the phone's callout */

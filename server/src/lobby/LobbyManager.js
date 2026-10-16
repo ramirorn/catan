@@ -18,6 +18,9 @@ export class LobbyManager {
       chat: [],         // last chat messages (survive page reloads)
       chatCounter: 0,
       chatRate: {},     // playerId → recent message timestamps (anti-flood)
+      spectators: {},   // playerId → { id, name, connected, removeTimer }
+      banned: new Set(),  // ids kicked by the host: cannot come back to this room
+      abandonTimer: null, // closes a game nobody is connected to
     };
 
     // Auto-join host
@@ -46,6 +49,13 @@ export class LobbyManager {
       clearTimeout(room.turnTimer.handle);
       room.turnTimer = null;
     }
+    if (room) {
+      if (room.abandonTimer) clearTimeout(room.abandonTimer);
+      room.abandonTimer = null;
+      for (const s of Object.values(room.spectators || {})) {
+        if (s.removeTimer) clearTimeout(s.removeTimer);
+      }
+    }
     delete this.rooms[roomId];
   }
 
@@ -53,6 +63,7 @@ export class LobbyManager {
     return Object.entries(this.rooms).map(([id, room]) => ({
       roomId: id,
       playerCount: room.engine.playerOrder.length,
+      spectatorCount: Object.values(room.spectators || {}).filter((s) => s.connected).length,
       maxPlayers: room.engine.boardType === 'extended' ? 6 : 4,
       phase: room.engine.phase,
       boardType: room.engine.boardType,

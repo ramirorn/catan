@@ -1,13 +1,15 @@
 // Overlays shared by the 2D and 3D boards: the phase banner, the "your turn"
-// cues and the zoom button column (which also hosts the 2D / 3D switch).
+// cues, the build-cost card (left) and the zoom button column (which also
+// hosts the 2D / 3D switch).
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { pieceColor } from '../../utils/theme';
 import { PHASE_DESCRIPTIONS, PHASE } from '../../utils/constants';
 import { ZoomInIcon, ZoomOutIcon, FitIcon, KunaiIcon } from '../Shared/Icons';
 import { useBoardViewMode } from './boardViewMode';
 import { useDiceBusy } from '../Dice3D/diceSignal';
+import { CostPanel } from './CostPanel';
 
 /**
  * "¡Tu turno!" cues: a one-shot banner when the turn (or my special build)
@@ -57,9 +59,26 @@ const BUILD_NAMES = {
   city: 'CIUDAD',
 };
 
-/** Phase banner (paper slip pinned to the table) + turn cues */
+/** Phase banner (paper slip pinned to the table) + build costs + turn cues */
 export function BoardBanner() {
   const { gameState, isMyTurn, isSpecialBuild, isMySpecialBuild, buildMode } = useGame();
+  const diceBusy = useDiceBusy();
+  // Line shown while the dice roll: { roll: id of the roll it belongs to, text }
+  const rollId = gameState?.lastDiceRoll?.id ?? null;
+  const [held, setHeld] = useState({ roll: rollId, text: '' });
+  // A new roll counts as "rolling" from the very first render (the dice flag
+  // rises a moment later); a short safety net covers a throw that never shows
+  const rollPending = rollId !== held.roll;
+  useEffect(() => {
+    if (!rollPending || diceBusy) return undefined;
+    const t = setTimeout(() => setHeld((h) => ({ ...h, roll: rollId })), 600);
+    return () => clearTimeout(t);
+  }, [rollPending, diceBusy, rollId]);
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (wasBusy.current && !diceBusy) setHeld((h) => ({ ...h, roll: rollId }));
+    wasBusy.current = diceBusy;
+  }, [diceBusy, rollId]);
   if (!gameState) return null;
 
   const currentTurnPlayer = gameState.players?.[gameState.currentPlayerId];
@@ -93,6 +112,12 @@ export function BoardBanner() {
     }...)`;
   }
 
+  // While the dice roll, keep the previous line: on a 7 «mueve al ladrón» /
+  // «descarta» only shows once the throw is over
+  const holding = diceBusy || rollPending;
+  if (!holding && held.text !== bannerText) setHeld({ roll: rollId, text: bannerText });
+  if (holding && held.text) bannerText = held.text;
+
   const turnColor = pieceColor((specialBuilder || currentTurnPlayer)?.color);
 
   // Identifies "my chance to act": changes when the turn / special build passes to me
@@ -118,6 +143,8 @@ export function BoardBanner() {
           </span>
         </div>
       </div>
+
+      <CostPanel />
 
       <TurnCues mine={bannerMine} turnKey={turnKey} special={isSpecialBuild} />
     </>

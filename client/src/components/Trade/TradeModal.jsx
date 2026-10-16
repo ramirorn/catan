@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { Modal } from '../Shared/Modal';
-import { RESOURCE, RESOURCE_NAMES } from '../../utils/constants';
+import { RESOURCE, RESOURCE_NAMES, PHASE } from '../../utils/constants';
 import { ResourceChip } from '../Shared/ResourceCard';
 import { AnchorIcon, TradeIcon, CheckIcon, CloseIcon, ArrowRightIcon, PlusIcon, MinusIcon } from '../Shared/Icons';
 
@@ -18,6 +18,7 @@ export function TradeModal({ isOpen, onClose }) {
     gameState,
     myPlayerId,
     myPlayer,
+    isMyTurn,
     bankTrade,
     proposeTrade,
     respondToTrade,
@@ -32,25 +33,28 @@ export function TradeModal({ isOpen, onClose }) {
   const [bankReceive, setBankReceive] = useState(RESOURCE.BRICK);
 
   // Player trade state
-  const [offering, setOffering] = useState({
-    [RESOURCE.WOOD]: 0,
-    [RESOURCE.BRICK]: 0,
-    [RESOURCE.SHEEP]: 0,
-    [RESOURCE.WHEAT]: 0,
-    [RESOURCE.ORE]: 0,
-  });
-  const [requesting, setRequesting] = useState({
-    [RESOURCE.WOOD]: 0,
-    [RESOURCE.BRICK]: 0,
-    [RESOURCE.SHEEP]: 0,
-    [RESOURCE.WHEAT]: 0,
-    [RESOURCE.ORE]: 0,
-  });
+  const [offering, setOffering] = useState(EMPTY_BUNDLE);
+  const [requesting, setRequesting] = useState(EMPTY_BUNDLE);
 
   // Counter-offer form (responder's point of view: what I give / what I get)
   const [counterOpen, setCounterOpen] = useState(false);
   const [counterGive, setCounterGive] = useState(EMPTY_BUNDLE);
   const [counterGet, setCounterGet] = useState(EMPTY_BUNDLE);
+
+  // The modal stays mounted: every new trade starts clean. Reset the player-trade
+  // and counter-offer forms when the window closes or the active offer changes
+  // (proposed, completed, cancelled). Bank selections are kept on purpose.
+  const activeTrade = gameState?.activeTrade;
+  const resetKey = isOpen ? `open:${activeTrade?.status === 'pending' ? activeTrade.id : 'none'}` : 'closed';
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    setOffering(EMPTY_BUNDLE);
+    setRequesting(EMPTY_BUNDLE);
+    setCounterOpen(false);
+    setCounterGive(EMPTY_BUNDLE);
+    setCounterGet(EMPTY_BUNDLE);
+  }
 
   if (!isOpen) return null;
 
@@ -63,7 +67,6 @@ export function TradeModal({ isOpen, onClose }) {
   };
 
   const myResources = myPlayer?.resources || {};
-  const activeTrade = gameState?.activeTrade;
   const isTradeProposer = activeTrade && activeTrade.proposerId === myPlayerId;
 
   // Bank trade validation
@@ -95,7 +98,11 @@ export function TradeModal({ isOpen, onClose }) {
 
   const openCounter = () => {
     // Start from the original offer, flipped to my side
-    setCounterGive({ ...EMPTY_BUNDLE, ...(activeTrade?.requesting || {}) });
+    // (what I give is capped at what I actually hold)
+    const asked = activeTrade?.requesting || {};
+    setCounterGive(Object.fromEntries(
+      Object.keys(EMPTY_BUNDLE).map((r) => [r, Math.min(asked[r] || 0, myResources[r] || 0)])
+    ));
     setCounterGet({ ...EMPTY_BUNDLE, ...(activeTrade?.offering || {}) });
     setCounterOpen(true);
   };
@@ -114,6 +121,10 @@ export function TradeModal({ isOpen, onClose }) {
     setCounterOpen(false);
   };
   const myResponse = activeTrade?.responses?.[myPlayerId];
+  // Can I pay what the offer asks of me? If not, I can only counter-offer or decline
+  const iCanAccept = Object.entries(activeTrade?.requesting || {}).every(([r, n]) => (myResources[r] || 0) >= n);
+  // Bank trades and new proposals only in my own main phase (off-turn I can only answer offers)
+  const canTradeNow = isMyTurn && gameState?.phase === PHASE.MAIN;
   const myCounter = activeTrade?.counterOffers?.[myPlayerId];
 
   const handlePropose = () => {
@@ -367,8 +378,20 @@ export function TradeModal({ isOpen, onClose }) {
                   </div>
                 </div>
               ) : (
+                <div>
+                {!iCanAccept && (
+                  <p className="text-[13px] font-semibold text-shu mb-2">
+                    No tienes los recursos que pide. Puedes rechazarla o hacer una contraoferta.
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => respondToTrade('accept')} className="btn btn-leaf min-h-[44px] px-4 py-2 text-[14px]">
+                  <button
+                    type="button"
+                    disabled={!iCanAccept}
+                    onClick={() => respondToTrade('accept')}
+                    className="btn btn-leaf min-h-[44px] px-4 py-2 text-[14px] disabled:opacity-40 disabled:saturate-50"
+                    title={iCanAccept ? undefined : 'No tienes los recursos que pide'}
+                  >
                     <CheckIcon className="w-4 h-4" />
                     Aceptar e intercambiar
                   </button>
@@ -381,6 +404,7 @@ export function TradeModal({ isOpen, onClose }) {
                     {myResponse === 'counter' ? 'Cambiar contraoferta' : 'Contraoferta'}
                   </button>
                 </div>
+                </div>
               )}
               </>
               )}
@@ -389,6 +413,12 @@ export function TradeModal({ isOpen, onClose }) {
         </div>
       )}
 
+      {!canTradeNow ? (
+        <p className="text-[13px] italic text-ink-soft">
+          Fuera de tu turno solo puedes responder a las ofertas de otros ninjas.
+        </p>
+      ) : (
+      <>
       {/* Tabs */}
       <div className="flex mb-4 sm:mb-5 border-b border-ink/15" role="tablist">
         <button
@@ -513,6 +543,8 @@ export function TradeModal({ isOpen, onClose }) {
           </button>
           </div>
         </div>
+      )}
+      </>
       )}
     </Modal>
   );

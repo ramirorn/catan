@@ -29,7 +29,7 @@ export const RESOURCE_NAMES = {
   [RESOURCE.BRICK]: 'Arcilla',
   [RESOURCE.SHEEP]: 'Oveja',
   [RESOURCE.WHEAT]: 'Trigo',
-  [RESOURCE.ORE]: 'Mineral',
+  [RESOURCE.ORE]: 'Piedra',
 };
 
 export const TERRAIN_ICONS = {

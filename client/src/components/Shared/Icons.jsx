@@ -876,3 +876,55 @@ export function FlagIcon(props) {
     </Svg>
   );
 }
+
+/** Watching eye: two brushed lids around an inked pupil (spectators) */
+const EYE = {
+  lids:
+    quad(2.4, 12.4, 12, 3.6, 21.6, 12.2, 2.2, { start: 0.5, peak: 0.45, end: 0.4 }) +
+    quad(2.6, 12.6, 12, 20, 21.4, 12, 1.8, { start: 0.45, peak: 0.5, end: 0.35 }),
+  pupil: circ(12, 12.2, 3.3) + circ(13.1, 11.1, 1),
+};
+
+export function EyeIcon(props) {
+  return (
+    <Svg {...props}>
+      <Ink d={EYE.lids} />
+      <Ink d={EYE.pupil} eo />
+    </Svg>
+  );
+}
+
+/** Leaving: an open gate post and a brushed arrow going out */
+const EXIT = {
+  gate:
+    line(10.4, 3.4, 4.2, 3.6, 2.1, { start: 0.9, peak: 0.2, end: 0.7 }) +
+    line(4.4, 3.4, 4.4, 20.6, 2.3, { bend: 0.3, start: 0.9, peak: 0.15, end: 0.8 }) +
+    line(4.2, 20.5, 10.4, 20.6, 2.1, { start: 0.8, peak: 0.3, end: 0.6 }),
+  arrow:
+    line(9.2, 12.2, 19.4, 12, 2.4, { bend: -0.4, start: 0.5, peak: 0.5, end: 0.8 }) +
+    line(20.6, 12, 16, 7.6, 2.3, { bend: 0.4, start: 1, peak: 0.05, end: 0.25 }) +
+    line(20.6, 12.1, 16, 16.5, 2.3, { bend: -0.4, start: 1, peak: 0.05, end: 0.25 }),
+};
+
+export function ExitIcon(props) {
+  return (
+    <Svg {...props}>
+      <Ink d={EXIT.gate} />
+      <Ink d={EXIT.arrow} />
+    </Svg>
+  );
+}
+
+/** Three brush strokes (menu) */
+const MENU =
+  line(4, 6.4, 20, 6.2, 2.3, { bend: -0.3, start: 0.7, peak: 0.25, end: 0.45 }) +
+  line(4, 12.1, 20, 12, 2.3, { bend: 0.3, start: 0.7, peak: 0.25, end: 0.45 }) +
+  line(4, 17.8, 20, 17.7, 2.3, { bend: -0.3, start: 0.7, peak: 0.25, end: 0.45 });
+
+export function MenuIcon(props) {
+  return (
+    <Svg {...props}>
+      <Ink d={MENU} />
+    </Svg>
+  );
+}
