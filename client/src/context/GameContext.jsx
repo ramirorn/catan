@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { whenStageIdle } from '../components/Effects/fxSignal';
 import { useSocket } from './SocketContext';
+import { useAuth } from './AuthContext';
 import { PHASE, RESOURCE_NAMES } from '../utils/constants';
 import { loadAvatarId, saveAvatarId, isAvatarId } from '../utils/avatars';
 
@@ -23,6 +24,27 @@ export function GameProvider({ children }) {
   const [isRolling, setIsRolling] = useState(false);
   // Server clock minus local clock (ms), so countdowns follow the server's deadline
   const [serverOffset, setServerOffset] = useState(0);
+  // Ryō earned in the game that just ended (logged-in players): { coins, total, reason }
+  const [coinsAward, setCoinsAward] = useState(null);
+  const { user, applyCoins } = useAuth();
+
+  // A logged-in player's profile fills in the name and avatar used in rooms
+  const profileName = user ? user.displayName : null;
+  const profileAvatar = user ? user.avatarId : null;
+  useEffect(() => {
+    if (profileName) {
+      setPlayerName(profileName);
+      try {
+        localStorage.setItem('catan_player_name', profileName);
+      } catch {
+        // storage blocked
+      }
+    }
+    if (isAvatarId(profileAvatar)) {
+      setAvatarIdState(profileAvatar);
+      saveAvatarId(profileAvatar);
+    }
+  }, [profileName, profileAvatar]);
 
   const addToast = useCallback((text, type = 'info', duration = 3000) => {
     const id = Date.now() + Math.random();
@@ -40,6 +62,7 @@ export function GameProvider({ children }) {
     setBuildMode(null);
     setActiveModal(null);
     setRobberVictims([]);
+    setCoinsAward(null);
   }, []);
 
   // Listen to socket events
@@ -90,7 +113,15 @@ export function GameProvider({ children }) {
     socket.on('chatHistory', handleChatHistory);
     socket.on('roomSpectators', handleRoomSpectators);
     socket.on('kicked', handleKicked);
+    // Ryō paid when the game ended (only sent to logged-in players)
+    const handleCoinsAwarded = ({ coins, total, won, reason } = {}) => {
+      const paidTotal = Number.isInteger(total) ? total : null;
+      setCoinsAward({ coins: Number(coins) || 0, total: paidTotal, reason: reason || null });
+      if (paidTotal !== null) applyCoins(paidTotal, won === true);
+    };
+
     socket.on('roomClosed', handleRoomClosed);
+    socket.on('coinsAwarded', handleCoinsAwarded);
 
     return () => {
       socket.off('gameState', handleGameState);
@@ -99,8 +130,9 @@ export function GameProvider({ children }) {
       socket.off('roomSpectators', handleRoomSpectators);
       socket.off('kicked', handleKicked);
       socket.off('roomClosed', handleRoomClosed);
+      socket.off('coinsAwarded', handleCoinsAwarded);
     };
-  }, [socket, resetToMenu, addToast]);
+  }, [socket, resetToMenu, addToast, applyCoins]);
 
   // Persistent player id (not socket.id, which changes on every reconnect)
   const myPlayerId = playerId;
@@ -584,6 +616,7 @@ export function GameProvider({ children }) {
     robberVictims,
     isRolling,
     serverOffset,
+    coinsAward,
     // Actions
     createRoom,
     updateRoomSettings,
@@ -619,7 +652,7 @@ export function GameProvider({ children }) {
     isSpectator, spectators, hostId, isHost, spectateRoom, leaveRoom, kickPlayer,
     canActOnBoard,
     buildMode, activeModal, toasts, addToast, chatMessages, robberVictims, isRolling,
-    serverOffset, updateRoomSettings,
+    serverOffset, coinsAward, updateRoomSettings,
     createRoom, joinRoom, startGame, rollDice, setupPlaceSettlement, setupPlaceRoad,
     buildRoad, buildSettlement, buildCity, buyDevCard, playDevCard, discardCards,
     moveRobber, stealCard, offerPeacePact, respondPeacePact, cancelPeacePact, bankTrade, proposeTrade, respondToTrade, acceptTrade,

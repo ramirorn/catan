@@ -8,9 +8,10 @@ import { RoomRules } from './RoomRules';
 import { InstallAppButton } from '../Shared/Pwa';
 import { DEFAULT_VP_TO_WIN } from '../../utils/constants';
 import { EyeIcon } from '../Shared/Icons';
+import { BackButton } from '../Menu/MenuParts';
 import { AvatarPicker } from '../Shared/AvatarPicker';
 
-export function LobbyScreen() {
+export function LobbyScreen({ onBack }) {
   const { createRoom, joinRoom, spectateRoom, playerName, setPlayerName, avatarId, setAvatarId } = useGame();
   const { socket, connected } = useSocket();
   const [tab, setTab] = useState('create');
@@ -96,7 +97,10 @@ export function LobbyScreen() {
 
         {/* Registration scroll */}
         <ScrollPanel className="w-full max-w-md mx-auto lg:mx-0 phland:mx-0 phland:max-w-none animate-modal-pop lg:max-h-full lg:min-h-0 lg:flex lg:flex-col phland:max-h-full phland:min-h-0 phland:flex phland:flex-col" bodyClassName="px-4 min-[360px]:px-5 sm:px-8 pt-6 short:pt-4 tiny:pt-3 pb-7 short:pb-5 tiny:pb-4 phland:px-5 phland:pt-3.5 phland:pb-4 lg:min-h-0 lg:overflow-y-auto phland:min-h-0 phland:overflow-y-auto">
-          <h2 className="font-display text-[24px] min-[360px]:text-[28px] short:text-[25px] phland:text-[24px] leading-tight text-ink">Registro de ninjas</h2>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="font-display text-[24px] min-[360px]:text-[28px] short:text-[25px] phland:text-[24px] leading-tight text-ink">Registro de ninjas</h2>
+            {onBack && <BackButton onClick={onBack} className="-mr-1.5 mt-0.5" />}
+          </div>
           <p className="text-[14px] text-ink-soft mt-0.5 mb-5 short:mb-3 phland:mb-3 squat:hidden">Funda una nueva partida o únete a una existente.</p>
 
           {/* Tab switch */}

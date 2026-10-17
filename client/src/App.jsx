@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
+import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { GameProvider, useGame } from './context/GameContext';
 import { PHASE } from './utils/constants';
 
-import { LobbyScreen } from './components/Lobby/LobbyScreen';
+import { HomeScreen } from './components/Menu/HomeScreen';
 import { WaitingRoom } from './components/Lobby/WaitingRoom';
 import { BoardView } from './components/Board/BoardView';
 import { DiceOverlay } from './components/Dice3D/DiceOverlay';
@@ -66,13 +67,16 @@ function useGameViewport(active) {
 function GameContent() {
   const { gameState, activeModal, setActiveModal, isSpectator, myPlayerId } = useGame();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  // Main menu screen ('menu' | 'play' | 'shop' | 'profile'); kept while in a
+  // room so leaving a game goes back to where the player was
+  const [menuScreen, setMenuScreen] = useState('menu');
   const inGame = !!gameState && gameState.phase !== PHASE.LOBBY;
   useGameViewport(inGame);
   const closePactModal = useCallback(() => setActiveModal((m) => (m === 'peacePact' ? null : m)), [setActiveModal]);
 
   // If not joined any room yet
   if (!gameState) {
-    return <LobbyScreen />;
+    return <HomeScreen screen={menuScreen} onScreen={setMenuScreen} />;
   }
 
   // Pre-game lobby room
@@ -212,12 +216,14 @@ function GameContent() {
 
 export default function App() {
   return (
-    <SocketProvider>
-      <GameProvider>
-        <GameContent />
-        <ToastContainer />
-        <PwaLayer />
-      </GameProvider>
-    </SocketProvider>
+    <AuthProvider>
+      <SocketProvider>
+        <GameProvider>
+          <GameContent />
+          <ToastContainer />
+          <PwaLayer />
+        </GameProvider>
+      </SocketProvider>
+    </AuthProvider>
   );
 }

@@ -11,3 +11,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Player accounts (optional). Without them everyone plays as a guest.
+      # Set the values in the Render dashboard (Environment), never in git.
+      - key: DATABASE_URL
+        sync: false
+      - key: NEON_AUTH_BASE_URL
+        sync: false

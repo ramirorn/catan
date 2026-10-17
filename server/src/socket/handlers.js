@@ -1,5 +1,6 @@
 import { createTurnTimers } from './turnTimer.js';
 import { sanitizeAvatarId } from '../game/constants.js';
+import { summarizeGame } from '../accounts/rewards.js';
 
 const CHAT_HISTORY_LIMIT = 200;
 const CHAT_MAX_LENGTH = 150;
@@ -25,7 +26,10 @@ const BANNED_MESSAGE = 'El anfitrión te expulsó de esta sala; no puedes volver
 // Socket.io room that only the spectators of a game join
 const specRoom = (roomId) => `spec:${roomId}`;
 
-export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
+// `accounts` (optional) links seats to logged-in accounts and pays the Ryō
+// when a game ends: { enabled, verifySocketToken(token), awardGame(summary) }.
+// Without it (tests, no database) everyone plays as a guest.
+export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, accounts = null) {
   // Players are identified by a persistent playerId sent by the client in the
   // handshake (survives page reloads / reconnects), not by the volatile socket.id.
   const playerToRoom = {};     // playerId → roomId (seated players)
@@ -50,6 +54,66 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
       emitGameState(roomId);
     },
   });
+
+  // ─── Accounts ───
+  // The handshake may carry a Neon Auth JWT; a bad or missing one just means
+  // "guest" (the connection is never refused for it)
+  io.use(async (socket, next) => {
+    socket.data.user = null;
+    const token = socket.handshake.auth && socket.handshake.auth.token;
+    if (accounts && accounts.enabled && token) {
+      try {
+        socket.data.user = await accounts.verifySocketToken(token);
+      } catch {
+        socket.data.user = null;
+      }
+    }
+    next();
+  });
+
+  // Called once per game by the engine when it ends: pays the Ryō of the
+  // logged-in seats and tells each one what they earned
+  function handleGameOver(roomId) {
+    const room = lobbyManager.getRoom(roomId);
+    if (!room || room.rewarded || !accounts || !accounts.enabled) return;
+    room.rewarded = true;
+    const summary = summarizeGame(room.engine, room.accounts);
+    const seated = summary.players.filter((p) => p.accountId && !p.left);
+    if (!seated.length) return;
+    accounts.awardGame(summary)
+      .then((result) => {
+        const paid = new Map(result.paid.map((p) => [p.userId, p]));
+        for (const p of seated) {
+          const pay = paid.get(p.accountId);
+          io.to(p.playerId).emit('coinsAwarded', {
+            roomId,
+            coins: pay ? pay.coins : 0,
+            won: p.won,
+            total: pay ? pay.total : null,
+            reason: pay ? null : result.reason,
+          });
+        }
+      })
+      .catch((err) => console.error(`Could not award coins for room ${roomId}:`, err.message));
+  }
+
+  // Binds a seat to the account of the socket that took it (first one wins)
+  function bindAccount(room, id, socket) {
+    const user = socket.data.user;
+    if (user && !room.accounts[id]) room.accounts[id] = user.id;
+  }
+
+  // The same account can't hold two seats of one room (two tabs)
+  function accountSeatedElsewhere(room, id, socket) {
+    const user = socket.data.user;
+    if (!user) return false;
+    return Object.entries(room.accounts).some(([pid, uid]) => uid === user.id && pid !== id && room.engine.players[pid]);
+  }
+
+  function watchGameOver(room) {
+    const roomId = room.engine.roomId;
+    room.engine.onGameOver = () => handleGameOver(roomId);
+  }
 
   // ─── Helpers ───
   function spectatorList(room) {
@@ -184,6 +248,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
     const engine = room.engine;
     if (engine.phase === 'lobby') {
       engine.removePlayer(id);
+      delete room.accounts[id];
     } else {
       engine.markLeft(id, { kicked });
     }
@@ -299,6 +364,9 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
       stopSpectating();
       const type = boardType === 'extended' ? 'extended' : 'standard';
       const { roomId, engine } = lobbyManager.createRoom(playerId, name, type, sanitizeAvatarId(avatarId));
+      const createdRoom = lobbyManager.getRoom(roomId);
+      bindAccount(createdRoom, playerId, socket);
+      watchGameOver(createdRoom);
       // Optional settings; invalid values keep the defaults
       engine.updateSettings({ vpToWin, turnTimeLimit });
       if (typeof peacePacts === 'boolean') engine.updateSettings({ peacePacts });
@@ -324,6 +392,10 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
         return cb({ success: false, error: 'Ya estás en otra sala' });
       }
 
+      if (accountSeatedElsewhere(room, playerId, socket)) {
+        return cb({ success: false, error: 'Tu cuenta ya ocupa un asiento en esta sala' });
+      }
+
       // Back to a seat left during the game
       const seat = room.engine.players[playerId];
       if (seat && room.engine.phase !== 'lobby') {
@@ -339,6 +411,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
         }
       }
       stopSpectating();
+      bindAccount(room, playerId, socket);
 
       socket.join(id);
       playerToRoom[playerId] = id;
@@ -576,6 +649,24 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
       io.to(roomId).emit('chatMessage', msg);
     });
 
+    // ─── Account sign-in / sign-out from the menu (no reconnect needed) ───
+    on('authenticate', ({ token }, cb) => {
+      if (!accounts || !accounts.enabled) {
+        socket.data.user = null;
+        return cb({ success: true, signedIn: false });
+      }
+      if (!token) {
+        socket.data.user = null;
+        return cb({ success: true, signedIn: false });
+      }
+      accounts.verifySocketToken(token)
+        .then((user) => {
+          socket.data.user = user;
+          cb({ success: !!user, signedIn: !!user });
+        })
+        .catch(() => cb({ success: false, signedIn: false }));
+    });
+
     // ─── List Rooms ───
     on('listRooms', (_, cb) => {
       cb({ rooms: lobbyManager.listRooms() });
@@ -614,6 +705,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
           if (removed) {
             // Player removed from lobby (game hasn't started)
             delete playerToRoom[playerId];
+            delete room.accounts[playerId];
             if (room.engine.playerOrder.length === 0) {
               closeRoom(roomId, 'La sala se cerró: no quedan ninjas');
               console.log(`Room ${roomId} deleted (empty)`);

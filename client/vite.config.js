@@ -56,7 +56,7 @@ export default defineConfig({
         navigateFallback: '/index.html',
         // Real-time server + health check are never served from the SW (no
         // route matches them either, so the SW does not even intercept them)
-        navigateFallbackDenylist: [/^\/socket\.io/, /^\/health/],
+        navigateFallbackDenylist: [/^\/socket\.io/, /^\/health/, /^\/api(?:\/|$)/],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.origin === 'https://fonts.googleapis.com',
@@ -77,4 +77,11 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
+  // In `vite dev` the account API lives on the game server (:3001); the proxy
+  // keeps it same-origin so the session cookie works like in production
+  server: {
+    proxy: {
+      '/api': { target: 'http://localhost:3001', changeOrigin: false },
+    },
+  },
 })

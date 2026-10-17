@@ -525,9 +525,16 @@ test('pacto: works after a Knight (before rolling) and returns to the roll', () 
   assert.ok(hexesOf(e, b).every((h) => !legal.includes(h)));
   // Timeout auto-move picks a legal hex and never robs b
   e.players[b].resources.ore = 1;
+  const stealBefore = e.lastSteal?.id ?? null;
+  const evBefore = e.recentEvents.length ? e.recentEvents[e.recentEvents.length - 1].id : 0;
   e.handleTimeout();
-  assert.ok(!hexesOf(e, b).includes(e.board.robberHex));
-  assert.equal(e.players[b].resources.ore, 1);
+  // The pact-bound move (the first one) avoided b. The timeout then goes on to
+  // roll the dice, which may pay b or even bring a new 7, so check the event
+  // of that first move instead of where the robber ends up or b's cards.
+  const firstMove = e.recentEvents.find((ev) => ev.id > evBefore && ev.type === 'robberMoved');
+  assert.ok(firstMove && !hexesOf(e, b).includes(firstMove.toHex));
+  const steal = e.lastSteal && e.lastSteal.id !== stealBefore ? e.lastSteal : null;
+  assert.ok(!steal || steal.victimId !== b || e.recentEvents.filter((ev) => ev.id > evBefore && ev.type === 'robberMoved').length > 1);
   assert.notEqual(e.phase, PHASE.ROBBER_MOVE);
 });
 

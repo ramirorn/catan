@@ -1,15 +1,18 @@
+import './env.js';
 import express from 'express';
 import { createServer } from 'http';
 import { existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
-import cors from 'cors';
 import { LobbyManager } from './lobby/LobbyManager.js';
 import { registerSocketHandlers } from './socket/handlers.js';
+import { createAccounts } from './accounts/index.js';
 
 const app = express();
-app.use(cors());
+// Render (and other hosts) put a proxy in front: trust it for https / client IP
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
 
 const httpServer = createServer(app);
 // In production the client is served from this same server (same origin, no
@@ -30,8 +33,14 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', rooms: lobbyManager.listRooms().length });
 });
 
+// Accounts (Neon Postgres + Neon Auth): REST API under /api. Without
+// DATABASE_URL / NEON_AUTH_BASE_URL it only answers "accounts disabled".
+const accounts = createAccounts();
+app.use('/api', accounts.router);
+console.log(accounts.enabled ? 'Accounts enabled (Neon)' : 'Accounts disabled: set DATABASE_URL and NEON_AUTH_BASE_URL to enable them');
+
 // Register all socket event handlers
-registerSocketHandlers(io, lobbyManager);
+registerSocketHandlers(io, lobbyManager, {}, accounts);
 
 // Serve the built client (client/dist) when it exists, e.g. on Render
 const clientDist = join(dirname(fileURLToPath(import.meta.url)), '../../client/dist');
@@ -55,7 +64,7 @@ if (existsSync(clientDist)) {
     }),
   );
   // Any other GET falls back to the app shell
-  app.get(/^\/(?!socket\.io|health).*/, (req, res) => {
+  app.get(/^\/(?!socket\.io|health|api(?:\/|$)).*/, (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(join(clientDist, 'index.html'));
   });

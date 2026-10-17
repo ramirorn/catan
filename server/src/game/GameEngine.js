@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Board } from './Board.js';
 import { Player } from './Player.js';
 import { Trade } from './Trade.js';
@@ -79,6 +80,13 @@ export class GameEngine {
     // Game clock: epoch ms when the setup began / when the game ended
     this.startedAt = null;
     this.endedAt = null;
+
+    // Unique id of the game (room codes are reused over time) and a callback
+    // the socket layer sets to pay the Ryō: called once, after the action
+    // that ended the game has finished (winner / vote already recorded)
+    this.gameId = null;
+    this.onGameOver = null;
+    this._gameOverNotified = false;
 
     // Last robbery (dice 7 or Knight). The resource is only serialized for the
     // thief and the victim; everyone else just sees that a card was taken.
@@ -339,6 +347,7 @@ export class GameEngine {
     this.setupRound = 0;
     this.startedAt = Date.now();
     this.endedAt = null;
+    this.gameId = randomUUID();
 
     this.log('¡Comienza la partida! Fase de colocación inicial.');
     this.log(`Turno de ${this.getCurrentPlayer().name} para colocar un poblado.`);
@@ -1293,6 +1302,17 @@ export class GameEngine {
     this.phase = PHASE.GAME_OVER;
     this.pact = null;
     if (!this.endedAt) this.endedAt = Date.now();
+    if (this.onGameOver && !this._gameOverNotified) {
+      this._gameOverNotified = true;
+      const notify = this.onGameOver;
+      queueMicrotask(() => {
+        try {
+          notify(this);
+        } catch (err) {
+          console.error('Game over callback failed:', err);
+        }
+      });
+    }
   }
 
   // ─── End Game by Unanimous Vote ───

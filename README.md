@@ -89,3 +89,28 @@ El servidor también entrega la pantalla del juego, así que todo queda en una s
 Notas del plan gratuito: el servicio se apaga tras 15 minutos sin uso y tarda cerca de un minuto en despertar. Las partidas viven en memoria, así que se pierden cuando se apaga o se reinicia.
 
 Para probar el modo producción en local: `npm run build` y luego `npm start` (abre http://localhost:3001).
+
+## Cuentas de jugador y Ryō (opcional)
+
+Los invitados juegan igual que siempre. Con cuenta, el perfil (nombre y avatar) se guarda y cada partida terminada suma **Ryō**, la moneda del juego (no hay dinero real).
+
+- **Inicio de sesión:** correo + contraseña o **Continuar con Google**, con [Neon Auth](https://neon.com/docs/auth/overview). El navegador solo habla con nuestro servidor (`/api/auth/*`), que llama a Neon Auth y guarda la sesión en una cookie *httpOnly* de nuestro propio dominio. La conexión del juego envía un token corto que el servidor verifica.
+- **Datos:** Postgres de Neon. El esquema está en `server/db/schema.sql` (tablas `users`, `user_items`, `user_equipped`, `game_results`). La base solo se usa al iniciar sesión, editar el perfil y al terminar una partida, nunca en cada jugada.
+- **Ryō por partida:** +20 por terminarla, +30 si ganas y +2 por punto de victoria. No dan Ryō: las partidas que abandonas, las que terminan con menos de 2 ninjas y las terminadas por votación antes de 15 minutos. Cada partida paga una sola vez por cuenta.
+
+### Variables de entorno
+
+| Variable | Qué es |
+| --- | --- |
+| `DATABASE_URL` | Cadena de conexión de Neon (Dashboard → Connect). Secreta. |
+| `NEON_AUTH_BASE_URL` | "Auth URL" de Neon Auth (Neon → Auth → Configuration), termina en `/neondb/auth`. |
+| `REWARD_MIN_VOTE_MINUTES` | Opcional, minutos mínimos para cobrar una partida terminada por votación (15). |
+
+En local van en `server/.env` (está en `.gitignore`). En Render: **Environment → Add Environment Variable** con las dos primeras. Si faltan, el servidor arranca igual con las cuentas desactivadas.
+
+Neon Auth solo acepta inicios de sesión desde dominios autorizados (localhost ya lo está): en Neon → **Auth → Configuration → Domains** agrega la dirección pública del juego, por ejemplo `https://catan-shinobi.onrender.com`.
+
+Google funciona sin crear nada en Google Cloud porque Neon presta sus credenciales compartidas (la pantalla de Google muestra el nombre de Neon). Para que muestre el nombre del juego hay que crear un cliente OAuth propio en Google Cloud y pegarlo en Neon → Auth → OAuth providers.
+
+Nota: la sesión usa cookies seguras, así que el inicio de sesión funciona en `https://` y en `http://localhost`, pero no al abrir el juego por la IP de la red local (`http://192.168…`).
+

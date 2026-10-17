@@ -1,0 +1,277 @@
+// Accounts: REST API under /api, socket token check and the Ryō award at the
+// end of a game. Everything degrades gracefully without DATABASE_URL /
+// NEON_AUTH_BASE_URL: the API answers "accounts disabled" and guests play
+// exactly as before.
+import express from 'express';
+import { getPool } from '../db/pool.js';
+import { createNeonAuth } from './neonAuth.js';
+import { createRateLimiter } from './rateLimit.js';
+import { COIN_NAME, REWARD_RULES, computeRewards } from './rewards.js';
+import { cleanDisplayName, ensureUser, getStats, getUser, recordGame, updateProfile } from './store.js';
+
+const DISABLED_MESSAGE = 'Las cuentas no están disponibles en este servidor. Puedes jugar como invitado.';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 128;
+// Neon Auth cookies we clear on logout even if the upstream call fails
+const CLEAR_COOKIES = ['session_token', 'session_data', 'dont_remember', 'session_challenge', 'session_challange']
+  .map((n) => `__Secure-neon-auth.${n}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`);
+
+function isAvatarId(v) {
+  return Number.isInteger(v) && v >= 0 && v < 12;
+}
+
+// Friendly Spanish messages for Neon Auth error codes
+function authErrorMessage(res) {
+  const code = res.data && res.data.code;
+  switch (code) {
+    case 'INVALID_EMAIL_OR_PASSWORD':
+    case 'INVALID_PASSWORD':
+    case 'CREDENTIAL_ACCOUNT_NOT_FOUND':
+      return 'Correo o contraseña incorrectos';
+    case 'USER_ALREADY_EXISTS':
+    case 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL':
+      return 'Ya existe una cuenta con ese correo. Inicia sesión.';
+    case 'PASSWORD_TOO_SHORT':
+      return `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres`;
+    case 'PASSWORD_TOO_LONG':
+      return 'La contraseña es demasiado larga';
+    case 'INVALID_EMAIL':
+      return 'Ese correo no es válido';
+    case 'INVALID_ORIGIN':
+      return 'Este sitio todavía no está autorizado para iniciar sesión (falta agregar el dominio en Neon Auth)';
+    case 'USER_BANNED':
+      return 'Esta cuenta está bloqueada';
+    default:
+      if (res.status === 429) return 'Demasiados intentos. Espera un momento y vuelve a probar.';
+      return 'No se pudo completar. Inténtalo de nuevo.';
+  }
+}
+
+export function createAccounts(env = process.env) {
+  const enabled = !!(env.DATABASE_URL && env.NEON_AUTH_BASE_URL);
+  const pool = enabled ? getPool() : null;
+  const auth = enabled ? createNeonAuth(env.NEON_AUTH_BASE_URL) : null;
+  const limit = createRateLimiter();
+  const router = express.Router();
+
+  // Our own origin as the browser sees it (Render terminates https: trust proxy)
+  const originOf = (req) => `${req.protocol}://${req.get('host')}`;
+
+  router.use(express.json({ limit: '8kb' }));
+
+  // Same-origin only: no CORS headers are ever sent, and state-changing
+  // requests coming from another site are refused
+  router.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      const origin = req.get('origin');
+      if (origin && origin !== originOf(req)) return res.status(403).json({ error: 'Origen no permitido' });
+    }
+    next();
+  });
+
+  router.get('/config', (req, res) => {
+    res.json({
+      accounts: enabled,
+      google: enabled,
+      message: enabled ? null : DISABLED_MESSAGE,
+      coinName: COIN_NAME,
+      rewards: {
+        finish: REWARD_RULES.finish,
+        win: REWARD_RULES.win,
+        perVp: REWARD_RULES.perVp,
+        minVoteMinutes: REWARD_RULES.minVoteMinutes,
+      },
+    });
+  });
+
+  // Everything below needs accounts
+  router.use((req, res, next) => {
+    if (!enabled) return res.status(503).json({ error: DISABLED_MESSAGE, disabled: true });
+    next();
+  });
+
+  const sendCookies = (res, cookies) => {
+    for (const c of cookies || []) res.append('Set-Cookie', c);
+  };
+
+  // Wraps async handlers: upstream / database errors become a clean 5xx
+  const handle = (fn) => async (req, res) => {
+    try {
+      await fn(req, res);
+    } catch (err) {
+      console.error(`API ${req.method} ${req.path} failed:`, err.message);
+      if (!res.headersSent) res.status(502).json({ error: 'El servidor de cuentas no responde. Inténtalo en un momento.' });
+    }
+  };
+
+  async function currentUser(req) {
+    const authUser = await auth.getSessionUser(req.get('cookie'), originOf(req));
+    return authUser ? { authUser } : null;
+  }
+
+  // ─── Session ───
+  router.get('/me', limit('me', 60, 60_000), handle(async (req, res) => {
+    const cookie = req.get('cookie');
+    if (!auth.sessionToken(cookie)) return res.json({ user: null });
+    // Uncached on purpose: Neon Auth may extend the session and re-set its cookie
+    const r = await auth.call('get-session', { cookie, origin: originOf(req) });
+    sendCookies(res, r.cookies);
+    if (!r.ok || !r.data || !r.data.user) return res.json({ user: null });
+    const user = await ensureUser(pool, r.data.user);
+    res.json({ user });
+  }));
+
+  // Short-lived JWT for the socket connection (verified by the game server)
+  router.get('/auth/token', limit('token', 60, 60_000), handle(async (req, res) => {
+    const cookie = req.get('cookie');
+    if (!auth.sessionToken(cookie)) return res.json({ token: null });
+    const r = await auth.call('token', { cookie, origin: originOf(req) });
+    res.json({ token: r.ok && r.data && typeof r.data.token === 'string' ? r.data.token : null });
+  }));
+
+  router.post('/auth/register', limit('register', 5, 15 * 60_000), handle(async (req, res) => {
+    const { email, password, displayName, avatarId } = req.body || {};
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const name = cleanDisplayName(displayName);
+    if (!EMAIL_RE.test(cleanEmail) || cleanEmail.length > 254) return res.status(400).json({ error: 'Escribe un correo válido' });
+    if (typeof password !== 'string' || password.length < PASSWORD_MIN) {
+      return res.status(400).json({ error: `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres` });
+    }
+    if (password.length > PASSWORD_MAX) return res.status(400).json({ error: 'La contraseña es demasiado larga' });
+    if (!name) return res.status(400).json({ error: 'Escribe tu nombre de ninja' });
+
+    const r = await auth.call('sign-up/email', {
+      method: 'POST',
+      origin: originOf(req),
+      body: { email: cleanEmail, password, name },
+    });
+    if (!r.ok || !r.data || !r.data.user) return res.status(r.status >= 500 ? 502 : 400).json({ error: authErrorMessage(r) });
+    sendCookies(res, r.cookies);
+    const user = await ensureUser(pool, r.data.user, { avatarId: isAvatarId(avatarId) ? avatarId : undefined });
+    res.json({ user });
+  }));
+
+  router.post('/auth/login', limit('login', 10, 10 * 60_000), handle(async (req, res) => {
+    const { email, password, avatarId } = req.body || {};
+    const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!EMAIL_RE.test(cleanEmail) || typeof password !== 'string' || !password || password.length > PASSWORD_MAX) {
+      return res.status(400).json({ error: 'Correo o contraseña incorrectos' });
+    }
+    const r = await auth.call('sign-in/email', {
+      method: 'POST',
+      origin: originOf(req),
+      body: { email: cleanEmail, password, rememberMe: true },
+    });
+    if (!r.ok || !r.data || !r.data.user) return res.status(r.status >= 500 ? 502 : 401).json({ error: authErrorMessage(r) });
+    sendCookies(res, r.cookies);
+    const user = await ensureUser(pool, r.data.user, { avatarId: isAvatarId(avatarId) ? avatarId : undefined });
+    res.json({ user });
+  }));
+
+  router.post('/auth/logout', limit('logout', 20, 60_000), handle(async (req, res) => {
+    const cookie = req.get('cookie');
+    auth.forgetSession(cookie);
+    let cookies = [];
+    if (auth.sessionToken(cookie)) {
+      try {
+        const r = await auth.call('sign-out', { method: 'POST', cookie, origin: originOf(req), body: {} });
+        cookies = r.cookies;
+      } catch (err) {
+        console.warn('Neon Auth sign-out failed:', err.message);
+      }
+    }
+    sendCookies(res, cookies.length ? cookies : CLEAR_COOKIES);
+    res.json({ success: true });
+  }));
+
+  // "Continuar con Google": a plain link. Neon Auth runs the Google flow and
+  // comes back to /api/auth/callback with a one-time verifier.
+  router.get('/auth/google', limit('google', 20, 10 * 60_000), handle(async (req, res) => {
+    const origin = originOf(req);
+    const r = await auth.call('sign-in/social', {
+      method: 'POST',
+      origin,
+      body: {
+        provider: 'google',
+        callbackURL: `${origin}/api/auth/callback`,
+        errorCallbackURL: `${origin}/api/auth/callback?error=1`,
+        disableRedirect: true,
+      },
+    });
+    const url = r.ok && r.data && typeof r.data.url === 'string' ? r.data.url : null;
+    if (!url || !/^https:\/\//.test(url)) {
+      console.warn('Google sign-in could not start:', r.status, r.data && r.data.code);
+      return res.redirect(302, '/?login=error');
+    }
+    sendCookies(res, r.cookies);
+    res.redirect(302, url);
+  }));
+
+  router.get('/auth/callback', limit('callback', 20, 10 * 60_000), handle(async (req, res) => {
+    const verifier = typeof req.query.neon_auth_session_verifier === 'string' ? req.query.neon_auth_session_verifier : '';
+    if (req.query.error || !verifier || verifier.length > 512) return res.redirect(302, '/?login=error');
+    const r = await auth.call('get-session', {
+      cookie: req.get('cookie'),
+      origin: originOf(req),
+      query: { neon_auth_session_verifier: verifier },
+    });
+    if (!r.ok || !r.data || !r.data.user) return res.redirect(302, '/?login=error');
+    sendCookies(res, r.cookies);
+    await ensureUser(pool, r.data.user);
+    res.redirect(302, '/?login=google');
+  }));
+
+  // ─── Profile & stats ───
+  router.patch('/profile', limit('profile', 30, 60_000), handle(async (req, res) => {
+    const session = await currentUser(req);
+    if (!session) return res.status(401).json({ error: 'Inicia sesión primero' });
+    const { displayName, avatarId } = req.body || {};
+    const change = {};
+    if (displayName !== undefined) {
+      const name = cleanDisplayName(displayName);
+      if (!name) return res.status(400).json({ error: 'Escribe tu nombre de ninja' });
+      change.displayName = name;
+    }
+    if (avatarId !== undefined) {
+      if (!isAvatarId(avatarId)) return res.status(400).json({ error: 'Avatar no válido' });
+      change.avatarId = avatarId;
+    }
+    await ensureUser(pool, session.authUser);
+    const user = await updateProfile(pool, session.authUser.id, change);
+    res.json({ user });
+  }));
+
+  router.get('/stats', limit('stats', 30, 60_000), handle(async (req, res) => {
+    const session = await currentUser(req);
+    if (!session) return res.status(401).json({ error: 'Inicia sesión primero' });
+    const stats = await getStats(pool, session.authUser.id);
+    res.json({ stats });
+  }));
+
+  router.use((req, res) => res.status(404).json({ error: 'No encontrado' }));
+
+  // ─── Used by the socket layer ───
+  async function verifySocketToken(token) {
+    if (!enabled || !token) return null;
+    return auth.verifyToken(token);
+  }
+
+  /**
+   * Pays a finished game (called once per game by the socket layer). Returns
+   * { eligible, reason, paid: [{ playerId, userId, coins, total }] }.
+   */
+  async function awardGame(summary) {
+    const result = computeRewards(summary);
+    if (!enabled || !result.eligible || !result.awards.length) return { ...result, paid: [] };
+    const rows = await recordGame(pool, summary, result.awards);
+    const byUser = new Map(rows.map((r) => [r.userId, r]));
+    const paid = result.awards
+      .filter((a) => byUser.has(a.userId))
+      .map((a) => ({ playerId: a.playerId, userId: a.userId, coins: byUser.get(a.userId).coins, total: byUser.get(a.userId).total }));
+    return { ...result, paid };
+  }
+
+  return { enabled, router, verifySocketToken, awardGame, getUser: (id) => (enabled ? getUser(pool, id) : null) };
+}

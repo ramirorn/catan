@@ -43,3 +43,6 @@ console.log('ALL ENGINE TESTS PASSED SUCCESSFULLY! 🎉');
 
 // Engine rules (setup order, special build, steals, spectators, leaving…)
 await import('./tests/engine.test.js');
+
+// Ryō rules, game-over hook, accounts disabled without a database
+await import('./tests/rewards.test.js');

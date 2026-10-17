@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import { io } from 'socket.io-client';
+import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
@@ -32,6 +33,16 @@ export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
   const [playerId] = useState(getPlayerId);
+  const { user, getSocketToken, currentUserId } = useAuth();
+  const tokenRef = useRef(getSocketToken);
+  const userIdOfRef = useRef(currentUserId);
+  useEffect(() => {
+    tokenRef.current = getSocketToken;
+    userIdOfRef.current = currentUserId;
+  }, [getSocketToken, currentUserId]);
+  // Account the server knows this socket by (null = guest)
+  const sentUserRef = useRef(null);
+  const userId = user ? user.id : null;
 
   useEffect(() => {
     // VITE_SERVER_URL overrides everything. In dev (vite on :5173) the server
@@ -43,7 +54,19 @@ export function SocketProvider({ children }) {
 
     const socketInstance = io(serverUrl, {
       transports: ['websocket', 'polling'],
-      auth: { playerId },
+      // A logged-in player also sends a short-lived account token (fetched
+      // again on every reconnection); guests send only their playerId
+      auth: (cb) => {
+        tokenRef.current()
+          .then((token) => {
+            sentUserRef.current = token ? userIdOfRef.current() : null;
+            cb(token ? { playerId, token } : { playerId });
+          })
+          .catch(() => {
+            sentUserRef.current = null;
+            cb({ playerId });
+          });
+      },
       // Keep trying: free hosts (Render) can take ~1 min to wake up
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
@@ -70,6 +93,15 @@ export function SocketProvider({ children }) {
       socketInstance.disconnect();
     };
   }, [playerId]);
+
+  // Signed in / out from the menu: tell the server without reconnecting
+  useEffect(() => {
+    if (!socket || !connected || sentUserRef.current === userId) return;
+    sentUserRef.current = userId;
+    (userId ? tokenRef.current() : Promise.resolve(null))
+      .then((token) => socket.emit('authenticate', { token }))
+      .catch(() => {});
+  }, [socket, connected, userId]);
 
   const value = useMemo(() => ({
     socket,

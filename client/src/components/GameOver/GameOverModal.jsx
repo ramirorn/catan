@@ -1,12 +1,14 @@
 import { useGame } from '../../context/GameContext';
 import { resetPlayerId } from '../../context/SocketContext';
 import { PHASE } from '../../utils/constants';
-import { CrownIcon, RoadIcon, SwordsIcon } from '../Shared/Icons';
+import { useAuth } from '../../context/AuthContext';
+import { CoinsIcon, CrownIcon, RoadIcon, SwordsIcon } from '../Shared/Icons';
 import { PlayerAvatar } from '../Shared/Avatar';
 import { ScrollPanel } from '../Shared/ScrollPanel';
 
 export function GameOverModal() {
-  const { gameState, myPlayerId, leaveRoom } = useGame();
+  const { gameState, myPlayerId, leaveRoom, coinsAward, isSpectator } = useGame();
+  const { user, accountsEnabled, coinName, status } = useAuth();
 
   if (gameState?.phase !== PHASE.GAME_OVER) return null;
 
@@ -94,6 +96,24 @@ export function GameOverModal() {
             })}
           </ol>
         </div>
+
+        {/* Ryō earned (logged-in players) or a hint for guests */}
+        {!isSpectator && coinsAward && (
+          <div className={`flex items-center gap-2.5 text-left mb-4 px-3 py-2.5 rounded-[3px] border ${coinsAward.coins > 0 ? 'border-chakra/50 bg-chakra/10' : 'border-ink/20 bg-paper-deep/40'}`} role="status">
+            <CoinsIcon className={`w-6 h-6 shrink-0 ${coinsAward.coins > 0 ? 'text-chakra-dark' : 'text-ink-faint'}`} />
+            {coinsAward.coins > 0 ? (
+              <p className="text-[14px] text-ink leading-snug">
+                <strong className="font-display text-[18px] text-chakra-dark">+{coinsAward.coins} {coinName}</strong>
+                {coinsAward.total !== null && <span className="text-ink-soft"> · ahora tienes {coinsAward.total}</span>}
+              </p>
+            ) : (
+              <p className="text-[13px] text-ink-soft leading-snug">{coinsAward.reason || `Esta partida no dio ${coinName}.`}</p>
+            )}
+          </div>
+        )}
+        {!isSpectator && !user && accountsEnabled && status === 'guest' && (
+          <p className="text-[12.5px] text-ink-faint mb-3">Inicia sesión en el menú para ganar {coinName} en tus partidas.</p>
+        )}
 
         <div className="flex flex-col gap-2">
           <button type="button" onClick={handlePlayAgain} className="btn btn-primary w-full min-h-[44px] py-3 text-[15px]">
