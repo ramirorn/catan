@@ -63,3 +63,5 @@ CREATE TABLE IF NOT EXISTS game_results (
 );
 
 CREATE INDEX IF NOT EXISTS game_results_user_idx ON game_results (user_id, played_at DESC);
+-- Ranking (most wins, all time / this week)
+CREATE INDEX IF NOT EXISTS game_results_wins_idx ON game_results (played_at DESC, user_id) WHERE won;

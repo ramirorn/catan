@@ -7,7 +7,7 @@ import { getPool } from '../db/pool.js';
 import { createNeonAuth } from './neonAuth.js';
 import { createRateLimiter } from './rateLimit.js';
 import { COIN_NAME, REWARD_RULES, computeRewards } from './rewards.js';
-import { cleanDisplayName, ensureUser, getStats, getUser, recordGame, updateProfile } from './store.js';
+import { cleanDisplayName, ensureUser, getLeaderboard, getStats, getUser, recordGame, updateProfile } from './store.js';
 import { createShopService, ShopError } from '../shop/service.js';
 import { createPgShopStore } from '../shop/store.js';
 import { DEFAULT_ITEMS } from '../shop/catalog.js';
@@ -296,6 +296,25 @@ export function createAccounts(env = process.env) {
     if (!session) return res.status(401).json({ error: 'Inicia sesión primero' });
     const stats = await getStats(pool, session.authUser.id);
     res.json({ stats });
+  }));
+
+  // ─── Ranking (public): most wins, all time and this week ───
+  // The shared top list is cached for a minute so the menu never hammers the
+  // database; the caller's own position is a cheap extra query.
+  const LEADERBOARD_TTL_MS = 60_000;
+  const leaderboardCache = new Map(); // period → { at, rows }
+  router.get('/leaderboard', limit('leaderboard', 30, 60_000), handle(async (req, res) => {
+    const period = req.query.period === 'week' ? 'week' : 'all';
+    const session = await currentUser(req).catch(() => null);
+    const userId = session ? session.authUser.id : null;
+    const hit = leaderboardCache.get(period);
+    if (hit && Date.now() - hit.at < LEADERBOARD_TTL_MS) {
+      const me = userId ? (hit.rows.find((r) => r.userId === userId) || (await getLeaderboard(pool, period, { limit: 0, userId })).me) : null;
+      return res.json({ period, rows: hit.rows, me });
+    }
+    const board = await getLeaderboard(pool, period, { limit: 20, userId });
+    leaderboardCache.set(period, { at: Date.now(), rows: board.rows });
+    res.json({ period, rows: board.rows, me: board.me });
   }));
 
   // ─── Shop: buy / equip (signed in only) ───

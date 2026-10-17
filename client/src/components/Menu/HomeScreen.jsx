@@ -5,6 +5,7 @@ import { LobbyScreen } from '../Lobby/LobbyScreen';
 import { MainMenu } from './MainMenu';
 import { ShopScreen } from './ShopScreen';
 import { ProfileScreen } from './ProfileScreen';
+import { RankingScreen } from './RankingScreen';
 import { LoginModal } from './LoginModal';
 
 /**
@@ -32,6 +33,8 @@ export function HomeScreen({ screen, onScreen }) {
     content = <LobbyScreen onBack={toMenu} />;
   } else if (screen === 'shop') {
     content = <ShopScreen onBack={toMenu} onLogin={openLogin} onProfile={() => go('profile')} />;
+  } else if (screen === 'ranking') {
+    content = <RankingScreen onBack={toMenu} onLogin={openLogin} onProfile={() => go('profile')} />;
   } else if (screen === 'profile') {
     // Re-mounted when the account changes so the form shows the saved profile
     content = <ProfileScreen key={user ? user.id : 'guest'} onBack={toMenu} onLogin={openLogin} onShop={() => go('shop')} />;

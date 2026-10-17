@@ -1,5 +1,5 @@
 import { useAuth } from '../../context/AuthContext';
-import { ArrowRightIcon, CoinsIcon, NinjaIcon, ScrollIcon, SwordsIcon } from '../Shared/Icons';
+import { ArrowRightIcon, CoinsIcon, CrownIcon, NinjaIcon, ScrollIcon, SwordsIcon } from '../Shared/Icons';
 import { MenuShell } from './MenuParts';
 
 // One menu entry: seal with an icon, title, one-line hint, arrow
@@ -57,6 +57,7 @@ export function MainMenu({ onNavigate, onLogin }) {
       <ul className="space-y-2.5 short:space-y-2 phland:space-y-1.5">
         <MenuItem icon={SwordsIcon} title="Jugar" hint="Crea, únete u observa una sala" primary onClick={() => onNavigate('play')} />
         <MenuItem icon={CoinsIcon} title="Tienda" hint="Fichas y tableros shinobi por Ryō" onClick={() => onNavigate('shop')} />
+        <MenuItem icon={CrownIcon} title="Ranking" hint="Los ninjas con más victorias" onClick={() => onNavigate('ranking')} />
         <MenuItem
           icon={NinjaIcon}
           title="Perfil"

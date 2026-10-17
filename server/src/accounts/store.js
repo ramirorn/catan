@@ -107,6 +107,44 @@ export async function getStats(pool, userId) {
   };
 }
 
+// The weekly ranking restarts every Monday at 00:00, Argentina time
+const WEEK_START_SQL = `(date_trunc('week', now() AT TIME ZONE 'America/Argentina/Buenos_Aires') AT TIME ZONE 'America/Argentina/Buenos_Aires')`;
+
+/**
+ * Players with the most wins ('all' time or this 'week'), ties broken by
+ * fewer games played. `rank` repeats on ties (1, 2, 2, 4…). With a userId,
+ * also returns that player's own row (null if they have no wins yet).
+ */
+export async function getLeaderboard(pool, period, { limit = 20, userId = null } = {}) {
+  const since = period === 'week' ? WEEK_START_SQL : `'-infinity'::timestamptz`;
+  const ranked = `
+    WITH ranked AS (
+      SELECT user_id,
+             count(*) FILTER (WHERE won)::int AS wins,
+             count(*)::int AS games,
+             rank() OVER (ORDER BY count(*) FILTER (WHERE won) DESC, count(*) ASC)::int AS pos
+        FROM game_results
+       WHERE played_at >= ${since}
+       GROUP BY user_id
+      HAVING count(*) FILTER (WHERE won) > 0
+    )`;
+  const cols = 'r.pos, r.wins, r.games, u.id, u.display_name, u.avatar_id';
+  const top = await pool.query(
+    `${ranked} SELECT ${cols} FROM ranked r JOIN users u ON u.id = r.user_id ORDER BY r.pos, u.display_name LIMIT $1`,
+    [limit],
+  );
+  let me = null;
+  if (userId) {
+    const mine = await pool.query(`${ranked} SELECT ${cols} FROM ranked r JOIN users u ON u.id = r.user_id WHERE r.user_id = $1`, [userId]);
+    me = mine.rows[0] ? toRankRow(mine.rows[0]) : null;
+  }
+  return { rows: top.rows.map(toRankRow), me };
+}
+
+function toRankRow(r) {
+  return { rank: r.pos, wins: r.wins, games: r.games, userId: r.id, displayName: r.display_name, avatarId: r.avatar_id };
+}
+
 /**
  * Writes the results of one game and pays the Ryō, in one statement: the
  * UNIQUE (game_id, user_id) key makes it idempotent (a second call for the
