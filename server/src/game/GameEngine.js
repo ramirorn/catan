@@ -840,9 +840,7 @@ export class GameEngine {
     if (!this._mayAct(playerId)) {
       return { success: false, error: 'No es tu turno' };
     }
-    // Free roads from Road Building can also be laid before rolling
-    const freeRoadBeforeRoll = this.phase === PHASE.ROLL_DICE && this.freeRoadsRemaining > 0;
-    if (!this._isBuildPhase() && !freeRoadBeforeRoll) {
+    if (!this._isBuildPhase()) {
       return { success: false, error: 'Ahora no puedes construir' };
     }
 
@@ -993,7 +991,11 @@ export class GameEngine {
     if (playerId !== this.getCurrentPlayerId()) {
       return { success: false, error: 'No es tu turno' };
     }
-    // Any development card may be played before rolling the dice
+    // Before rolling only the Knight may be played (official rule); the
+    // other development cards wait until the dice are rolled
+    if (this.phase === PHASE.ROLL_DICE && cardType !== DEV_CARD.KNIGHT) {
+      return { success: false, error: 'Antes de tirar los dados solo puedes jugar el Caballero' };
+    }
     if (this.phase !== PHASE.MAIN && this.phase !== PHASE.ROLL_DICE) {
       return { success: false, error: 'Ahora no puedes jugar cartas' };
     }
@@ -1501,7 +1503,7 @@ export class GameEngine {
         if (this.board.canPlaceRoad(edgeId, playerId, true, player.lastSetupVertex)) {
           validRoads.push(edgeId);
         }
-      } else if (!isSetup && (canBuild || (this.phase === PHASE.ROLL_DICE && this.freeRoadsRemaining > 0))) {
+      } else if (!isSetup && canBuild) {
         if (this.board.canPlaceRoad(edgeId, playerId)) {
           validRoads.push(edgeId);
         }

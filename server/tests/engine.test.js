@@ -710,6 +710,22 @@ test('players who left the game no longer collect resources from the dice', () =
   if (!e.board.hexes[hexOfB.id].hasRobber) assert.ok(e.bankCount(hexOfB.resource) >= bankBefore - paidOthers - 4);
 });
 
+test('before rolling only the Knight can be played; other cards after the roll', () => {
+  const e = newGame(3, 'standard');
+  playSetup(e);
+  const pid = e.getCurrentPlayerId();
+  const p = e.players[pid];
+  p.devCards = ['monopoly', 'yearOfPlenty', 'roadBuilding', 'knight'];
+  p.devCardBoughtThisTurn = [];
+  assert.equal(e.phase, PHASE.ROLL_DICE);
+  for (const [card, params] of [['monopoly', { resource: 'wood' }], ['yearOfPlenty', { resource1: 'wood', resource2: 'ore' }], ['roadBuilding', {}]]) {
+    const r = e.playDevCard(pid, card, params);
+    assert.equal(r.success, false, card);
+  }
+  assert.equal(e.freeRoadsRemaining, 0);
+  assert.ok(e.playDevCard(pid, 'knight', {}).success);
+});
+
 // ─── Report ───
 let failed = 0;
 for (const r of results) {

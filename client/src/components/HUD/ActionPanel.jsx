@@ -18,8 +18,6 @@ export function ActionPanel() {
   // Building only in my own turn, after rolling
   const canBuild = isMainPhase;
   const freeRoads = gameState?.freeRoadsRemaining || 0;
-  // Road Building can be played before rolling, so its free roads too
-  const canLayFreeRoads = freeRoads > 0 && isMyTurn && gameState?.phase === PHASE.ROLL_DICE;
 
   const res = myPlayer?.resources || {};
 
@@ -49,7 +47,7 @@ export function ActionPanel() {
   return (
     <div className="hud-actions-row">
       <ActionButton
-        disabled={!(canBuild || canLayFreeRoads) || !canAffordRoad}
+        disabled={!canBuild || !canAffordRoad}
         onClick={() => handleToggleBuild('road')}
         title="Camino: 1 Madera, 1 Arcilla"
         active={buildMode === 'road'}

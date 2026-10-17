@@ -129,7 +129,9 @@ export function DevCardModal({ isOpen, onClose }) {
               const boughtOfType = boughtThisTurn.filter((c) => c === card).length;
               const isBoughtThisTurn = sameTypeBefore >= sameTypeTotal - boughtOfType;
               const isVP = card === DEV_CARD.VICTORY_POINT;
-              const canPlay = canPlayNow && !alreadyPlayedCard && !isBoughtThisTurn && !isVP;
+              // Before rolling, only the Knight (official rule)
+              const beforeRoll = gameState?.phase === 'rollDice';
+              const canPlay = canPlayNow && !alreadyPlayedCard && !isBoughtThisTurn && !isVP && (!beforeRoll || card === DEV_CARD.KNIGHT);
               const isSelected = selectedCard === idx;
 
               return (
