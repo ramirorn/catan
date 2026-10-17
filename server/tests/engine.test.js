@@ -690,6 +690,26 @@ for (const [boardType, n] of [['standard', 4], ['extended', 6]]) {
   });
 }
 
+test('players who left the game no longer collect resources from the dice', () => {
+  const e = newGame(3, 'standard');
+  playSetup(e);
+  const [a, b] = e.playerOrder;
+  // Find a number that pays player b, then make b leave
+  const hexOfB = Object.values(e.board.hexes).find((h) => h.number && h.resource
+    && e.board.getBuildingsAdjacentToHex(h.id).some((bd) => bd.playerId === b));
+  assert.ok(hexOfB, 'b has a producing hex');
+  e.players[b].left = true;
+  const before = { ...e.players[b].resources };
+  const bankBefore = e.bankCount(hexOfB.resource);
+  const others = e.board.getBuildingsAdjacentToHex(hexOfB.id).filter((bd) => bd.playerId !== b);
+  const d1 = Math.min(6, Math.max(1, hexOfB.number - 1));
+  withDice([d1, hexOfB.number - d1], () => e.rollDice(e.getCurrentPlayerId() === b ? a : e.getCurrentPlayerId()));
+  assert.deepEqual(e.players[b].resources, before);
+  // The bank only paid the players still in the game
+  const paidOthers = others.reduce((n, bd) => n + (bd.type === 'city' ? 2 : 1), 0);
+  if (!e.board.hexes[hexOfB.id].hasRobber) assert.ok(e.bankCount(hexOfB.resource) >= bankBefore - paidOthers - 4);
+});
+
 // ─── Report ───
 let failed = 0;
 for (const r of results) {

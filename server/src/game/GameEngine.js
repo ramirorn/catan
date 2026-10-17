@@ -493,6 +493,9 @@ export class GameEngine {
     for (const hex of hexes) {
       const buildings = this.board.getBuildingsAdjacentToHex(hex.id);
       for (const building of buildings) {
+        // Players who left get nothing: their share stays in the bank for the
+        // others (and doesn't count towards the shortage rule below)
+        if (this.players[building.playerId]?.left) continue;
         const amount = building.type === 'city' ? 2 : 1;
         const res = hex.resource;
         if (!owed[res]) owed[res] = {};
