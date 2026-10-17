@@ -1,4 +1,5 @@
 import { RESOURCE, MAX_ROADS, MAX_SETTLEMENTS, MAX_CITIES, sanitizeAvatarId } from './constants.js';
+import { sanitizePieceSet } from '../shop/catalog.js';
 
 export class Player {
   constructor(id, name, color, index, avatarId = 0) {
@@ -7,6 +8,7 @@ export class Player {
     this.avatarId = sanitizeAvatarId(avatarId); // profile picture (index, drawn by the client)
     this.color = color;
     this.index = index;
+    this.pieceSet = sanitizePieceSet(null); // shop piece set (seen by everyone)
     this.connected = true;
     this.left = false;    // left the game in progress (seat kept, played by the server)
     this.kicked = false;  // removed by the host
@@ -113,6 +115,7 @@ export class Player {
       id: this.id,
       name: this.name,
       avatarId: this.avatarId,
+      pieceSet: this.pieceSet,
       color: this.color,
       index: this.index,
       connected: this.connected,

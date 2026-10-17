@@ -8,6 +8,9 @@ import { createNeonAuth } from './neonAuth.js';
 import { createRateLimiter } from './rateLimit.js';
 import { COIN_NAME, REWARD_RULES, computeRewards } from './rewards.js';
 import { cleanDisplayName, ensureUser, getStats, getUser, recordGame, updateProfile } from './store.js';
+import { createShopService, ShopError } from '../shop/service.js';
+import { createPgShopStore } from '../shop/store.js';
+import { DEFAULT_ITEMS } from '../shop/catalog.js';
 
 const DISABLED_MESSAGE = 'Las cuentas no están disponibles en este servidor. Puedes jugar como invitado.';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -54,6 +57,7 @@ export function createAccounts(env = process.env) {
   const auth = enabled ? createNeonAuth(env.NEON_AUTH_BASE_URL) : null;
   const limit = createRateLimiter();
   const router = express.Router();
+  const shop = createShopService(enabled ? createPgShopStore(pool) : null);
 
   // Our own origin as the browser sees it (Render terminates https: trust proxy)
   const originOf = (req) => `${req.protocol}://${req.get('host')}`;
@@ -84,6 +88,23 @@ export function createAccounts(env = process.env) {
         minVoteMinutes: REWARD_RULES.minVoteMinutes,
       },
     });
+  });
+
+  // ─── Shop catalogue: open to everyone (guests see it, signed-in users also
+  // get what they own and wear) ───
+  router.get('/shop', limit('shop', 60, 60_000), async (req, res) => {
+    let userId = null;
+    try {
+      if (enabled && auth.sessionToken(req.get('cookie'))) {
+        const authUser = await auth.getSessionUser(req.get('cookie'), originOf(req));
+        if (authUser) userId = authUser.id;
+      }
+      res.json(await shop.view(userId));
+    } catch (err) {
+      console.error('API GET /shop failed:', err.message);
+      // The catalogue itself never depends on the database
+      if (!res.headersSent) res.json({ ...(await shop.view(null)), error: 'No se pudo cargar tu inventario' });
+    }
   });
 
   // Everything below needs accounts
@@ -250,6 +271,31 @@ export function createAccounts(env = process.env) {
     res.json({ stats });
   }));
 
+  // ─── Shop: buy / equip (signed in only) ───
+  const shopHandle = (fn) => handle(async (req, res) => {
+    const session = await currentUser(req);
+    if (!session) return res.status(401).json({ error: 'Inicia sesión para comprar' });
+    await ensureUser(pool, session.authUser);
+    try {
+      await fn(req, res, session.authUser.id);
+    } catch (err) {
+      if (!(err instanceof ShopError)) throw err;
+      res.status(err.status).json({ error: err.message, ...err.extra });
+    }
+  });
+
+  router.post('/shop/buy', limit('shop-buy', 20, 60_000), shopHandle(async (req, res, userId) => {
+    const { itemId } = req.body || {};
+    const result = await shop.buy(userId, itemId);
+    res.json({ ...result, ...(await shop.view(userId)) });
+  }));
+
+  router.post('/shop/equip', limit('shop-equip', 40, 60_000), shopHandle(async (req, res, userId) => {
+    const { slot, itemId } = req.body || {};
+    const result = await shop.equip(userId, slot, itemId);
+    res.json({ ...result, ...(await shop.view(userId)) });
+  }));
+
   router.use((req, res) => res.status(404).json({ error: 'No encontrado' }));
 
   // ─── Used by the socket layer ───
@@ -273,5 +319,29 @@ export function createAccounts(env = process.env) {
     return { ...result, paid };
   }
 
-  return { enabled, router, verifySocketToken, awardGame, getUser: (id) => (enabled ? getUser(pool, id) : null) };
+  // Equipped cosmetics of a seat ({ pieces, board }); defaults for guests or
+  // when the database is not reachable (a game never waits on the shop)
+  async function getLoadout(userId) {
+    if (!enabled || !userId) return { ...DEFAULT_ITEMS };
+    try {
+      return await shop.loadout(userId);
+    } catch (err) {
+      console.warn('Could not load the equipped items:', err.message);
+      return { ...DEFAULT_ITEMS };
+    }
+  }
+
+  async function ownsItem(userId, itemId) {
+    return shop.owns(enabled ? userId : null, itemId);
+  }
+
+  return {
+    enabled,
+    router,
+    verifySocketToken,
+    awardGame,
+    getLoadout,
+    ownsItem,
+    getUser: (id) => (enabled ? getUser(pool, id) : null),
+  };
 }

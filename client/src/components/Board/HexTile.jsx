@@ -7,7 +7,7 @@ import { useGame } from '../../context/GameContext';
 import { memo } from 'react';
 import { TERRAIN_BASE } from '../../utils/theme';
 
-export const HexTile = memo(function HexTile({ hex }) {
+export const HexTile = memo(function HexTile({ hex, wash = null }) {
   const game = useGame();
   const canPlaceRobberHere = canMoveRobberTo(game, hex);
   // A signed peace pact keeps the robber off this hex (shown to the mover)
@@ -50,6 +50,8 @@ export const HexTile = memo(function HexTile({ hex }) {
       {TERRAIN_BASE[hex.terrain] && (
         <polygon points={points} fill={TERRAIN_BASE[hex.terrain]} fillOpacity="0.32" pointerEvents="none" />
       )}
+      {/* Board theme light wash (under the number seal, which stays crisp) */}
+      {wash && <polygon points={points} fill={wash.color} fillOpacity={wash.opacity} pointerEvents="none" />}
       <polygon points={points} className="hex-polygon" fill="none" pointerEvents="none" />
 
       {/* Printed-tile depth: vignette + inner bevel */}

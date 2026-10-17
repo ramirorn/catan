@@ -4,6 +4,8 @@ import { useGame } from '../../context/GameContext';
 import { AvatarPicker } from '../Shared/AvatarPicker';
 import { CoinsIcon, CrownIcon, ExitIcon, SwordsIcon } from '../Shared/Icons';
 import { MenuShell, PanelHeading } from './MenuParts';
+import { Dropdown } from '../Shared/Choice';
+import { ThemeSwatch } from '../Shared/ThemeSwatch';
 
 function StatTile({ icon: Icon, label, value }) {
   return (
@@ -26,7 +28,50 @@ function CoinRules() {
   );
 }
 
-export function ProfileScreen({ onBack, onLogin }) {
+/** Owned shop items and what is equipped (equip without opening the shop) */
+function Inventory({ onShop }) {
+  const { shop, equipItem } = useAuth();
+  const { addToast } = useGame();
+  if (!shop || !shop.signedIn) return null;
+  const bought = shop.owned.filter((id) => shop.catalog.some((i) => i.id === id && !i.isDefault));
+  const optionsFor = (slot) =>
+    shop.catalog
+      .filter((i) => i.slot === slot && (i.isDefault || shop.owned.includes(i.id)))
+      .map((i) => ({ value: i.id, label: i.name, icon: slot === 'board' ? <ThemeSwatch themeId={i.id} size={14} /> : null }));
+  const equip = async (slot, id) => {
+    const res = await equipItem(slot, id);
+    if (!res.success) addToast(res.error, 'error');
+  };
+  return (
+    <div className="mt-3.5 short:mt-3 phland:mt-2">
+      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+        <span className="label-caps">Tus objetos de la tienda</span>
+        <button type="button" onClick={onShop} className="text-[12.5px] font-bold text-shu hover:underline cursor-pointer">
+          {bought.length} {bought.length === 1 ? 'objeto' : 'objetos'} · Tienda
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          ['pieces', 'Fichas'],
+          ['board', 'Tablero'],
+        ].map(([slot, label]) => (
+          <div key={slot} className="min-w-0">
+            <span id={`inv-${slot}`} className="block text-[11px] text-ink-faint mb-0.5">{label}</span>
+            <Dropdown
+              id={`inv-${slot}-dd`}
+              ariaLabelledby={`inv-${slot}`}
+              options={optionsFor(slot)}
+              value={shop.equipped[slot]}
+              onChange={(v) => v !== shop.equipped[slot] && equip(slot, v)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ProfileScreen({ onBack, onLogin, onShop }) {
   const { user, status, accountsEnabled, updateProfile, logout, fetchStats, coinName } = useAuth();
   const { playerName, setPlayerName, avatarId, setAvatarId, addToast } = useGame();
   const [name, setName] = useState(user ? user.displayName : playerName);
@@ -133,6 +178,8 @@ export function ProfileScreen({ onBack, onLogin }) {
         <StatTile icon={CrownIcon} label="Victorias" value={user.gamesWon} />
         <StatTile icon={CoinsIcon} label={coinName} value={user.coins} />
       </div>
+
+      <Inventory onShop={onShop} />
 
       <div className="mt-3.5 short:mt-3 phland:mt-2">
         <CoinRules />

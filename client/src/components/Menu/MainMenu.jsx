@@ -56,7 +56,7 @@ export function MainMenu({ onNavigate, onLogin }) {
 
       <ul className="space-y-2.5 short:space-y-2 phland:space-y-1.5">
         <MenuItem icon={SwordsIcon} title="Jugar" hint="Crea, únete u observa una sala" primary onClick={() => onNavigate('play')} />
-        <MenuItem icon={CoinsIcon} title="Tienda" tag="Pronto" hint="Fichas y tableros shinobi" onClick={() => onNavigate('shop')} />
+        <MenuItem icon={CoinsIcon} title="Tienda" hint="Fichas y tableros shinobi por Ryō" onClick={() => onNavigate('shop')} />
         <MenuItem
           icon={NinjaIcon}
           title="Perfil"

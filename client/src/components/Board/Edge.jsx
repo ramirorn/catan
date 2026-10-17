@@ -1,7 +1,8 @@
 import { memo } from 'react';
 import { useGame } from '../../context/GameContext';
 import { edgeActionFor, runEdgeAction } from './boardActions';
-import { pieceColor, shade } from '../../utils/theme';
+import { pieceColor } from '../../utils/theme';
+import { RoadArt } from './pieceArt2D';
 
 export const Edge = memo(function Edge({ edge }) {
   const game = useGame();
@@ -54,20 +55,12 @@ export const Edge = memo(function Edge({ edge }) {
         </g>
       )}
 
-      {/* Built road: a plank bridge painted in the player's colour, with a
-          light rim + ink edges so it reads on any terrain */}
+      {/* Built road in the owner's shop set (light rim + ink edges so it reads
+          on any terrain). No SVG filter: a filter on a perfectly vertical /
+          horizontal line has a zero-size bounding box and gets dropped. */}
       {road && (
-        // No SVG filter here: a filter on a perfectly vertical/horizontal line
-        // has a zero-size bounding box, so the browser drops the whole road.
-        // The shadow is a plain offset line instead.
         <g className="road-built">
-          <line x1={rx1 + 1.6} y1={ry1 + 3.2} x2={rx2 + 1.6} y2={ry2 + 3.2} stroke="#05070c" strokeOpacity="0.5" strokeWidth="14" strokeLinecap="round" />
-          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke="#fff4dc" strokeWidth="15.5" strokeLinecap="round" />
-          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke="#120e0b" strokeWidth="12.5" strokeLinecap="round" />
-          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke={playerColor} strokeWidth="8.6" strokeLinecap="round" />
-          {/* Gaps between the planks */}
-          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke={shade(playerColor, -0.45)} strokeWidth="8.6" strokeDasharray="1.2 4.2" strokeDashoffset="-2" />
-          <line x1={rx1} y1={ry1} x2={rx2} y2={ry2} stroke={shade(playerColor, 0.5)} strokeOpacity="0.7" strokeWidth="1.8" strokeLinecap="round" />
+          <RoadArt set={player?.pieceSet} x1={rx1} y1={ry1} x2={rx2} y2={ry2} color={playerColor} />
         </g>
       )}
     </g>

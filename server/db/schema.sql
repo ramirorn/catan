@@ -23,8 +23,10 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
--- Items owned (shop, next phase). item_id is a catalogue key defined in code,
--- e.g. 'pieces:akatsuki' or 'board:desert-night'.
+-- Items bought in the shop. item_id is a catalogue key defined in code
+-- (server/src/shop/catalog.js), e.g. 'pieces:temple' or 'board:night'. The
+-- free default items ('pieces:classic', 'board:classic') are never stored:
+-- everyone owns them. The primary key makes a purchase idempotent.
 CREATE TABLE IF NOT EXISTS user_items (
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   item_id     text NOT NULL CHECK (char_length(item_id) BETWEEN 1 AND 64),
@@ -34,7 +36,7 @@ CREATE TABLE IF NOT EXISTS user_items (
 
 -- What is equipped in each slot: piece skins (seen by everyone in the game)
 -- and the board theme (the host's one is used for the room). Only owned
--- items can be equipped.
+-- items can be equipped; no row = the slot's free default.
 CREATE TABLE IF NOT EXISTS user_equipped (
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   slot    text NOT NULL CHECK (slot IN ('pieces', 'board')),

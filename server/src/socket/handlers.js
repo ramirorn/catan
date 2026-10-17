@@ -1,6 +1,7 @@
 import { createTurnTimers } from './turnTimer.js';
 import { sanitizeAvatarId } from '../game/constants.js';
 import { summarizeGame } from '../accounts/rewards.js';
+import { getItem } from '../shop/catalog.js';
 
 const CHAT_HISTORY_LIMIT = 200;
 const CHAT_MAX_LENGTH = 150;
@@ -14,6 +15,8 @@ const CHAT_RUN_RE = /(.)\1{5,}/gu; // a character repeated more than CHAT_MAX_RU
 export const MAX_SPECTATORS = 20;
 // setAvatar re-sends the room state: one change per socket every 300 ms at most
 const AVATAR_MIN_INTERVAL_MS = 300;
+// Board theme changes by the host: at most one every 400 ms
+const THEME_MIN_INTERVAL_MS = 400;
 // A spectator who closes the page keeps their place this long (page reloads)
 const SPECTATOR_GRACE_MS = 2 * 60 * 1000;
 // A game in progress with nobody connected is closed after this long
@@ -98,9 +101,31 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
   }
 
   // Binds a seat to the account of the socket that took it (first one wins)
-  function bindAccount(room, id, socket) {
+  // and dresses it with the account's equipped piece set (the room's board
+  // theme too, for a host who just created it)
+  function bindAccount(room, id, socket, { asHost = false } = {}) {
     const user = socket.data.user;
-    if (user && !room.accounts[id]) room.accounts[id] = user.id;
+    if (user && !room.accounts[id]) {
+      room.accounts[id] = user.id;
+      applyLoadout(room.engine.roomId, id, user.id, asHost);
+    }
+  }
+
+  function applyLoadout(roomId, id, userId, asHost) {
+    if (!accounts || !accounts.enabled || typeof accounts.getLoadout !== 'function') return;
+    accounts.getLoadout(userId)
+      .then((loadout) => {
+        const room = lobbyManager.getRoom(roomId);
+        // The seat may be gone or taken by someone else meanwhile
+        if (!room || room.accounts[id] !== userId || !room.engine.players[id]) return;
+        let changed = room.engine.setPieceSet(id, loadout.pieces);
+        if (asHost && room.host === id && !room.boardThemeChosen && room.engine.phase === 'lobby' &&
+            room.engine.boardTheme !== loadout.board) {
+          changed = room.engine.setBoardTheme(loadout.board).success || changed;
+        }
+        if (changed) emitGameState(roomId);
+      })
+      .catch((err) => console.warn(`Could not dress seat ${id}:`, err.message));
   }
 
   // The same account can't hold two seats of one room (two tabs)
@@ -365,7 +390,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       const type = boardType === 'extended' ? 'extended' : 'standard';
       const { roomId, engine } = lobbyManager.createRoom(playerId, name, type, sanitizeAvatarId(avatarId));
       const createdRoom = lobbyManager.getRoom(roomId);
-      bindAccount(createdRoom, playerId, socket);
+      bindAccount(createdRoom, playerId, socket, { asHost: true });
       watchGameOver(createdRoom);
       // Optional settings; invalid values keep the defaults
       engine.updateSettings({ vpToWin, turnTimeLimit });
@@ -550,6 +575,40 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       const result = room.engine.updateSettings({ vpToWin, turnTimeLimit, peacePacts });
       cb(result);
       if (result.success) emitGameState(roomId);
+    });
+
+    // ─── Lobby: board theme (host only, before starting, among the boards
+    // their account owns; guests only have the classic one) ───
+    let lastThemeAt = 0;
+    on('setBoardTheme', ({ themeId }, cb) => {
+      const now = Date.now();
+      if (now - lastThemeAt < THEME_MIN_INTERVAL_MS) return cb({ success: false, error: 'Espera un momento' });
+      lastThemeAt = now;
+      const roomId = playerToRoom[playerId];
+      const room = lobbyManager.getRoom(roomId);
+      if (!room) return cb({ success: false, error: 'No estás en una sala' });
+      if (!isHost(room, playerId)) return cb({ success: false, error: 'Solo el anfitrión puede elegir el tablero' });
+      if (room.engine.phase !== 'lobby') return cb({ success: false, error: 'La partida ya comenzó' });
+      const item = getItem(themeId);
+      if (!item || item.slot !== 'board') return cb({ success: false, error: 'Tablero no válido' });
+
+      const apply = () => {
+        const r = lobbyManager.getRoom(roomId);
+        if (!r || !isHost(r, playerId) || r.engine.phase !== 'lobby') return cb({ success: false, error: 'Ya no puedes cambiar el tablero' });
+        const result = r.engine.setBoardTheme(item.id);
+        if (!result.success) return cb(result);
+        r.boardThemeChosen = true;
+        cb(result);
+        emitGameState(roomId);
+      };
+      if (item.isDefault) return apply();
+      const userId = room.accounts[playerId];
+      if (!userId || !accounts || !accounts.enabled || typeof accounts.ownsItem !== 'function') {
+        return cb({ success: false, error: 'Inicia sesión y compra ese tablero en la tienda' });
+      }
+      accounts.ownsItem(userId, item.id)
+        .then((owned) => (owned ? apply() : cb({ success: false, error: 'Ese tablero no es tuyo: cómpralo en la tienda' })))
+        .catch(() => cb({ success: false, error: 'No se pudo comprobar tu tablero. Inténtalo de nuevo.' }));
     });
 
     // ─── Lobby: Start Game ───

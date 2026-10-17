@@ -22,6 +22,8 @@ const TAP_SLOP_PX = 6;
 export default function HexBoard3D() {
   const { gameState } = useGame();
   const board = gameState?.board;
+  // Board theme of the room: sea / frame textures and tile tints, built once
+  const themeId = gameState?.boardTheme || null;
   const hexes = board?.hexes || EMPTY;
 
   // Geometry only changes with the map, not with every state update
@@ -67,10 +69,10 @@ export default function HexBoard3D() {
     let built = null;
     const store = new TextureStore({ lowPower });
     store
-      .load({ hexGeom: layout.hexGeom, bounds: layout.bounds, ports: board?.ports || [] })
+      .load({ hexGeom: layout.hexGeom, bounds: layout.bounds, ports: board?.ports || [], theme: themeId })
       .then(() => {
         if (!alive) return;
-        built = new BoardResources(store, { lowPower });
+        built = new BoardResources(store, { lowPower, theme: themeId });
         setRes(built);
       })
       .catch((e) => {
@@ -83,7 +85,7 @@ export default function HexBoard3D() {
       store.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hexGeomKey, portsKey, lowPower]);
+  }, [hexGeomKey, portsKey, lowPower, themeId]);
 
   // Taps vs drags: R3F reports the pointer travel of a click; a second finger
   // (pinch) also disqualifies the gesture
@@ -189,6 +191,7 @@ export default function HexBoard3D() {
               />
               <Board3D
                 board={board}
+                hexGeom={layout.hexGeom}
                 bounds={layout.bounds}
                 center={layout.center}
                 radius={layout.radius}

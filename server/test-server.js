@@ -46,3 +46,6 @@ await import('./tests/engine.test.js');
 
 // Ryō rules, game-over hook, accounts disabled without a database
 await import('./tests/rewards.test.js');
+
+// Shop: catalogue, buying / equipping rules, cosmetics in the game state
+await import('./tests/shop.test.js');

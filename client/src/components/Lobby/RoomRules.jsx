@@ -1,4 +1,6 @@
 import { Dropdown, SegmentedControl } from '../Shared/Choice';
+import { ThemeSwatch } from '../Shared/ThemeSwatch';
+import { DEFAULT_BOARD, boardThemeOf } from '../../utils/cosmetics';
 import { VP_TO_WIN_OPTIONS, TURN_TIME_OPTIONS, DEFAULT_VP_TO_WIN, turnTimeLabel } from '../../utils/constants';
 
 const PACT_OPTIONS = [
@@ -82,6 +84,44 @@ export function RoomRules({
           chipClassName="rules-pact-chip"
         />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Board theme of the room (shop item). The host picks one of the boards
+ * their account owns (guests only have the classic one); everybody else
+ * sees which one will be used.
+ */
+export function BoardThemeRule({ value, catalog = [], owned = [], readOnly = false, onChange, idPrefix = 'rules', className = '', note }) {
+  const current = boardThemeOf(value);
+  const nameOf = (id) => catalog.find((i) => i.id === id)?.name || 'Clásico';
+  if (readOnly) {
+    return (
+      <div className={`min-w-0 ${className}`}>
+        <span className="label-caps block">Tablero</span>
+        <span className="flex items-center gap-1.5 font-serif font-extrabold text-[17px] text-ink leading-tight min-w-0">
+          <ThemeSwatch themeId={current} size={16} />
+          <span className="truncate">{nameOf(current)}</span>
+        </span>
+      </div>
+    );
+  }
+  const ids = catalog.filter((i) => i.slot === 'board' && (i.isDefault || owned.includes(i.id))).map((i) => i.id);
+  if (!ids.includes(DEFAULT_BOARD)) ids.unshift(DEFAULT_BOARD);
+  if (!ids.includes(current)) ids.push(current);
+  const options = ids.map((id) => ({ value: id, label: nameOf(id), icon: <ThemeSwatch themeId={id} size={15} /> }));
+  return (
+    <div className={`min-w-0 ${className}`}>
+      <span id={`${idPrefix}-board-label`} className="label-caps block mb-1">Tablero</span>
+      <Dropdown
+        id={`${idPrefix}-board`}
+        ariaLabelledby={`${idPrefix}-board-label`}
+        options={options}
+        value={current}
+        onChange={(v) => v !== current && onChange?.(v)}
+      />
+      {note && <p className="text-[11.5px] leading-snug text-ink-faint mt-1">{note}</p>}
     </div>
   );
 }

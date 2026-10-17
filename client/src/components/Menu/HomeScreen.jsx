@@ -34,7 +34,7 @@ export function HomeScreen({ screen, onScreen }) {
     content = <ShopScreen onBack={toMenu} onLogin={openLogin} onProfile={() => go('profile')} />;
   } else if (screen === 'profile') {
     // Re-mounted when the account changes so the form shows the saved profile
-    content = <ProfileScreen key={user ? user.id : 'guest'} onBack={toMenu} onLogin={openLogin} />;
+    content = <ProfileScreen key={user ? user.id : 'guest'} onBack={toMenu} onLogin={openLogin} onShop={() => go('shop')} />;
   } else {
     content = <MainMenu onNavigate={go} onLogin={openLogin} />;
   }

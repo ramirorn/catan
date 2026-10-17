@@ -403,6 +403,12 @@ export function GameProvider({ children }) {
     socket.emit('updateRoomSettings', settings, (res) => handleCallback(res));
   }, [socket, handleCallback]);
 
+  // Host: board theme of the room (one of the boards their account owns)
+  const setBoardTheme = useCallback((themeId) => {
+    if (!socket) return;
+    socket.emit('setBoardTheme', { themeId }, (res) => handleCallback(res));
+  }, [socket, handleCallback]);
+
   const startGame = useCallback(() => {
     if (!socket) return;
     socket.emit('startGame', {}, (res) => handleCallback(res, '¡Partida iniciada!'));
@@ -620,6 +626,7 @@ export function GameProvider({ children }) {
     // Actions
     createRoom,
     updateRoomSettings,
+    setBoardTheme,
     joinRoom,
     spectateRoom,
     leaveRoom,
@@ -652,7 +659,7 @@ export function GameProvider({ children }) {
     isSpectator, spectators, hostId, isHost, spectateRoom, leaveRoom, kickPlayer,
     canActOnBoard,
     buildMode, activeModal, toasts, addToast, chatMessages, robberVictims, isRolling,
-    serverOffset, coinsAward, updateRoomSettings,
+    serverOffset, coinsAward, updateRoomSettings, setBoardTheme,
     createRoom, joinRoom, startGame, rollDice, setupPlaceSettlement, setupPlaceRoad,
     buildRoad, buildSettlement, buildCity, buyDevCard, playDevCard, discardCards,
     moveRobber, stealCard, offerPeacePact, respondPeacePact, cancelPeacePact, bankTrade, proposeTrade, respondToTrade, acceptTrade,

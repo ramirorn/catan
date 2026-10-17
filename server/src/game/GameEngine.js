@@ -5,6 +5,7 @@ import { Trade } from './Trade.js';
 import { DevCards } from './DevCards.js';
 import { Robber } from './Robber.js';
 import { Scoring } from './Scoring.js';
+import { sanitizeBoardTheme, sanitizePieceSet } from '../shop/catalog.js';
 import {
   PHASE, BUILD_COSTS, PLAYER_COLORS, RESOURCE,
   DEV_CARD, BANK_RESOURCE_COUNT, BANK_RESOURCE_COUNT_EXTENDED, MAX_ROADS,
@@ -72,6 +73,7 @@ export class GameEngine {
     this.vpToWin = VP_TO_WIN;
     this.turnTimeLimit = 90;  // seconds per turn, 0 = no limit (default 90 s)
     this.peacePacts = true;   // «Pacto de paz» house rule (robber bribe)
+    this.boardTheme = sanitizeBoardTheme(null); // shop board theme chosen by the host (cosmetic)
     // Absolute epoch ms when whoever must act runs out of time. Managed by the
     // socket layer's turn timer (null when no timer is running).
     this.turnDeadline = null;
@@ -255,6 +257,23 @@ export class GameEngine {
     player.left = false;
     player.connected = true;
     return true;
+  }
+
+  // ─── Cosmetics (shop items: only short catalogue ids travel) ───
+  setPieceSet(id, pieceSet) {
+    const player = this.players[id];
+    if (!player) return false;
+    const value = sanitizePieceSet(pieceSet);
+    if (player.pieceSet === value) return false;
+    player.pieceSet = value;
+    return true;
+  }
+
+  /** Board theme of the room: only before the game starts */
+  setBoardTheme(themeId) {
+    if (this.phase !== PHASE.LOBBY) return { success: false, error: 'La partida ya comenzó' };
+    this.boardTheme = sanitizeBoardTheme(themeId);
+    return { success: true, boardTheme: this.boardTheme };
   }
 
   setAvatar(id, avatarId) {
@@ -1596,6 +1615,7 @@ export class GameEngine {
       vpToWin: this.vpToWin,
       turnTimeLimit: this.turnTimeLimit,
       peacePacts: this.peacePacts,
+      boardTheme: this.boardTheme,
       peacePact: this._serializePact(forPlayerId),
       turnDeadline: this.turnDeadline,
       startedAt: this.startedAt,

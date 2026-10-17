@@ -9,6 +9,8 @@ import { Port } from './Port';
 import { useBoardZoom } from './useBoardZoom';
 import { BoardBanner, ZoomControls } from './BoardChrome';
 import { tipDomHandlers } from './boardTip';
+import { SeaAccents } from './ThemeAccents';
+import { boardTheme, seaSpots } from '../../utils/cosmetics';
 
 const EMPTY = {};
 const BoardDefs = memo(TerrainDefs);
@@ -18,7 +20,7 @@ const BoardDefs = memo(TerrainDefs);
  * seigaiha sea, foam and sand. Each ring is a single path (no group opacity,
  * no filters), so zooming never re-composites translucent layers.
  */
-const BoardFrame = memo(function BoardFrame({ hexList }) {
+const BoardFrame = memo(function BoardFrame({ hexList, theme }) {
   const paths = useMemo(() => {
     const r = (k) => hexUnionPath(hexList, HEX_SIZE * k);
     return {
@@ -32,19 +34,23 @@ const BoardFrame = memo(function BoardFrame({ hexList }) {
       shore: r(1.1),
     };
   }, [hexList]);
+  const spots = useMemo(() => (theme.accent ? seaSpots(hexList, HEX_SIZE) : null), [hexList, theme.accent]);
+  const f = theme.frame;
 
   return (
     <g pointerEvents="none">
       {/* Short, soft drop shadow under the scroll */}
       <path d={paths.shadow} transform="translate(1.5 4)" fill="#03050a" fillOpacity="0.5" />
-      <path d={paths.margin} fill="#efe6d0" stroke="#efe6d0" strokeWidth="8" strokeLinejoin="round" />
-      <path d={paths.red} fill="#b6331f" />
-      <path d={paths.white} fill="#efe6d0" />
-      <path d={paths.line} fill="#1f1b17" />
+      <path d={paths.margin} fill={f.margin} stroke={f.margin} strokeWidth="8" strokeLinejoin="round" />
+      <path d={paths.red} fill={f.rule} />
+      <path d={paths.white} fill={f.inner} />
+      <path d={paths.line} fill={f.line} />
       <path d={paths.sea} fill="url(#pat-sea)" />
+      {/* Theme decorations out at sea (stars, dunes, mist, falls, petals) */}
+      <SeaAccents kind={theme.accent} spots={spots} />
       {/* Sandy shoreline with a foam line */}
-      <path d={paths.foam} fill="#e9eef0" fillOpacity="0.45" />
-      <path d={paths.shore} fill="#d6bf8a" stroke="#d6bf8a" strokeWidth="6" strokeLinejoin="round" />
+      <path d={paths.foam} fill={f.foam} fillOpacity={f.foamOpacity} />
+      <path d={paths.shore} fill={f.shore} stroke={f.shore} strokeWidth="6" strokeLinejoin="round" />
     </g>
   );
 });
@@ -82,6 +88,8 @@ export function HexBoard() {
   );
 
   const zoom = useBoardZoom(bounds);
+  // Board theme chosen by the host (palette tables, shared by every tile)
+  const theme = boardTheme(gameState?.boardTheme);
 
   if (!board) {
     return (
@@ -120,9 +128,9 @@ export function HexBoard() {
         className={`board-svg w-full h-full max-w-full max-h-full touch-none ${zoom.canZoomOut ? 'cursor-grab active:cursor-grabbing' : ''}`}
         {...zoom.handlers}
       >
-        <BoardDefs />
+        <BoardDefs sea={theme.sea} />
 
-        <BoardFrame hexList={hexGeom} />
+        <BoardFrame hexList={hexGeom} theme={theme} />
 
         {/* Layer 1: Ports */}
         <g className="ports-layer">
@@ -134,7 +142,7 @@ export function HexBoard() {
         {/* Layer 2: Hex Tiles */}
         <g className="hexes-layer">
           {hexList.map((hex) => (
-            <HexTile key={hex.id} hex={hex} />
+            <HexTile key={hex.id} hex={hex} wash={theme.wash} />
           ))}
         </g>
 

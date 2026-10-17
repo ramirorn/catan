@@ -17,6 +17,8 @@ import {
   pactProtectedId,
 } from '../Board/boardActions';
 import { PX, TILE_H, TILE_SCALE, INK } from './resources';
+import { boardTheme } from '../../utils/cosmetics';
+import { ThemeAccents3D } from './ThemeAccents3D';
 
 import { SceneContext } from './sceneContext';
 import { tipHandlers3D } from '../Board/boardTip';
@@ -319,7 +321,7 @@ const easeOutBack = (t) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 
  * placed. A city being upgraded waits hidden while the upgrade animation
  * starts (fxKey), then rises out of the ground with a turn.
  */
-const Piece = memo(function Piece({ geometry, color, tipId, fxKey = null, rise = false }) {
+const Piece = memo(function Piece({ set, kind, color, tipId, fxKey = null, rise = false }) {
   const { res, bornAt } = useScene();
   const tip = tipId ? tipHandlers3D('vertex', tipId) : null;
   const dpr = useOutlinePx();
@@ -371,8 +373,8 @@ const Piece = memo(function Piece({ geometry, color, tipId, fxKey = null, rise =
   return (
     <mesh
       ref={ref}
-      geometry={geometry}
-      material={res.pieceMaterial(color)}
+      geometry={res.pieceGeometry(set, kind)}
+      material={res.pieceMaterials(set, color)}
       visible={!hidden}
       castShadow
       receiveShadow
@@ -510,15 +512,16 @@ function OutlineScaler() {
 
 /* ─── Lights ─── */
 
-function Lights({ radius, shadows }) {
+export function Lights({ radius, shadows, themeId = null }) {
   const r = radius + 1.5;
+  const theme = boardTheme(themeId);
   return (
     <>
-      <hemisphereLight args={['#fff2dc', '#6b5d63', 1.05]} />
+      <hemisphereLight args={theme.hemi} />
       <directionalLight
         position={[-radius * 0.55, radius * 1.25, radius * 0.75]}
-        intensity={1.25}
-        color="#ffdcb0"
+        intensity={theme.sun[1]}
+        color={theme.sun[0]}
         castShadow={shadows}
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0005}
@@ -537,7 +540,7 @@ function Lights({ radius, shadows }) {
 
 /* ─── Board ─── */
 
-export function Board3D({ board, bounds, center, radius, shadows, lowPower }) {
+export function Board3D({ board, hexGeom, bounds, center, radius, shadows, lowPower }) {
   const game = useGame();
   const { gameState } = game;
   const players = gameState?.players;
@@ -564,13 +567,15 @@ export function Board3D({ board, bounds, center, radius, shadows, lowPower }) {
   );
 
   const colorOf = (playerId) => pieceColor(players?.[playerId]?.color || '#e74c3c');
+  // Shop piece set of each owner (everyone sees the same)
+  const setOf = (playerId) => players?.[playerId]?.pieceSet;
+  const themeId = gameState?.boardTheme;
 
   const hexList = Object.values(board.hexes || {});
   const vertexList = Object.values(board.vertices || {});
   const edgeList = Object.values(board.edges || {});
   const ports = board.ports || [];
   const centerPx = { x: center.x / PX, y: center.z / PX };
-  const res = useScene().res;
 
   let anyMarker = false;
 
@@ -595,7 +600,8 @@ export function Board3D({ board, bounds, center, radius, shadows, lowPower }) {
         {v.building && (
           <Piece
             key={v.building.type}
-            geometry={v.building.type === 'city' ? res.geo.city : res.geo.settlement}
+            set={setOf(v.building.playerId)}
+            kind={v.building.type === 'city' ? 'city' : 'settlement'}
             color={colorOf(v.building.playerId)}
             tipId={v.id}
             fxKey={`vertex:${v.id}`}
@@ -624,7 +630,7 @@ export function Board3D({ board, bounds, center, radius, shadows, lowPower }) {
     const z2 = e.y2 * PX;
     edges.push(
       <group key={e.id} position={[(x1 + x2) / 2, TILE_H, (z1 + z2) / 2]} rotation-y={-Math.atan2(z2 - z1, x2 - x1)}>
-        {e.road && <Piece geometry={res.geo.road} color={colorOf(e.road.playerId)} />}
+        {e.road && <Piece set={setOf(e.road.playerId)} kind="road" color={colorOf(e.road.playerId)} />}
         {action && <EdgeMarker onAct={() => act.edge(action, e.id)} />}
       </group>
     );
@@ -632,9 +638,10 @@ export function Board3D({ board, bounds, center, radius, shadows, lowPower }) {
 
   return (
     <>
-      <Lights radius={radius} shadows={shadows} />
+      <Lights radius={radius} shadows={shadows} themeId={themeId} />
       <OutlineScaler />
       <SeaAndFrame bounds={bounds} />
+      <ThemeAccents3D themeId={themeId} hexes={hexGeom} />
       <group>{tiles}</group>
       {hexList.map(
         (hex) => hex.number && !hex.hasRobber && <Token key={hex.id} x={hex.x * PX} z={hex.y * PX} number={hex.number} />

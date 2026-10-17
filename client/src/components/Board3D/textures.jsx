@@ -12,6 +12,7 @@ import { TerrainArt } from '../Board/TerrainArt';
 import { ResourceIcon, AnchorIcon } from '../Shared/Icons';
 import { getHexPoints, getDiceDots, hexUnionPath, HEX_SIZE } from '../../utils/hexMath';
 import { TERRAIN_BASE } from '../../utils/theme';
+import { boardTheme } from '../../utils/cosmetics';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SERIF = "'Shippori Mincho B1', Georgia, serif";
@@ -111,7 +112,7 @@ async function createTerrainTextures(px, anisotropy) {
 
 /* ─── Sea (seigaiha), repeating ─── */
 
-async function createSeaTexture(anisotropy) {
+async function createSeaTexture(anisotropy, seaPalette) {
   // The 2D sea pattern tile is 20×10 scaled by 1.3
   const w = 26;
   const h = 13;
@@ -119,7 +120,7 @@ async function createSeaTexture(anisotropy) {
   const img = await markupToImage(
     renderMarkup(
       <svg xmlns={SVG_NS} width={px} height={px / 2} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-        <TerrainDefs />
+        <TerrainDefs sea={seaPalette} />
         <rect width={w} height={h} fill="url(#pat-sea)" />
       </svg>
     )
@@ -138,7 +139,7 @@ async function createSeaTexture(anisotropy) {
  * left transparent (the sea is its own repeating-texture mesh below), plus an
  * alpha mask of the sea for that mesh.
  */
-async function createFrameTextures(hexGeom, bounds, maxPx, anisotropy) {
+async function createFrameTextures(hexGeom, bounds, maxPx, anisotropy, f) {
   const scale = maxPx / Math.max(bounds.width, bounds.height);
   const w = Math.round(bounds.width * scale);
   const h = Math.round(bounds.height * scale);
@@ -156,13 +157,13 @@ async function createFrameTextures(hexGeom, bounds, maxPx, anisotropy) {
         </defs>
         <g mask="url(#no-sea)">
           <path d={hexUnionPath(hexGeom, HEX_SIZE * 1.9 + 5)} transform="translate(1.5 4)" fill="#03050a" fillOpacity="0.5" />
-          <path d={r(1.9)} fill="#efe6d0" stroke="#efe6d0" strokeWidth="8" strokeLinejoin="round" />
-          <path d={r(1.83)} fill="#b6331f" />
-          <path d={r(1.81)} fill="#efe6d0" />
-          <path d={r(1.78)} fill="#1f1b17" />
+          <path d={r(1.9)} fill={f.margin} stroke={f.margin} strokeWidth="8" strokeLinejoin="round" />
+          <path d={r(1.83)} fill={f.rule} />
+          <path d={r(1.81)} fill={f.inner} />
+          <path d={r(1.78)} fill={f.line} />
         </g>
-        <path d={hexUnionPath(hexGeom, HEX_SIZE * 1.16 + 3)} fill="#e9eef0" fillOpacity="0.45" />
-        <path d={r(1.1)} fill="#d6bf8a" stroke="#d6bf8a" strokeWidth="6" strokeLinejoin="round" />
+        <path d={hexUnionPath(hexGeom, HEX_SIZE * 1.16 + 3)} fill={f.foam} fillOpacity={f.foamOpacity} />
+        <path d={r(1.1)} fill={f.shore} stroke={f.shore} strokeWidth="6" strokeLinejoin="round" />
       </svg>
     )
   );
@@ -380,13 +381,19 @@ export class TextureStore {
     return tex;
   }
 
-  async load({ hexGeom, bounds, ports }) {
+  /**
+   * `theme` = board theme id (sea pattern + frame colours are baked into
+   * their textures once per board); `tilePx` / `framePx` let small previews
+   * use smaller textures.
+   */
+  async load({ hexGeom, bounds, ports, theme = null, tilePx: tileOverride, framePx }) {
     await fontsReady();
-    const tilePx = this.lowPower ? 256 : 512;
+    const palette = boardTheme(theme);
+    const tilePx = tileOverride || (this.lowPower ? 256 : 512);
     const [terrain, sea, frame] = await Promise.all([
       createTerrainTextures(tilePx, this.anisotropy),
-      createSeaTexture(this.anisotropy),
-      createFrameTextures(hexGeom, bounds, this.lowPower ? 1536 : 2560, this.anisotropy),
+      createSeaTexture(this.anisotropy, palette.sea),
+      createFrameTextures(hexGeom, bounds, framePx || (this.lowPower ? 1536 : 2560), this.anisotropy, palette.frame),
     ]);
     Object.values(terrain).forEach((t) => this.track(t));
     this.track(sea);

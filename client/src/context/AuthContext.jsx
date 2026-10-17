@@ -152,6 +152,48 @@ export function AuthProvider({ children }) {
     } : u));
   }, [setUser]);
 
+  // ─── Shop: catalogue (everyone) + owned / equipped items (signed in) ───
+  const [shop, setShop] = useState(null);
+  const shopUserRef = useRef(undefined);
+  const acceptShop = useCallback((data) => {
+    if (!data || !Array.isArray(data.catalog)) return;
+    setShop({
+      catalog: data.catalog,
+      signedIn: !!data.signedIn,
+      owned: Array.isArray(data.owned) ? data.owned : [],
+      equipped: data.equipped || {},
+    });
+    if (data.signedIn && Number.isInteger(data.coins)) setUser((u) => (u ? { ...u, coins: data.coins } : u));
+  }, [setUser]);
+
+  const loadShop = useCallback(async () => {
+    const res = await api('/shop');
+    if (res.ok) acceptShop(res.data);
+    return res.ok;
+  }, [acceptShop]);
+
+  const shopAction = useCallback(async (path, body) => {
+    const res = await api(path, { method: 'POST', body });
+    if (res.status === 401) {
+      setUser(null);
+      setStatus((s) => (s === 'disabled' ? s : 'guest'));
+    }
+    if (res.ok) acceptShop(res.data);
+    else if (Number.isInteger(res.data.coins)) setUser((u) => (u ? { ...u, coins: res.data.coins } : u));
+    return res.ok ? { success: true, ...res.data } : { success: false, error: res.data.error || 'No se pudo completar. Inténtalo de nuevo.' };
+  }, [acceptShop, setUser]);
+
+  const buyItem = useCallback((itemId) => shopAction('/shop/buy', { itemId }), [shopAction]);
+  const equipItem = useCallback((slot, itemId) => shopAction('/shop/equip', { slot, itemId }), [shopAction]);
+
+  // The inventory belongs to an account: reload it when the account changes
+  const shopUserId = status === 'loading' ? undefined : user ? user.id : null;
+  useEffect(() => {
+    if (shopUserId === undefined || shopUserRef.current === shopUserId) return;
+    shopUserRef.current = shopUserId;
+    loadShop();
+  }, [shopUserId, loadShop]);
+
   const clearNotice = useCallback(() => setNotice(null), []);
   const currentUserId = useCallback(() => (userRef.current ? userRef.current.id : null), []);
 
@@ -174,7 +216,11 @@ export function AuthProvider({ children }) {
     getSocketToken,
     currentUserId,
     applyCoins,
-  }), [currentUserId, status, user, config, notice, clearNotice, refresh, register, login, logout, loginWithGoogle, updateProfile, fetchStats, getSocketToken, applyCoins]);
+    shop,
+    loadShop,
+    buyItem,
+    equipItem,
+  }), [currentUserId, status, user, config, notice, clearNotice, refresh, register, login, logout, loginWithGoogle, updateProfile, fetchStats, getSocketToken, applyCoins, shop, loadShop, buyItem, equipItem]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

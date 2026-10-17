@@ -14,7 +14,10 @@ const GRAIN_URI =
 // Enlarges the ground texture drawn inside each land tile
 const TILE_ART_SCALE = 1.7;
 
-export function TerrainDefs() {
+const CLASSIC_SEA = { base: '#1d4660', scale: '#1f4b66', stroke: '#12344a', ring: '#4f86a3' };
+
+/** `sea` = sea pattern palette of the board theme (utils/cosmetics.js) */
+export function TerrainDefs({ sea = CLASSIC_SEA }) {
   return (
     <defs>
       {/* Forest floor: moss and fallen-leaf brush ticks */}
@@ -77,13 +80,13 @@ export function TerrainDefs() {
 
       {/* Sea: seigaiha wave scales */}
       <pattern id="pat-sea" width="20" height="10" patternUnits="userSpaceOnUse" patternTransform="scale(1.3)">
-        <rect width="20" height="10" fill="#1d4660" />
+        <rect width="20" height="10" fill={sea.base} />
         {[[0, 0], [20, 0], [10, 5], [0, 10], [20, 10]].map(([cx, cy]) => (
           <g key={`${cx}-${cy}`}>
-            <circle cx={cx} cy={cy} r="10" fill="#1f4b66" stroke="#12344a" strokeWidth="0.8" />
-            <circle cx={cx} cy={cy} r="7.5" fill="none" stroke="#4f86a3" strokeWidth="0.6" opacity="0.65" />
-            <circle cx={cx} cy={cy} r="5" fill="none" stroke="#4f86a3" strokeWidth="0.6" opacity="0.55" />
-            <circle cx={cx} cy={cy} r="2.5" fill="none" stroke="#4f86a3" strokeWidth="0.6" opacity="0.45" />
+            <circle cx={cx} cy={cy} r="10" fill={sea.scale} stroke={sea.stroke} strokeWidth="0.8" />
+            <circle cx={cx} cy={cy} r="7.5" fill="none" stroke={sea.ring} strokeWidth="0.6" opacity="0.65" />
+            <circle cx={cx} cy={cy} r="5" fill="none" stroke={sea.ring} strokeWidth="0.6" opacity="0.55" />
+            <circle cx={cx} cy={cy} r="2.5" fill="none" stroke={sea.ring} strokeWidth="0.6" opacity="0.45" />
           </g>
         ))}
       </pattern>

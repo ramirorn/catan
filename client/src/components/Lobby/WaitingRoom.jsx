@@ -5,7 +5,8 @@ import { CrownIcon, CopyIcon, HourglassIcon, EyeIcon, ExitIcon } from '../Shared
 import { ConfirmDialog } from '../Shared/ConfirmDialog';
 import { ScrollPanel } from '../Shared/ScrollPanel';
 import { BrandPlate } from '../Shared/Brand';
-import { RoomRules } from './RoomRules';
+import { BoardThemeRule, RoomRules } from './RoomRules';
+import { useAuth } from '../../context/AuthContext';
 import { PlayerAvatar } from '../Shared/Avatar';
 import { AvatarPicker } from '../Shared/AvatarPicker';
 import { SPECTATOR_RING } from '../../utils/avatars';
@@ -14,8 +15,9 @@ export function WaitingRoom() {
   const {
     gameState, myPlayerId, startGame, addToast, updateRoomSettings,
     hostId, isHost, isSpectator, spectators, leaveRoom, kickPlayer,
-    avatarId, setAvatarId,
+    avatarId, setAvatarId, setBoardTheme,
   } = useGame();
+  const { shop, user } = useAuth();
   const [confirm, setConfirm] = useState(null); // { kind: 'leave' } | { kind: 'kick', id, name }
 
   if (!gameState) return null;
@@ -71,6 +73,17 @@ export function WaitingRoom() {
             turnTimeLimit={gameState.turnTimeLimit}
             peacePacts={gameState.peacePacts !== false}
             onChange={updateRoomSettings}
+          />
+          {/* Board theme (shop): chosen by the host among their boards */}
+          <BoardThemeRule
+            idPrefix="room"
+            className="mb-4 tiny:mb-3 phland:mb-2"
+            readOnly={!isHost}
+            value={gameState.boardTheme}
+            catalog={shop?.catalog || []}
+            owned={shop?.signedIn ? shop.owned : []}
+            onChange={setBoardTheme}
+            note={isHost && !user ? 'Inicia sesión y consigue tableros en la Tienda.' : null}
           />
           </div>
 

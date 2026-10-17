@@ -3,9 +3,10 @@
 // together on unmount. Units: 1 world unit = one hex radius (60 SVG px).
 
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TERRAIN_BASE, shade } from '../../utils/theme';
+import { boardTheme, pieceSetOf } from '../../utils/cosmetics';
 import { LAND_TERRAINS } from './textures';
+import { ROAD_LEN, buildPieceGeometry, createAccentMaterials, createPlayerMaterial } from './pieceSets';
 
 export const PX = 1 / 60; // SVG board px → world units
 export const TILE_H = 0.14; // tile thickness
@@ -13,6 +14,30 @@ export const TILE_SCALE = 0.965; // small gaps between tiles show their sides
 export const INK = '#120e0b';
 
 const SQRT3 = Math.sqrt(3);
+
+/** Open six-sided tile wall, flat shaded */
+export function hexSideGeometry() {
+  const g = new THREE.CylinderGeometry(1, 1, TILE_H, 6, 1, true).translate(0, TILE_H / 2, 0);
+  const flat = g.toNonIndexed();
+  g.dispose();
+  flat.computeVertexNormals();
+  return flat;
+}
+
+/**
+ * Board theme on the tile materials: the terrain textures stay the same
+ * (artwork readable), the theme only tints them / lifts them with a haze.
+ */
+export function applyTileTheme(mat, themeId) {
+  const theme = boardTheme(themeId);
+  const tint = new THREE.Color(theme.tileTint);
+  const haze = new THREE.Color(theme.tileHaze);
+  for (const t of LAND_TERRAINS) {
+    mat.tileTop[t].color.copy(tint);
+    mat.tileTop[t].emissive.copy(haze);
+    mat.tileSide[t].color.set(shade(TERRAIN_BASE[t], -0.55)).multiply(tint);
+  }
+}
 const CORNERS = [
   [0, -1],
   [SQRT3 / 2, -0.5],
@@ -23,7 +48,7 @@ const CORNERS = [
 ];
 
 /** Flat hexagon facing up, uv mapped like the 2D tile (x right, svg-y = world z) */
-function hexTopGeometry() {
+export function hexTopGeometry() {
   const pos = [0, 0, 0];
   const uv = [0.5, 0.5];
   for (const [x, z] of CORNERS) {
@@ -40,135 +65,15 @@ function hexTopGeometry() {
   return g;
 }
 
-/** Flat-shaded part with a constant vertex colour (multiplies the player colour) */
-function part(geom, tone, at) {
-  if (at) geom.translate(at[0], at[1], at[2]);
-  const g = geom.index ? geom.toNonIndexed() : geom;
-  if (g !== geom) geom.dispose();
-  g.computeVertexNormals();
-  const n = g.attributes.position.count;
-  // Tones are perceptual (sRGB-ish); vertex colours are linear
-  g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(n * 3).fill(Math.pow(tone, 2.2)), 3));
-  if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(n * 2), 2));
-  return g;
-}
-
-function merge(parts) {
-  const g = mergeGeometries(parts, false);
-  parts.forEach((p) => p.dispose());
-  g.computeBoundingSphere();
-  return g;
-}
-
-/**
- * Square hip roof with curved (concave, flared) slopes, as a 4-sided lathe.
- * `profile` = [[halfSide, y], …] from the eave up to the ridge.
- */
-function curvedRoof(profile) {
-  const pts = profile.map(([a, y]) => new THREE.Vector2(a * Math.SQRT2, y));
-  return new THREE.LatheGeometry(pts, 4, Math.PI / 4);
-}
-
-/** Settlement: a little house with a curved, flared roof */
-function settlementGeometry() {
-  return merge([
-    part(new THREE.CylinderGeometry(0.19, 0.205, 0.035, 8), 0.6, [0, 0.0175, 0]),
-    part(new THREE.BoxGeometry(0.22, 0.17, 0.22), 1, [0, 0.12, 0]),
-    part(new THREE.BoxGeometry(0.065, 0.1, 0.012), 0.1, [0, 0.085, 0.112]),
-    part(new THREE.BoxGeometry(0.05, 0.045, 0.012), 0.16, [0.065, 0.13, 0.112]),
-    part(new THREE.BoxGeometry(0.31, 0.012, 0.31), 0.35, [0, 0.206, 0]),
-    part(
-      curvedRoof([
-        [0.17, 0.2],
-        [0.135, 0.222],
-        [0.09, 0.262],
-        [0.045, 0.315],
-        [0.012, 0.35],
-        [0, 0.356],
-      ]),
-      0.68
-    ),
-    part(new THREE.CylinderGeometry(0.012, 0.012, 0.05, 6), 0.25, [0, 0.37, 0]),
-  ]);
-}
-
-/**
- * City: a three-tier pagoda on a wide, stepped stone plinth with a ring
- * around it, crowned by a ringed spire. Taller (≈1.7×) and wider than the
- * settlement, so the two read apart at a glance from any angle.
- */
-function cityGeometry() {
-  const tier = (half, y0, h, roofHalf, roofTop, tone = 1) => [
-    part(new THREE.BoxGeometry(half * 2, h, half * 2), tone, [0, y0 + h / 2, 0]),
-    // window strip on the front
-    part(new THREE.BoxGeometry(half * 0.9, h * 0.38, 0.012), 0.12, [0, y0 + h * 0.55, half + 0.004]),
-    part(new THREE.BoxGeometry(roofHalf * 2 + 0.04, 0.012, roofHalf * 2 + 0.04), 0.35, [0, y0 + h + 0.004, 0]),
-    part(
-      curvedRoof([
-        [roofHalf, y0 + h],
-        [roofHalf * 0.8, y0 + h + 0.022],
-        [roofHalf * 0.6, y0 + h + 0.05],
-        [half * 0.7, roofTop],
-      ]),
-      0.68
-    ),
-  ];
-  return merge([
-    // stepped stone plinth + a lighter ring around it
-    part(new THREE.CylinderGeometry(0.31, 0.33, 0.035, 10), 0.55, [0, 0.0175, 0]),
-    part(new THREE.TorusGeometry(0.3, 0.018, 6, 30).rotateX(Math.PI / 2), 1.15, [0, 0.038, 0]),
-    part(new THREE.CylinderGeometry(0.24, 0.26, 0.03, 10), 0.7, [0, 0.05, 0]),
-    // ground floor with a door
-    ...tier(0.15, 0.065, 0.17, 0.235, 0.29),
-    part(new THREE.BoxGeometry(0.08, 0.11, 0.012), 0.08, [0, 0.12, 0.155]),
-    // middle and top floors, each narrower
-    ...tier(0.11, 0.285, 0.12, 0.185, 0.45, 0.94),
-    ...tier(0.075, 0.445, 0.1, 0.14, 0.6, 0.9),
-    part(
-      curvedRoof([
-        [0.1, 0.6],
-        [0.06, 0.64],
-        [0.025, 0.68],
-        [0, 0.69],
-      ]),
-      0.68
-    ),
-    // spire with rings (sorin)
-    part(new THREE.CylinderGeometry(0.01, 0.012, 0.16, 6), 0.3, [0, 0.76, 0]),
-    part(new THREE.TorusGeometry(0.028, 0.007, 4, 12).rotateX(Math.PI / 2), 1.2, [0, 0.73, 0]),
-    part(new THREE.TorusGeometry(0.022, 0.007, 4, 12).rotateX(Math.PI / 2), 1.2, [0, 0.765, 0]),
-    part(new THREE.SphereGeometry(0.024, 8, 6), 1.2, [0, 0.85, 0]),
-  ]);
-}
-
-/** Road: a small arched plank bridge laid along +x, centred on the origin */
-const ROAD_LEN = 0.5;
-function roadGeometry() {
-  const parts = [];
-  const n = 6;
-  const pitch = ROAD_LEN / n;
-  for (let i = 0; i < n; i++) {
-    const t = (i + 0.5) / n;
-    const plank = new THREE.BoxGeometry(pitch * 0.8, 0.032, 0.17);
-    plank.rotateZ(-Math.cos(Math.PI * t) * 0.18);
-    parts.push(part(plank, i % 2 ? 0.84 : 1, [-ROAD_LEN / 2 + pitch * (i + 0.5), 0.026 + 0.034 * Math.sin(Math.PI * t), 0]));
-  }
-  for (const z of [-0.088, 0.088]) {
-    parts.push(part(new THREE.BoxGeometry(ROAD_LEN + 0.02, 0.022, 0.022), 0.5, [0, 0.105, z]));
-    for (const x of [-ROAD_LEN / 2, 0, ROAD_LEN / 2]) {
-      parts.push(part(new THREE.BoxGeometry(0.024, 0.075, 0.024), 0.42, [x, 0.065 + (x === 0 ? 0.01 : 0), z]));
-    }
-  }
-  return merge(parts);
-}
-
 /** Every reusable geometry / material of a board */
 export class BoardResources {
-  constructor(textures, { lowPower }) {
+  constructor(textures, { lowPower, theme = null }) {
     this.textures = textures;
     this.lowPower = lowPower;
     this.disposables = new Set();
     this.pieceMats = new Map();
+    this.pieceGeos = new Map();
+    this.accentMats = new Map();
 
     const keep = (o) => {
       this.disposables.add(o);
@@ -177,18 +82,7 @@ export class BoardResources {
 
     this.geo = {
       hexTop: keep(hexTopGeometry()),
-      hexSide: keep(
-        (() => {
-          const g = new THREE.CylinderGeometry(1, 1, TILE_H, 6, 1, true).translate(0, TILE_H / 2, 0);
-          const flat = g.toNonIndexed();
-          g.dispose();
-          flat.computeVertexNormals();
-          return flat;
-        })()
-      ),
-      settlement: keep(settlementGeometry()),
-      city: keep(cityGeometry()),
-      road: keep(roadGeometry()),
+      hexSide: keep(hexSideGeometry()),
       tokenSide: keep(new THREE.CylinderGeometry(0.3, 0.31, 0.04, 32, 1, true)),
       tokenTop: keep(new THREE.CircleGeometry(0.3, 40).rotateX(-Math.PI / 2)),
       seal: keep(new THREE.CircleGeometry(0.15, 32).rotateX(-Math.PI / 2)),
@@ -240,6 +134,20 @@ export class BoardResources {
       strawDark: lambert({ color: '#8d6f35' }),
       paper: lambert({ color: '#efe7d6' }),
     };
+    applyTileTheme(this.mat, theme);
+  }
+
+  /** Geometry of a piece ('settlement' | 'city' | 'road') of a shop set, built once */
+  pieceGeometry(rawSetId, kind) {
+    const setId = pieceSetOf(rawSetId);
+    const key = `${setId}|${kind}`;
+    let g = this.pieceGeos.get(key);
+    if (!g) {
+      g = buildPieceGeometry(setId, kind);
+      this.pieceGeos.set(key, g);
+      this.disposables.add(g);
+    }
+    return g;
   }
 
   /** Breathing opacity of the placement markers (k in 0..1, null = steady) */
@@ -255,27 +163,34 @@ export class BoardResources {
     robberRing.opacity = 0.45 + 0.5 * k;
   }
 
-  /** Lacquered piece material in a player colour (vertex colours shade it) */
-  pieceMaterial(color) {
-    let m = this.pieceMats.get(color);
-    if (!m) {
-      m = new THREE.MeshStandardMaterial({
-        color,
-        vertexColors: true,
-        roughness: 0.5,
-        metalness: 0.05,
-        // keeps the lacquer colour saturated on the shaded sides
-        emissive: new THREE.Color(color).multiplyScalar(0.18),
-      });
-      this.pieceMats.set(color, m);
-      this.disposables.add(m);
+  /**
+   * Materials of a piece: [player-colour lacquer of the set, …the set's own
+   * materials]. Cached per set and colour (a handful per game).
+   */
+  pieceMaterials(rawSetId, color) {
+    const setId = pieceSetOf(rawSetId);
+    const key = `${setId}|${color}`;
+    let list = this.pieceMats.get(key);
+    if (!list) {
+      let accents = this.accentMats.get(setId);
+      if (!accents) {
+        accents = createAccentMaterials(setId);
+        accents.forEach((m) => this.disposables.add(m));
+        this.accentMats.set(setId, accents);
+      }
+      const player = createPlayerMaterial(setId, color);
+      this.disposables.add(player);
+      list = [player, ...accents];
+      this.pieceMats.set(key, list);
     }
-    return m;
+    return list;
   }
 
   dispose() {
     this.disposables.forEach((o) => o.dispose());
     this.disposables.clear();
     this.pieceMats.clear();
+    this.pieceGeos.clear();
+    this.accentMats.clear();
   }
 }
