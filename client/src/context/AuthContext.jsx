@@ -57,6 +57,8 @@ export function AuthProvider({ children }) {
     return null;
   });
   const readyRef = useRef(null);
+  // Came back from the Google sign-in redirect: /me must be retried if needed
+  const justSignedInRef = useRef(notice?.type === 'success');
   const userRef = useRef(null);
   // The ref is read by getSocketToken right after a sign-in, before any render
   const setUser = useCallback((next) => {
@@ -69,7 +71,19 @@ export function AuthProvider({ children }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    const [cfg, me] = await Promise.all([api('/config', { timeout: ME_TIMEOUT_MS }), api('/me', { timeout: ME_TIMEOUT_MS })]);
+    const [cfg, first] = await Promise.all([api('/config', { timeout: ME_TIMEOUT_MS }), api('/me', { timeout: ME_TIMEOUT_MS })]);
+    let me = first;
+    // Right after the Google redirect (or when the server asks for it, e.g. the
+    // database is waking up) keep asking a few times before showing "guest":
+    // a new account must come back signed in, not as a guest
+    const justSignedIn = justSignedInRef.current;
+    for (let attempt = 1; attempt <= 4 && cfg.ok && cfg.data.accounts; attempt++) {
+      const signedIn = me.ok && me.data.user;
+      if (signedIn || !(justSignedIn || me.data.retry || !me.ok)) break;
+      await new Promise((done) => setTimeout(done, 1200 * attempt));
+      me = await api('/me', { timeout: 15000 });
+    }
+    justSignedInRef.current = false;
     if (cfg.ok) setConfig(cfg.data);
     if (cfg.ok && !cfg.data.accounts) {
       setUser(null);

@@ -140,7 +140,15 @@ export function createAccounts(env = process.env) {
     const r = await auth.call('get-session', { cookie, origin: originOf(req) });
     sendCookies(res, r.cookies);
     if (!r.ok || !r.data || !r.data.user) return res.json({ user: null });
-    const user = await ensureUser(pool, r.data.user);
+    let user;
+    try {
+      user = await ensureUser(pool, r.data.user);
+    } catch (err) {
+      // Signed in, but our database is slow to wake: tell the client to retry
+      // instead of making it look signed out
+      console.warn('ensureUser failed in /me:', err.message);
+      return res.status(503).json({ user: null, retry: true });
+    }
     res.json({ user });
   }));
 
@@ -233,14 +241,30 @@ export function createAccounts(env = process.env) {
   router.get('/auth/callback', limit('callback', 20, 10 * 60_000), handle(async (req, res) => {
     const verifier = typeof req.query.neon_auth_session_verifier === 'string' ? req.query.neon_auth_session_verifier : '';
     if (req.query.error || !verifier || verifier.length > 512) return res.redirect(302, '/?login=error');
-    const r = await auth.call('get-session', {
-      cookie: req.get('cookie'),
-      origin: originOf(req),
-      query: { neon_auth_session_verifier: verifier },
-    });
-    if (!r.ok || !r.data || !r.data.user) return res.redirect(302, '/?login=error');
+    // A brand-new Google account can take a moment to be ready upstream, so
+    // the one-time verifier exchange is retried a couple of times
+    let r = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise((done) => setTimeout(done, 700 * attempt));
+      r = await auth.call('get-session', {
+        cookie: req.get('cookie'),
+        origin: originOf(req),
+        query: { neon_auth_session_verifier: verifier },
+      });
+      if (r.ok && r.data && r.data.user) break;
+    }
+    if (!r || !r.ok || !r.data || !r.data.user) {
+      console.warn('Google callback: no session after the verifier exchange', r && r.status);
+      return res.redirect(302, '/?login=error');
+    }
     sendCookies(res, r.cookies);
-    await ensureUser(pool, r.data.user);
+    // The session cookie is already set: a slow database must not undo the
+    // sign-in (the profile row is created on the next /me anyway)
+    try {
+      await ensureUser(pool, r.data.user);
+    } catch (err) {
+      console.warn('ensureUser failed in the Google callback:', err.message);
+    }
     res.redirect(302, '/?login=google');
   }));
 
