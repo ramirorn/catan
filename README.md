@@ -82,8 +82,8 @@ npm test
 El servidor también entrega la pantalla del juego, así que todo queda en una sola dirección.
 
 1. Sube el proyecto a un repositorio de GitHub.
-2. En [Render](https://render.com), elige **New → Blueprint** y selecciona el repositorio. Render lee `render.yaml` y crea el servicio solo.
-   - O a mano: **New → Web Service**, con *Build command* `npm run build` y *Start command* `npm start`.
+2. En [Render](https://render.com), elige **New → Web Service**, selecciona el repositorio y usa *Build command* `npm run build` y *Start command* `npm start`.
+   - No uses **Blueprint**: el proyecto no tiene `render.yaml` a propósito, para que un push nunca cree un servicio nuevo.
 3. Al terminar, el juego queda en `https://<nombre>.onrender.com`.
 
 Notas del plan gratuito: el servicio se apaga tras 15 minutos sin uso y tarda cerca de un minuto en despertar. Las partidas viven en memoria, así que se pierden cuando se apaga o se reinicia.
@@ -108,7 +108,7 @@ Los invitados juegan igual que siempre. Con cuenta, el perfil (nombre y avatar) 
 
 En local van en `server/.env` (está en `.gitignore`). En Render: **Environment → Add Environment Variable** con las dos primeras. Si faltan, el servidor arranca igual con las cuentas desactivadas.
 
-Neon Auth solo acepta inicios de sesión desde dominios autorizados (localhost ya lo está): en Neon → **Auth → Configuration → Domains** agrega la dirección pública del juego, por ejemplo `https://catan-shinobi.onrender.com`.
+Neon Auth solo acepta inicios de sesión desde dominios autorizados (localhost ya lo está): en Neon → **Auth → Configuration → Domains** agrega la dirección pública del juego, por ejemplo `https://catan-jqnb.onrender.com`.
 
 Google funciona sin crear nada en Google Cloud porque Neon presta sus credenciales compartidas (la pantalla de Google muestra el nombre de Neon). Para que muestre el nombre del juego hay que crear un cliente OAuth propio en Google Cloud y pegarlo en Neon → Auth → OAuth providers.
 
