@@ -225,6 +225,9 @@ export function createAccounts(env = process.env) {
       body: {
         provider: 'google',
         callbackURL: `${origin}/api/auth/callback`,
+        // Without this, a brand-new account is sent back to "/" and its session
+        // verifier is never exchanged (the user had to sign in a second time)
+        newUserCallbackURL: `${origin}/api/auth/callback`,
         errorCallbackURL: `${origin}/api/auth/callback?error=1`,
         disableRedirect: true,
       },

@@ -31,6 +31,21 @@ async function api(path, { method = 'GET', body, timeout = 15000 } = {}) {
   return { ok: res.ok, status: res.status, data: data || {} };
 }
 
+// Safety net: if the sign-in ever lands on a page with the one-time session
+// verifier (instead of our callback), hand it to the callback to finish it
+function forwardSessionVerifier() {
+  try {
+    const url = new URL(window.location.href);
+    const verifier = url.searchParams.get('neon_auth_session_verifier');
+    if (!verifier || url.pathname.startsWith(`${API_BASE}/auth/callback`)) return false;
+    window.location.replace(`${API_BASE}/auth/callback?neon_auth_session_verifier=${encodeURIComponent(verifier)}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+if (typeof window !== 'undefined') forwardSessionVerifier();
+
 // One-shot message carried back by the Google redirect (?login=google|error)
 function takeLoginParam() {
   try {
