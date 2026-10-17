@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SocketProvider } from './context/SocketContext';
 import { GameProvider, useGame } from './context/GameContext';
 import { PHASE } from './utils/constants';
@@ -19,6 +19,7 @@ import { TradeModal } from './components/Trade/TradeModal';
 import { DevCardModal } from './components/DevCards/DevCardModal';
 import { DiscardModal } from './components/Robber/DiscardModal';
 import { StealModal } from './components/Robber/StealModal';
+import { PeacePactModal, PeacePactPrompt } from './components/Robber/PeacePact';
 import { GameOverModal } from './components/GameOver/GameOverModal';
 import { ProductionModal } from './components/HUD/ProductionModal';
 import { EndGameModal } from './components/HUD/EndGameModal';
@@ -63,10 +64,11 @@ function useGameViewport(active) {
 }
 
 function GameContent() {
-  const { gameState, activeModal, setActiveModal, isSpectator } = useGame();
+  const { gameState, activeModal, setActiveModal, isSpectator, myPlayerId } = useGame();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const inGame = !!gameState && gameState.phase !== PHASE.LOBBY;
   useGameViewport(inGame);
+  const closePactModal = useCallback(() => setActiveModal((m) => (m === 'peacePact' ? null : m)), [setActiveModal]);
 
   // If not joined any room yet
   if (!gameState) {
@@ -183,6 +185,14 @@ function GameContent() {
         isOpen={activeModal === 'steal'}
         onClose={() => setActiveModal(null)}
       />
+
+      {/* «Pacto de paz»: the robber mover's window (kept open while the offer waits) and the target's prompt */}
+      <PeacePactModal
+        isOpen={!isSpectator && (activeModal === 'peacePact' ||
+          (gameState.peacePact?.status === 'pending' && gameState.peacePact.fromId === myPlayerId))}
+        onClose={closePactModal}
+      />
+      <PeacePactPrompt />
 
       <ProductionModal />
 

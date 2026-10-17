@@ -1,5 +1,5 @@
 import { getHexPoints, HEX_SIZE } from '../../utils/hexMath';
-import { canMoveRobberTo } from './boardActions';
+import { canMoveRobberTo, pactProtectedId } from './boardActions';
 import { NumberToken } from './NumberToken';
 import { Robber } from './Robber';
 import { TerrainArt } from './TerrainArt';
@@ -10,6 +10,10 @@ import { TERRAIN_BASE } from '../../utils/theme';
 export const HexTile = memo(function HexTile({ hex }) {
   const game = useGame();
   const canPlaceRobberHere = canMoveRobberTo(game, hex);
+  // A signed peace pact keeps the robber off this hex (shown to the mover)
+  const gs = game.gameState;
+  const shielded = game.isMyTurn && !!pactProtectedId(gs) && !hex.hasRobber &&
+    Array.isArray(gs.robberHexes) && !gs.robberHexes.includes(hex.id);
 
   const points = getHexPoints(hex.x, hex.y);
   const innerPoints = getHexPoints(hex.x, hex.y, HEX_SIZE - 4);
@@ -61,6 +65,7 @@ export const HexTile = memo(function HexTile({ hex }) {
 
       {/* Robber destination hint */}
       <polygon points={targetPoints} className="robber-target" />
+      {shielded && <polygon points={targetPoints} className="pact-shield" />}
 
       {/* Number token if not desert and not occupied by robber */}
       {hex.number && !hex.hasRobber && (

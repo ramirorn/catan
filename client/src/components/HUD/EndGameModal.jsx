@@ -1,7 +1,7 @@
 import { useGame } from '../../context/GameContext';
 import { Modal } from '../Shared/Modal';
-import { pieceColor } from '../../utils/theme';
-import { SettlementIcon, CheckIcon, HourglassIcon } from '../Shared/Icons';
+import { CheckIcon, HourglassIcon } from '../Shared/Icons';
+import { PlayerAvatar } from '../Shared/Avatar';
 
 /**
  * Vote to end the game. It only ends when every ninja votes yes.
@@ -57,12 +57,7 @@ export function EndGameModal({ isOpen, onClose }) {
           return (
             <li key={pid} className="flex items-center justify-between gap-3 py-2 border-b border-ink/15">
               <span className="flex items-center gap-2.5 min-w-0">
-                <span
-                  className="w-6 h-6 rounded-[3px] flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: pieceColor(p.color) }}
-                >
-                  <SettlementIcon className="w-3.5 h-3.5 text-paper-light" />
-                </span>
+                <PlayerAvatar player={p} size={28} />
                 <span className="font-bold text-ink truncate">
                   {p.name}
                   {pid === myPlayerId && <span className="ml-1.5 font-normal italic text-ink-faint text-[13px]">(tú)</span>}

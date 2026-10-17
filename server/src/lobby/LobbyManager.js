@@ -6,7 +6,7 @@ export class LobbyManager {
     this.rooms = {};  // roomId → { engine, host, created }
   }
 
-  createRoom(hostId, hostName, boardType = 'standard') {
+  createRoom(hostId, hostName, boardType = 'standard', avatarId = 0) {
     const roomId = uuidv4().slice(0, 6).toUpperCase();
     const engine = new GameEngine(roomId, boardType);
 
@@ -18,24 +18,24 @@ export class LobbyManager {
       chat: [],         // last chat messages (survive page reloads)
       chatCounter: 0,
       chatRate: {},     // playerId → recent message timestamps (anti-flood)
-      spectators: {},   // playerId → { id, name, connected, removeTimer }
+      spectators: {},   // playerId → { id, name, avatarId, connected, removeTimer }
       banned: new Set(),  // ids kicked by the host: cannot come back to this room
       abandonTimer: null, // closes a game nobody is connected to
     };
 
     // Auto-join host
-    engine.addPlayer(hostId, hostName);
+    engine.addPlayer(hostId, hostName, avatarId);
 
     return { roomId, engine };
   }
 
-  joinRoom(roomId, playerId, playerName) {
+  joinRoom(roomId, playerId, playerName, avatarId = 0) {
     const room = this.rooms[roomId];
     if (!room) {
       return { success: false, error: 'No existe esa sala' };
     }
 
-    const result = room.engine.addPlayer(playerId, playerName);
+    const result = room.engine.addPlayer(playerId, playerName, avatarId);
     return result;
   }
 
@@ -69,6 +69,7 @@ export class LobbyManager {
       boardType: room.engine.boardType,
       vpToWin: room.engine.vpToWin,
       turnTimeLimit: room.engine.turnTimeLimit,
+      peacePacts: room.engine.peacePacts,
       host: room.host,
     }));
   }

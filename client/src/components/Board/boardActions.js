@@ -45,5 +45,16 @@ export function runEdgeAction(game, action, edgeId) {
 
 /** The robber may be moved onto this hex by me right now */
 export function canMoveRobberTo(game, hex) {
-  return game.gameState?.phase === PHASE.ROBBER_MOVE && game.isMyTurn && !hex.hasRobber;
+  const gs = game.gameState;
+  if (gs?.phase !== PHASE.ROBBER_MOVE || !game.isMyTurn || hex.hasRobber) return false;
+  // Waiting for the answer to a peace pact: the robber stays put meanwhile
+  if (gs.peacePact?.status === 'pending') return false;
+  // The server lists the legal hexes (a signed pact protects its player)
+  return !Array.isArray(gs.robberHexes) || gs.robberHexes.includes(hex.id);
+}
+
+/** Player protected by a peace pact signed in this robber move (or null) */
+export function pactProtectedId(gameState) {
+  const p = gameState?.peacePact;
+  return p?.status === 'accepted' && gameState?.phase === PHASE.ROBBER_MOVE ? p.toId : null;
 }

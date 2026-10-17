@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { Modal } from '../Shared/Modal';
 import { ConfirmDialog } from '../Shared/ConfirmDialog';
-import { pieceColor } from '../../utils/theme';
+import { PlayerAvatar } from '../Shared/Avatar';
 import { PHASE } from '../../utils/constants';
 import { formatDuration, useGameElapsed } from '../../utils/gameClock';
-import { SettlementIcon, CrownIcon, EyeIcon, ExitIcon, FlagIcon } from '../Shared/Icons';
+import { CrownIcon, EyeIcon, ExitIcon, FlagIcon } from '../Shared/Icons';
 
 /**
  * Room menu (header ☰): game info, who is playing / watching, the host's
@@ -132,9 +132,7 @@ export function RoomMenuModal({ isOpen, onClose }) {
           return (
             <li key={pid} className="flex items-center justify-between gap-2 py-1.5 border-b border-ink/15">
               <span className={`flex items-center gap-2 min-w-0 ${p.left ? 'opacity-55' : ''}`}>
-                <span className="w-6 h-6 rounded-[3px] flex items-center justify-center shrink-0" style={{ backgroundColor: pieceColor(p.color) }}>
-                  <SettlementIcon className="w-3.5 h-3.5 text-paper-light" />
-                </span>
+                <PlayerAvatar player={p} size={28} />
                 <span className="font-bold text-ink truncate">
                   {p.name}
                   {pid === myPlayerId && <span className="ml-1 font-normal italic text-ink-faint text-[12px]">(tú)</span>}
@@ -165,9 +163,10 @@ export function RoomMenuModal({ isOpen, onClose }) {
         <ul className="border-t border-ink/15">
           {spectators.map((s) => (
             <li key={s.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-ink/15">
-              <span className="text-ink truncate">
-                {s.name}
-                {s.id === myPlayerId && <span className="ml-1 italic text-ink-faint text-[12px]">(tú)</span>}
+              <span className="flex items-center gap-2 min-w-0 text-ink">
+                <PlayerAvatar player={s} size={24} spectator />
+                <span className="truncate">{s.name}</span>
+                {s.id === myPlayerId && <span className="shrink-0 italic text-ink-faint text-[12px]">(tú)</span>}
               </span>
               {isHost && (
                 <button

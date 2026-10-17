@@ -129,7 +129,6 @@ export const PHASE = {
   ROBBER_STEAL: 'robberSteal',
   MAIN: 'main',
   // 5–6 player extension: after a turn ends, the other players may build in order
-  SPECIAL_BUILD: 'specialBuild',
   GAME_OVER: 'gameOver',
 };
 
@@ -143,6 +142,13 @@ export const PLAYER_COLORS = [
   '#1abc9c', // teal
 ];
 
+// ─── Profile avatars ───
+// The client draws them (inline SVG); the server only stores the index.
+export const AVATAR_COUNT = 12;
+export function sanitizeAvatarId(value) {
+  return Number.isInteger(value) && value >= 0 && value < AVATAR_COUNT ? value : 0;
+}
+
 // ─── Limits ───
 export const MAX_ROADS = 15;
 export const MAX_SETTLEMENTS = 5;
@@ -152,6 +158,9 @@ export const VP_TO_WIN = 10; // default victory points target
 export const VP_TO_WIN_OPTIONS = [8, 10, 12, 14, 16];
 export const TURN_TIME_OPTIONS = [0, 60, 90, 120, 180]; // seconds per turn (0 = no limit)
 export const ROBBER_HAND_LIMIT = 7;
+// «Pacto de paz» house rule: the robber mover may offer one pact per robber move
+export const PEACE_PACT_MS = 20000;      // time the target has to answer
+export const PEACE_PACT_MAX_CARDS = 2;   // cards the mover may ask for
 export const MIN_LONGEST_ROAD = 5;
 export const MIN_LARGEST_ARMY = 3;
 export const BANK_RESOURCE_COUNT = 19; // cards of each resource in the bank

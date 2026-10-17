@@ -16,6 +16,7 @@ import { Component, lazy, Suspense, useCallback, useEffect, useLayoutEffect, use
 import { useGame } from '../../context/GameContext';
 import { PHASE, RESOURCE_NAMES } from '../../utils/constants';
 import { pieceColor } from '../../utils/theme';
+import { Avatar } from '../Shared/Avatar';
 import { hasWebGL, isLowPowerDevice } from '../Board/boardViewMode';
 import { isDiceBusy, whenDiceIdle } from '../Dice3D/diceSignal';
 import {
@@ -34,7 +35,7 @@ const FxScene = lazy(loadFxScene);
 const START_TIMEOUT_MS = 1200;
 // Extra time after an animation's planned end before we force it to finish
 const SAFETY_MS = 2500;
-const STATIC_MS = { city: 900, robber: 900, steal: 1100, devCard: 1500, nearWin: 1800 };
+const STATIC_MS = { city: 900, robber: 900, steal: 1100, devCard: 1500, nearWin: 1800, pact: 1500 };
 // After the last animation the idle canvas (no frames drawn) is kept this
 // long, so chained events (Knight → renegade → steal) share one WebGL context
 const KEEP_ALIVE_MS = 12000;
@@ -172,6 +173,22 @@ function resolveEvent(ev, gs) {
         },
       };
     }
+    case 'peacePact': {
+      // Public: who signed with whom (never the cards)
+      return {
+        ...base,
+        kind: 'pact',
+        fromColor: colorOf(ev.fromId),
+        toColor: colorOf(ev.toId),
+        dur: 2.0,
+        caption: {
+          title: 'Pacto de paz',
+          sub: `${nameOf(ev.fromId)} y ${nameOf(ev.toId)} firmaron la paz`,
+          color: '#f4efe2',
+          big: true,
+        },
+      };
+    }
     case 'nearWin': {
       const left = Number.isInteger(ev.vpLeft) && ev.vpLeft > 0 ? ev.vpLeft : 2;
       return {
@@ -184,6 +201,7 @@ function resolveEvent(ev, gs) {
           title: `¡A ${left} punto${left === 1 ? '' : 's'} de la victoria!`,
           sub: nameOf(ev.playerId),
           color: colorOf(ev.playerId),
+          avatarId: players[ev.playerId]?.avatarId ?? null,
           big: true,
           hero: true,
         },
@@ -207,7 +225,12 @@ function FxCaption({ item, mode }) {
       style={{ '--fx-dur': `${dur}s`, '--fx-color': c.color }}
     >
       <span className="fx-caption-title">{c.title}</span>
-      {c.sub && <span className="fx-caption-sub">{c.sub}</span>}
+      {c.sub && c.avatarId != null ? (
+        <span className="fx-caption-who">
+          <Avatar id={c.avatarId} size={26} ring={c.color} />
+          <span className="fx-caption-sub">{c.sub}</span>
+        </span>
+      ) : c.sub && <span className="fx-caption-sub">{c.sub}</span>}
     </div>
   );
 }

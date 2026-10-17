@@ -10,19 +10,21 @@ import { ZoomInIcon, ZoomOutIcon, FitIcon, KunaiIcon } from '../Shared/Icons';
 import { useBoardViewMode } from './boardViewMode';
 import { useDiceBusy } from '../Dice3D/diceSignal';
 import { CostPanel } from './CostPanel';
+import { PeacePactButton } from '../Robber/PeacePact';
+import { requestText } from '../Robber/peacePactUtils';
 
 /**
- * "¡Tu turno!" cues: a one-shot banner when the turn (or my special build)
+ * "¡Tu turno!" cues: a one-shot banner when the turn
  * passes to me, plus a persistent glow around the board while I may act.
  */
-function TurnCues({ mine, turnKey, special }) {
+function TurnCues({ mine, turnKey }) {
   // Remember the last key so the banner fires only on a change, not on load
   const [prevKey, setPrevKey] = useState(turnKey);
   const [flash, setFlash] = useState(null);
   const diceBusy = useDiceBusy();
   if (turnKey !== prevKey) {
     setPrevKey(turnKey);
-    if (turnKey) setFlash({ key: turnKey, special });
+    if (turnKey) setFlash({ key: turnKey });
   }
 
   // Tab title hint for players looking at another tab
@@ -44,7 +46,7 @@ function TurnCues({ mine, turnKey, special }) {
           <div key={flash.key} className="turn-banner" role="status" aria-live="polite">
             <div className="turn-banner-strip">
               <span className="turn-banner-title">¡Tu turno!</span>
-              <span className="turn-banner-sub">{flash.special ? 'Construcción especial' : 'Es tu momento, ninja'}</span>
+              <span className="turn-banner-sub">Es tu momento, ninja</span>
             </div>
           </div>
         </div>
@@ -61,7 +63,7 @@ const BUILD_NAMES = {
 
 /** Phase banner (paper slip pinned to the table) + build costs + turn cues */
 export function BoardBanner() {
-  const { gameState, isMyTurn, isSpecialBuild, isMySpecialBuild, buildMode } = useGame();
+  const { gameState, isMyTurn, buildMode, myPlayerId } = useGame();
   const diceBusy = useDiceBusy();
   // Line shown while the dice roll: { roll: id of the roll it belongs to, text }
   const rollId = gameState?.lastDiceRoll?.id ?? null;
@@ -82,26 +84,17 @@ export function BoardBanner() {
   if (!gameState) return null;
 
   const currentTurnPlayer = gameState.players?.[gameState.currentPlayerId];
-  const specialBuilder = isSpecialBuild ? gameState.players?.[gameState.specialBuilderId] : null;
   // The banner speaks to whoever may act right now
-  const bannerMine = isSpecialBuild ? isMySpecialBuild : isMyTurn;
+  const bannerMine = isMyTurn;
 
   // Helper description for banner
   let bannerText = PHASE_DESCRIPTIONS[gameState.phase] || '';
-  if (isSpecialBuild) {
-    if (isMySpecialBuild) {
-      bannerText = buildMode
-        ? `Construcción especial: selecciona un marcador resaltado para tu ${BUILD_NAMES[buildMode] || buildMode.toUpperCase()}`
-        : 'Tu construcción especial: construye o compra cartas, luego pulsa «Terminar construcción»';
-    } else {
-      bannerText = `Fase especial de construcción: turno de ${specialBuilder?.name || 'otro ninja'}…`;
-    }
-  } else if (isMyTurn) {
+  if (isMyTurn) {
     if (gameState.phase === PHASE.MAIN) {
       if (buildMode) {
         bannerText = `Selecciona un marcador resaltado para construir tu ${BUILD_NAMES[buildMode] || buildMode.toUpperCase()}`;
       } else {
-        bannerText = 'Tu Turno: Lanza los dados, comercia, construye o pasa turno';
+        bannerText = 'Tu turno: construye, comercia, juega cartas o pasa el turno';
       }
     } else if (gameState.phase === PHASE.ROBBER_MOVE) {
       bannerText = 'Haz clic en otro hexágono para mover al ladrón renegado';
@@ -112,17 +105,34 @@ export function BoardBanner() {
     }...)`;
   }
 
+  // «Pacto de paz» during the robber move: everyone sees who offers it to whom
+  // (the cards asked for only reach the two players involved)
+  const pact = gameState.phase === PHASE.ROBBER_MOVE ? gameState.peacePact : null;
+  if (pact) {
+    const fromName = gameState.players?.[pact.fromId]?.name || 'Un ninja';
+    const toName = gameState.players?.[pact.toId]?.name || 'un ninja';
+    if (pact.status === 'pending') {
+      if (pact.fromId === myPlayerId) bannerText = `Esperando la respuesta de ${toName} a tu pacto de paz…`;
+      else if (pact.toId === myPlayerId) bannerText = `${fromName} te ofrece un pacto de paz`;
+      else bannerText = `${fromName} ofrece un pacto de paz a ${toName}…`;
+    } else if (pact.status === 'accepted') {
+      if (pact.fromId === myPlayerId) bannerText = `Mueve al ladrón: las casillas de ${toName} están protegidas por el pacto`;
+      else if (pact.toId === myPlayerId) bannerText = `Pacto firmado con ${fromName}: tus casillas están protegidas`;
+      else bannerText = `${fromName} y ${toName} firmaron un pacto de paz${pact.request ? ` (${requestText(pact.request)})` : ''}`;
+    }
+  }
+
   // While the dice roll, keep the previous line: on a 7 «mueve al ladrón» /
   // «descarta» only shows once the throw is over
   const holding = diceBusy || rollPending;
   if (!holding && held.text !== bannerText) setHeld({ roll: rollId, text: bannerText });
   if (holding && held.text) bannerText = held.text;
 
-  const turnColor = pieceColor((specialBuilder || currentTurnPlayer)?.color);
+  const turnColor = pieceColor(currentTurnPlayer?.color);
 
-  // Identifies "my chance to act": changes when the turn / special build passes to me
+  // Identifies "my chance to act": changes when the turn passes to me
   const turnKey = bannerMine
-    ? `${gameState.turnNumber}:${gameState.currentPlayerId}:${isSpecialBuild ? `sb-${gameState.specialBuilderId}` : 'turn'}`
+    ? `${gameState.turnNumber}:${gameState.currentPlayerId}`
     : null;
 
   return (
@@ -142,11 +152,12 @@ export function BoardBanner() {
             <span className={bannerMine ? 'font-bold' : 'font-medium text-ink-soft'}>{bannerText}</span>
           </span>
         </div>
+        {!holding && <PeacePactButton className="mt-1.5" />}
       </div>
 
       <CostPanel />
 
-      <TurnCues mine={bannerMine} turnKey={turnKey} special={isSpecialBuild} />
+      <TurnCues mine={bannerMine} turnKey={turnKey} />
     </>
   );
 }

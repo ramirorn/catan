@@ -3,15 +3,21 @@ import { useGame } from '../../context/GameContext';
 import { pieceColor, shade } from '../../utils/theme';
 import { ScrollIcon, ChatIcon, ChevronDownIcon } from '../Shared/Icons';
 import { useLogExpanded, setLogExpanded } from './logLayout';
+import { Avatar } from '../Shared/Avatar';
 
 export function GameLog() {
-  const { gameState, chatMessages, sendChatMessage } = useGame();
+  const { gameState, chatMessages, sendChatMessage, spectators } = useGame();
   const [activeTab, setActiveTab] = useState('log');
   const [text, setText] = useState('');
   const scrollRef = useRef(null);
   const expanded = useLogExpanded();
 
   const logs = gameState?.gameLog || [];
+  // Current avatar of whoever wrote a message (it may have changed since)
+  const avatarOf = (msg) => {
+    const live = gameState?.players?.[msg.playerId] || spectators.find((s) => s.id === msg.playerId);
+    return live?.avatarId ?? msg.avatarId ?? 0;
+  };
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -108,11 +114,14 @@ export function GameLog() {
         ) : (
           <ol>
             {chatMessages.map((msg, idx) => (
-              <li key={msg.id ?? idx} className="py-1.5 border-b border-dotted border-ink/20 last:border-b-0 break-words">
-                <span className="font-extrabold" style={{ color: shade(pieceColor(msg.playerColor), -0.15) }}>
-                  {msg.playerName}:
-                </span>{' '}
-                <span className="text-ink">{msg.message}</span>
+              <li key={msg.id ?? idx} className="flex items-start gap-1.5 py-1.5 border-b border-dotted border-ink/20 last:border-b-0">
+                <Avatar id={avatarOf(msg)} size={20} ring={pieceColor(msg.playerColor)} className="mt-[-1px]" />
+                <span className="flex-1 min-w-0 break-words">
+                  <span className="font-extrabold" style={{ color: shade(pieceColor(msg.playerColor), -0.15) }}>
+                    {msg.playerName}:
+                  </span>{' '}
+                  <span className="text-ink">{msg.message}</span>
+                </span>
               </li>
             ))}
           </ol>
@@ -133,7 +142,7 @@ export function GameLog() {
             onChange={(e) => setText(e.target.value)}
             onFocus={handleChatFocus}
             onBlur={handleChatBlur}
-            maxLength={500}
+            maxLength={150}
             enterKeyHint="send"
             autoComplete="off"
           />

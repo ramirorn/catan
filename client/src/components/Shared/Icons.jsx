@@ -608,6 +608,26 @@ export function SummonSealIcon(props) {
   );
 }
 
+/** Peace talisman (ofuda) with a brushed ensō: «Pacto de paz» */
+const PEACE = {
+  // paper strip with a knocked-out ensō and a stroke below
+  ofuda:
+    'M7 1.8L17 1.8L17 22.2L7 22.2Z' +
+    ring(12, 9, 3.1, 3.1, 1.5, { phase: 200 }) +
+    line(10, 15.6, 14, 15.6, 1.1, { start: 0.9, end: 0.3 }) +
+    line(12, 17.2, 12, 20.4, 1.1, { start: 0.9, end: 0.3 }),
+  cord: line(4, 4.6, 20, 4.2, 1.2, { bend: -0.6, start: 0.6, peak: 0.4, end: 0.3 }),
+};
+
+export function PeaceSealIcon(props) {
+  return (
+    <Svg {...props}>
+      <Ink d={PEACE.ofuda} eo />
+      <Ink d={PEACE.cord} o="0.85" />
+    </Svg>
+  );
+}
+
 export function DevCardIcon({ type, ...props }) {
   switch (type) {
     case 'knight':

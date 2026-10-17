@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useMemo, u
 import { whenStageIdle } from '../components/Effects/fxSignal';
 import { useSocket } from './SocketContext';
 import { PHASE, RESOURCE_NAMES } from '../utils/constants';
+import { loadAvatarId, saveAvatarId, isAvatarId } from '../utils/avatars';
 
 const GameContext = createContext(null);
 const NO_SPECTATORS = [];
@@ -11,6 +12,9 @@ export function GameProvider({ children }) {
   const [gameState, setGameState] = useState(null);
   const [roomId, setRoomId] = useState('');
   const [playerName, setPlayerName] = useState(() => localStorage.getItem('catan_player_name') || '');
+  // Profile avatar (index); remembered in localStorage, random the first time
+  const [avatarId, setAvatarIdState] = useState(loadAvatarId);
+  const avatarSendRef = useRef(null);
   const [buildMode, setBuildMode] = useState(null); // 'road' | 'settlement' | 'city' | null
   const [activeModal, setActiveModal] = useState(null); // 'trade' | 'bankTrade' | 'devCard' | 'discard' | 'steal' | null
   const [toasts, setToasts] = useState([]);
@@ -107,11 +111,9 @@ export function GameProvider({ children }) {
   const hostId = gameState?.hostId ?? gameState?.playerOrder?.[0] ?? null;
   const isHost = !isSpectator && !!myPlayerId && hostId === myPlayerId;
   const isMyTurn = !isSpectator && gameState?.currentPlayerId === myPlayerId;
-  // 5–6 player extension: after each turn the others build one by one
-  const isSpecialBuild = gameState?.phase === PHASE.SPECIAL_BUILD;
-  const isMySpecialBuild = isSpecialBuild && gameState?.specialBuilderId === myPlayerId;
-  // Who may place pieces on the board right now
-  const canActOnBoard = isSpecialBuild ? isMySpecialBuild : isMyTurn;
+  // Who may place pieces on the board right now: only the turn player
+  // (building happens in your own turn, after rolling the dice)
+  const canActOnBoard = isMyTurn;
 
   // Auto show discard modal if player must discard
   useEffect(() => {
@@ -274,7 +276,7 @@ export function GameProvider({ children }) {
     localStorage.setItem('catan_player_name', name);
     setPlayerName(name);
 
-    socket.emit('createRoom', { playerName: name, boardType, ...settings }, (res) => {
+    socket.emit('createRoom', { playerName: name, boardType, ...settings, avatarId }, (res) => {
       if (res.success) {
         setRoomId(res.roomId);
         setGameState(res.state);
@@ -284,7 +286,7 @@ export function GameProvider({ children }) {
         addToast(res.error || 'Error al crear la sala', 'error');
       }
     });
-  }, [socket, connected, addToast]);
+  }, [socket, connected, addToast, avatarId]);
 
   const joinRoom = useCallback((targetRoomId, name) => {
     if (!socket || !connected) {
@@ -295,7 +297,7 @@ export function GameProvider({ children }) {
     localStorage.setItem('catan_player_name', name);
     setPlayerName(name);
 
-    socket.emit('joinRoom', { roomId: cleanRoomId, playerName: name }, (res) => {
+    socket.emit('joinRoom', { roomId: cleanRoomId, playerName: name, avatarId }, (res) => {
       if (res.success) {
         setRoomId(cleanRoomId);
         addToast(`¡Te has unido a la sala ${cleanRoomId}!`, 'success');
@@ -303,7 +305,7 @@ export function GameProvider({ children }) {
         addToast(res.error || 'Error al unirse a la sala', 'error');
       }
     });
-  }, [socket, connected, addToast]);
+  }, [socket, connected, addToast, avatarId]);
 
   // Watch a room (waiting or in progress) without a seat
   const spectateRoom = useCallback((targetRoomId, name) => {
@@ -314,7 +316,7 @@ export function GameProvider({ children }) {
     const cleanRoomId = targetRoomId.trim().toUpperCase();
     localStorage.setItem('catan_player_name', name);
     setPlayerName(name);
-    socket.emit('spectateRoom', { roomId: cleanRoomId, playerName: name }, (res) => {
+    socket.emit('spectateRoom', { roomId: cleanRoomId, playerName: name, avatarId }, (res) => {
       if (res?.success) {
         setRoomId(cleanRoomId);
         addToast(`Observando la sala ${cleanRoomId}`, 'success');
@@ -322,7 +324,27 @@ export function GameProvider({ children }) {
         addToast(res?.error || 'No se pudo observar la sala', 'error');
       }
     });
-  }, [socket, connected, addToast]);
+  }, [socket, connected, addToast, avatarId]);
+
+  // Change the avatar: saved at once; inside a room the server is told after
+  // a short pause (quick arrow-key browsing sends a single update)
+  const setAvatarId = useCallback((id) => {
+    if (!isAvatarId(id)) return;
+    setAvatarIdState(id);
+    saveAvatarId(id);
+    if (avatarSendRef.current) clearTimeout(avatarSendRef.current);
+    if (!socket || !roomId) return;
+    avatarSendRef.current = setTimeout(() => {
+      avatarSendRef.current = null;
+      socket.emit('setAvatar', { avatarId: id }, (res) => {
+        if (res && res.success === false && res.error) addToast(res.error, 'error');
+      });
+    }, 350);
+  }, [socket, roomId, addToast]);
+
+  useEffect(() => () => {
+    if (avatarSendRef.current) clearTimeout(avatarSendRef.current);
+  }, []);
 
   // Leave the room / game (players and spectators) and go back to the menu
   const leaveRoom = useCallback(() => {
@@ -428,6 +450,8 @@ export function GameProvider({ children }) {
           setActiveModal('steal');
         } else if (res.fromPlayer) {
           // «Le robaste 1 …» arrives with the new state (lastSteal)
+        } else if (res.desert) {
+          addToast('El renegado se esconde en el desierto: no roba a nadie.', 'info');
         } else {
           addToast('Ladrón reubicado. No hay colonos para robar.', 'info');
         }
@@ -448,6 +472,22 @@ export function GameProvider({ children }) {
         handleCallback(res);
       }
     });
+  }, [socket, handleCallback]);
+
+  // «Pacto de paz»: the robber mover offers it, the target answers
+  const offerPeacePact = useCallback((targetId, request) => {
+    if (!socket) return;
+    socket.emit('offerPeacePact', { targetId, request }, (res) => handleCallback(res));
+  }, [socket, handleCallback]);
+
+  const respondPeacePact = useCallback((accept) => {
+    if (!socket) return;
+    socket.emit('respondPeacePact', { accept }, (res) => handleCallback(res, res?.status === 'accepted' ? 'Pacto de paz firmado' : null));
+  }, [socket, handleCallback]);
+
+  const cancelPeacePact = useCallback(() => {
+    if (!socket) return;
+    socket.emit('cancelPeacePact', {}, (res) => handleCallback(res));
   }, [socket, handleCallback]);
 
   const bankTrade = useCallback((give, receive) => {
@@ -524,6 +564,8 @@ export function GameProvider({ children }) {
     roomId,
     playerName,
     setPlayerName,
+    avatarId,
+    setAvatarId,
     myPlayerId,
     myPlayer,
     isMyTurn,
@@ -531,8 +573,6 @@ export function GameProvider({ children }) {
     spectators,
     hostId,
     isHost,
-    isSpecialBuild,
-    isMySpecialBuild,
     canActOnBoard,
     buildMode,
     setBuildMode,
@@ -563,6 +603,9 @@ export function GameProvider({ children }) {
     discardCards,
     moveRobber,
     stealCard,
+    offerPeacePact,
+    respondPeacePact,
+    cancelPeacePact,
     bankTrade,
     proposeTrade,
     respondToTrade,
@@ -572,14 +615,14 @@ export function GameProvider({ children }) {
     voteEndGame,
     sendChatMessage,
   }), [
-    gameState, roomId, playerName, myPlayerId, myPlayer, isMyTurn,
+    gameState, roomId, playerName, avatarId, setAvatarId, myPlayerId, myPlayer, isMyTurn,
     isSpectator, spectators, hostId, isHost, spectateRoom, leaveRoom, kickPlayer,
-    isSpecialBuild, isMySpecialBuild, canActOnBoard,
+    canActOnBoard,
     buildMode, activeModal, toasts, addToast, chatMessages, robberVictims, isRolling,
     serverOffset, updateRoomSettings,
     createRoom, joinRoom, startGame, rollDice, setupPlaceSettlement, setupPlaceRoad,
     buildRoad, buildSettlement, buildCity, buyDevCard, playDevCard, discardCards,
-    moveRobber, stealCard, bankTrade, proposeTrade, respondToTrade, acceptTrade,
+    moveRobber, stealCard, offerPeacePact, respondPeacePact, cancelPeacePact, bankTrade, proposeTrade, respondToTrade, acceptTrade,
     cancelTrade, endTurn, voteEndGame, sendChatMessage
   ]);
 

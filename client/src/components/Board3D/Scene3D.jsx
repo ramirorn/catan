@@ -14,6 +14,7 @@ import {
   edgeActionFor,
   runEdgeAction,
   canMoveRobberTo,
+  pactProtectedId,
 } from '../Board/boardActions';
 import { PX, TILE_H, TILE_SCALE, INK } from './resources';
 
@@ -83,7 +84,7 @@ const SeaAndFrame = memo(function SeaAndFrame({ bounds }) {
 
 /* ─── Tiles ─── */
 
-const Tile = memo(function Tile({ hex, robberTarget, onRobber }) {
+const Tile = memo(function Tile({ hex, robberTarget, shielded = false, onRobber }) {
   const { res, isTap, noteAction } = useScene();
   const [hover, hoverHandlers] = useHover(robberTarget);
   const tip = tipHandlers3D('hex', hex.id);
@@ -122,6 +123,9 @@ const Tile = memo(function Tile({ hex, robberTarget, onRobber }) {
       />
       {robberTarget && (
         <mesh geometry={res.geo.robberRing} material={res.mat.robberRing} position-y={TILE_H + 0.006} renderOrder={3} />
+      )}
+      {shielded && (
+        <mesh geometry={res.geo.hexTop} material={res.mat.pactShield} position-y={TILE_H + 0.005} renderOrder={2} />
       )}
       {robberTarget && hover && (
         <mesh geometry={res.geo.hexTop} material={res.mat.hover} position-y={TILE_H + 0.004} renderOrder={2} />
@@ -196,7 +200,9 @@ const Port3D = memo(function Port3D({ port, index, v1, v2, center }) {
     <group>
       {v1 && pier(v1)}
       {v2 && pier(v2)}
-      <mesh geometry={res.geo.post} material={res.mat.woodDark} position={[b[0], 0.3, b[1]]} scale-y={0.6} castShadow {...tip} />
+      {/* The post stops at the talisman's lower edge (0.66 − 0.31): the paper
+          turns to face the camera, so a taller post would cut through it */}
+      <mesh geometry={res.geo.post} material={res.mat.woodDark} position={[b[0], 0.18, b[1]]} scale-y={0.36} castShadow {...tip} />
       <group ref={ref} position={[b[0], 0.66, b[1]]}>
         {mat && <mesh geometry={res.geo.talisman} material={mat} castShadow {...tip} />}
       </group>
@@ -288,7 +294,9 @@ function Robber3D({ x, z }) {
           <coneGeometry args={[0.19, 0.11, 24, 1]} />
           <Outlines thickness={OUTLINE_PX * dpr} color={INK} />
         </mesh>
-        <mesh material={res.mat.strawDark} position-y={0.466} rotation-x={Math.PI}>
+        {/* hat underside: the circle faces +z by default, so turn it a quarter
+            turn to lie flat facing down (a half turn left it standing upright) */}
+        <mesh material={res.mat.strawDark} position-y={0.4655} rotation-x={Math.PI / 2}>
           <circleGeometry args={[0.19, 24]} />
         </mesh>
         {/* hanging paper strips */}
@@ -569,7 +577,10 @@ export function Board3D({ board, bounds, center, radius, shadows, lowPower }) {
   const tiles = hexList.map((hex) => {
     const target = canMoveRobberTo(game, hex);
     if (target) anyMarker = true;
-    return <Tile key={hex.id} hex={hex} robberTarget={target} onRobber={act.robber} />;
+    // A signed peace pact: the mover sees the protected hexes veiled in white
+    const shielded = !target && game.isMyTurn && !!pactProtectedId(game.gameState) && !hex.hasRobber &&
+      Array.isArray(game.gameState.robberHexes) && !game.gameState.robberHexes.includes(hex.id);
+    return <Tile key={hex.id} hex={hex} robberTarget={target} shielded={shielded} onRobber={act.robber} />;
   });
 
   const robberHex = hexList.find((h) => h.hasRobber);

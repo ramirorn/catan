@@ -230,6 +230,8 @@ export class BoardResources {
       ring: basic({ color: '#f6a04b', transparent: true }),
       robberRing: basic({ color: '#f6a04b', transparent: true, depthWrite: false }),
       hover: basic({ color: '#fff4dc', transparent: true, opacity: 0.2, depthWrite: false }),
+      // hex protected by a signed peace pact (robber can't go there)
+      pactShield: basic({ color: '#ffffff', transparent: true, opacity: 0.32, depthWrite: false }),
       hit: basic({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false }),
       // Robber
       cloak: keep(new THREE.MeshStandardMaterial({ map: textures.cloak, roughness: 0.85 })),

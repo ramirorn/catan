@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
 import { useGame } from '../../context/GameContext';
 import { pieceColor, TERRAIN_BASE } from '../../utils/theme';
 import { ResourceChip } from '../Shared/ResourceCard';
-import { AnchorIcon, CheckIcon, CityIcon, RobberIcon, SettlementIcon } from '../Shared/Icons';
+import { AnchorIcon, CheckIcon, CityIcon, PeaceSealIcon, RobberIcon, SettlementIcon } from '../Shared/Icons';
 import { tipInfo } from './boardInfo';
 import { getTip, getTipPos, resetTip, setTipPlacing, subscribeTip, subscribeTipPos } from './boardTip';
 import { isSetupPhase } from './boardActions';
@@ -125,6 +125,15 @@ function HexCard({ info }) {
         <p className="mt-1.5 flex items-center gap-1.5 font-bold text-shu">
           <RobberIcon className="w-4 h-4 shrink-0" />
           {info.desert ? 'Aquí está el ladrón' : 'Bloqueada por el ladrón: no produce'}
+        </p>
+      )}
+      {info.desert && (
+        <p className="mt-1 text-[11.5px] text-ink-soft">En el desierto el renegado no roba a nadie</p>
+      )}
+      {info.pactProtected && (
+        <p className="mt-1.5 flex items-center gap-1.5 font-bold text-ink">
+          <PeaceSealIcon className="w-4 h-4 shrink-0 text-chakra" />
+          Protegido por un pacto de paz ({info.pactProtected.name})
         </p>
       )}
       {!info.desert && (

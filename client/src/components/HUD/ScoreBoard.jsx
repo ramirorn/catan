@@ -1,9 +1,9 @@
 import { useGame } from '../../context/GameContext';
-import { pieceColor } from '../../utils/theme';
-import { SettlementIcon, RoadIcon, SwordsIcon, CardsIcon, TurnMarkerIcon } from '../Shared/Icons';
+import { RoadIcon, SwordsIcon, CardsIcon, TurnMarkerIcon } from '../Shared/Icons';
 import { ResourceChip } from '../Shared/ResourceCard';
 import { RESOURCE_NAMES } from '../../utils/constants';
 import { useLogExpanded, setLogExpanded } from './logLayout';
+import { PlayerAvatar } from '../Shared/Avatar';
 
 const BANK_ORDER = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
 
@@ -41,7 +41,6 @@ export function ScoreBoard() {
           const totalCards =
             p.totalResources ??
             (p.resources ? Object.values(p.resources).reduce((a, b) => a + b, 0) : 0);
-          const color = pieceColor(p.color);
 
           return (
             <li
@@ -55,18 +54,14 @@ export function ScoreBoard() {
                 <TurnMarkerIcon className="absolute -left-0.5 w-3.5 h-3.5 text-shu" />
               )}
 
-              {/* Player piece */}
-              <span
-                className={`${dense ? 'w-5 h-5' : 'w-6 h-6'} rounded-[3px] flex items-center justify-center shrink-0 shadow-[inset_0_-2px_0_rgba(0,0,0,0.25)]`}
-                style={{ backgroundColor: color }}
-              >
-                <SettlementIcon className={`${dense ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-paper-light`} />
-              </span>
+              {/* Avatar ringed with the player's colour */}
+              <PlayerAvatar player={p} size={dense ? 20 : 30} className={p.left ? 'opacity-50 grayscale' : ''} />
 
               {/* Player name */}
               <span className={`flex-1 min-w-0 leading-tight ${dense ? 'flex items-center gap-2' : ''}`}>
                 <span className={`block truncate ${dense ? 'flex-1 min-w-0 text-[13px]' : 'text-[14px]'} ${isCurrentTurn ? 'font-extrabold' : 'font-semibold'}`}>
-                  {p.name}
+                  {/* Struck through once the player left the game */}
+                  <span className={p.left ? 'line-through decoration-2 decoration-shu/80 text-ink-faint' : ''}>{p.name}</span>
                   {isMe && <span className="ml-1 font-normal italic text-ink-faint text-[12px]">(tú)</span>}
                   {/* Left the game for good vs. just lost the connection */}
                   {!isMe && (p.left || p.connected === false) && (
@@ -179,9 +174,9 @@ function MiniStandings({ players, gameState, myPlayerId }) {
               <li
                 key={p.id}
                 className={`flex items-center gap-1 pl-0.5 pr-1 py-0.5 rounded-[2px] ${turn ? 'bg-chakra/25 ring-1 ring-chakra/60' : ''}`}
-                title={`${p.name}${me ? ' (tú)' : ''}: ${p.publicVP} PV`}
+                title={`${p.name}${me ? ' (tú)' : ''}${p.left ? ' (se fue)' : ''}: ${p.publicVP} PV`}
               >
-                <span className="w-3.5 h-3.5 rounded-[2px] shrink-0" style={{ backgroundColor: pieceColor(p.color) }} />
+                <PlayerAvatar player={p} size={16} className={p.left ? 'opacity-50 grayscale' : ''} />
                 <span className={`font-serif font-extrabold text-[13px] leading-none tabular-nums ${me ? 'underline decoration-2 decoration-chakra underline-offset-2' : ''}`}>
                   {p.publicVP}
                 </span>

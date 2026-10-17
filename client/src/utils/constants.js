@@ -93,7 +93,6 @@ export const PHASE = {
   ROBBER_MOVE: 'robberMove',
   ROBBER_STEAL: 'robberSteal',
   MAIN: 'main',
-  SPECIAL_BUILD: 'specialBuild',
   GAME_OVER: 'gameOver',
 };
 
@@ -105,7 +104,6 @@ export const PHASE_DESCRIPTIONS = {
   [PHASE.ROBBER_MOVE]: 'Mueve al ladrón renegado para bloquear un hexágono',
   [PHASE.ROBBER_STEAL]: 'Roba una carta a un ninja junto al hexágono bloqueado',
   [PHASE.MAIN]: 'Turno principal: comercia, construye o juega cartas de desarrollo',
-  [PHASE.SPECIAL_BUILD]: 'Fase especial de construcción: solo construir o comprar cartas',
   [PHASE.GAME_OVER]: '¡Fin de la misión!',
 };
 

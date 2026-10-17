@@ -1,9 +1,10 @@
-import { RESOURCE, MAX_ROADS, MAX_SETTLEMENTS, MAX_CITIES } from './constants.js';
+import { RESOURCE, MAX_ROADS, MAX_SETTLEMENTS, MAX_CITIES, sanitizeAvatarId } from './constants.js';
 
 export class Player {
-  constructor(id, name, color, index) {
+  constructor(id, name, color, index, avatarId = 0) {
     this.id = id;
     this.name = name;
+    this.avatarId = sanitizeAvatarId(avatarId); // profile picture (index, drawn by the client)
     this.color = color;
     this.index = index;
     this.connected = true;
@@ -111,6 +112,7 @@ export class Player {
     const base = {
       id: this.id,
       name: this.name,
+      avatarId: this.avatarId,
       color: this.color,
       index: this.index,
       connected: this.connected,

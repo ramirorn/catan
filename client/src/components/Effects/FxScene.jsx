@@ -1414,6 +1414,133 @@ function NearWinFx({ item, assets, clock, onDone }) {
   );
 }
 
+/* ─── 6. Peace pact: two hands clasp under a white peace talisman ─── */
+
+/** Ofuda: white paper strip, vermilion frame, 和 (peace) and a small seal */
+function ofudaTex() {
+  return canvasTex(160, 448, (ctx, w, h) => {
+    ctx.fillStyle = '#fbf8ef';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#b6331f';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(10, 10, w - 20, h - 20);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(22, 22, w - 44, h - 44);
+    ctx.fillStyle = '#1f1b17';
+    ctx.font = '900 104px "Yu Mincho", "MS Mincho", "Noto Serif JP", serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('和', w / 2, h * 0.36);
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#1f1b17';
+    ctx.beginPath();
+    ctx.moveTo(w / 2, h * 0.52);
+    ctx.lineTo(w / 2, h * 0.7);
+    ctx.stroke();
+    ctx.fillStyle = '#b6331f';
+    ctx.beginPath();
+    ctx.arc(w / 2, h * 0.82, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fbf8ef';
+    ctx.beginPath();
+    ctx.arc(w / 2, h * 0.82, 9, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+/** A stylised hand reaching along +x: sleeve (player colour), palm, fingers, thumb */
+function Hand({ assets, mats, sleeve }) {
+  return (
+    <group>
+      <mesh geometry={assets.geo.cyl} material={sleeve} rotation-z={Math.PI / 2} position-x={-0.55} scale={[0.2, 0.7, 0.2]} />
+      <mesh geometry={assets.geo.torus} material={mats.cuff} rotation-y={Math.PI / 2} position-x={-0.2} scale={0.2} />
+      <mesh geometry={assets.geo.box} material={mats.skin} position-x={0.02} scale={[0.32, 0.3, 0.12]} />
+      {[0.11, 0.035, -0.04, -0.11].map((y, i) => (
+        <mesh key={y} geometry={assets.geo.box} material={mats.skin} position={[0.24 + (i === 0 || i === 3 ? -0.02 : 0), y, 0]} scale={[0.17, 0.06, 0.1]} />
+      ))}
+      <mesh geometry={assets.geo.box} material={mats.skin} position={[0.08, 0.17, 0.04]} rotation-z={0.7} scale={[0.14, 0.065, 0.1]} />
+    </group>
+  );
+}
+
+function PactFx({ item, assets, clock, onDone }) {
+  const { K, cy, w } = useStage();
+  const left = useRef(null);
+  const right = useRef(null);
+  const tali = useRef(null);
+  const halo = useRef(null);
+  const burst = useRef(null);
+  const flags = useRef({ done: false });
+  const mats = useMaterials(() => {
+    const tex = ofudaTex();
+    return {
+      tex,
+      skin: new THREE.MeshStandardMaterial({ color: '#e9c6a1', roughness: 0.7 }),
+      cuff: new THREE.MeshStandardMaterial({ color: '#f4efe2', roughness: 0.6 }),
+      fromSleeve: new THREE.MeshStandardMaterial({ color: item.fromColor, roughness: 0.6 }),
+      toSleeve: new THREE.MeshStandardMaterial({ color: item.toColor, roughness: 0.6 }),
+      paper: new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, emissive: new THREE.Color('#ffffff'), emissiveIntensity: 0.15 }),
+      halo: additive({ map: assets.tex.glow, color: '#ffffff', opacity: 0 }),
+    };
+  }, [item.fromColor, item.toColor, assets]);
+
+  useFrame(() => {
+    const t = tick(clock);
+    const out = 1 - easeIn(seg(t, item.dur - 0.35, item.dur));
+    // hands slide in from the screen edges, then clasp in the middle
+    const come = easeOut(seg(t, 0, 0.6));
+    const clasp = easeInOut(seg(t, 0.6, 0.82));
+    const gap = K * (0.62 - 0.36 * clasp);
+    const fromX = w / 2 + K;
+    const shake = t > 0.82 && t < 1.25 ? Math.sin((t - 0.82) * 30) * 0.05 * K * (1 - seg(t, 0.82, 1.25)) : 0;
+    const handY = cy - K * 0.25 + shake;
+    const s = Math.max(0.001, K * 1.15 * out);
+    left.current.position.set(-gap - (fromX - gap) * (1 - come), handY, 20);
+    left.current.scale.setScalar(s);
+    left.current.rotation.set(0.25, 0, -0.08);
+    right.current.position.set(gap + (fromX - gap) * (1 - come), handY, 20);
+    // mirrored: reaches along -x
+    right.current.scale.set(-s, s, s);
+    right.current.rotation.set(0.25, 0, 0.08);
+    // the white talisman floats down above the clasp
+    const fall = easeOut(seg(t, 0.45, 1.05));
+    const tl = tali.current;
+    tl.visible = t > 0.45;
+    tl.position.set(0, cy + K * (0.75 + 1.6 * (1 - fall)), 40);
+    tl.rotation.set(0.1 * Math.sin(t * 2.4), 0.25 * Math.sin(t * 1.6) * (1 - fall * 0.6), 0.12 * (1 - fall) + 0.04 * Math.sin(t * 3));
+    const ts = Math.max(0.001, K * out);
+    tl.scale.set(ts * 0.42, ts * 1.18, ts * 0.02);
+    // soft white light behind
+    halo.current.position.set(0, cy + K * 0.3, -30);
+    halo.current.scale.setScalar(K * 4.4 * (0.92 + 0.08 * Math.sin(t * 5)) * out);
+    mats.halo.opacity = 0.8 * seg(t, 0.55, 0.9) * out;
+    burst.current.position.set(0, handY, 30);
+    if (!flags.current.done && t >= item.dur) {
+      flags.current.done = true;
+      onDone();
+    }
+  });
+
+  return (
+    <>
+      <mesh ref={halo} geometry={assets.geo.plane} material={mats.halo} />
+      <group ref={left}>
+        <Hand assets={assets} mats={mats} sleeve={mats.fromSleeve} />
+      </group>
+      <group ref={right}>
+        <Hand assets={assets} mats={mats} sleeve={mats.toSleeve} />
+      </group>
+      <mesh ref={tali} geometry={assets.geo.box} material={[mats.cuff, mats.cuff, mats.cuff, mats.cuff, mats.paper, mats.cuff]} visible={false} />
+      <group ref={burst} scale={K}>
+        <Shockwave clock={clock} assets={assets} start={0.8} dur={0.7} from={0.2} to={2.2} color="#ffffff" />
+        <Shockwave clock={clock} assets={assets} start={0.9} dur={0.6} from={0.2} to={1.5} color="#bfe3ff" thin />
+        <Sparks clock={clock} assets={assets} seed={item.id * 11} start={0.82} dur={0.9} count={30} up={1.3} spread={1.6} size={9} color="#ffffff" />
+      </group>
+    </>
+  );
+}
+
 /* ─── scene ─── */
 
 const EFFECTS = {
@@ -1422,6 +1549,7 @@ const EFFECTS = {
   steal: StealFx,
   devCard: DevCardFx,
   nearWin: NearWinFx,
+  pact: PactFx,
 };
 
 function FirstFrame({ onStart }) {

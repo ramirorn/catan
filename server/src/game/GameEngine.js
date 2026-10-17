@@ -7,7 +7,8 @@ import { Scoring } from './Scoring.js';
 import {
   PHASE, BUILD_COSTS, PLAYER_COLORS, RESOURCE,
   DEV_CARD, BANK_RESOURCE_COUNT, BANK_RESOURCE_COUNT_EXTENDED, MAX_ROADS,
-  VP_TO_WIN, VP_TO_WIN_OPTIONS, TURN_TIME_OPTIONS,
+  VP_TO_WIN, VP_TO_WIN_OPTIONS, TURN_TIME_OPTIONS, sanitizeAvatarId,
+  PEACE_PACT_MS, PEACE_PACT_MAX_CARDS,
 } from './constants.js';
 
 const VALID_RESOURCES = Object.values(RESOURCE);
@@ -66,13 +67,10 @@ export class GameEngine {
     this.endVotes = new Set();
     this.endedByAgreement = false;
 
-    // 5–6 player extension: special building phase after each turn
-    this.specialBuilderId = null; // player who may build right now
-    this.specialBuildQueue = [];  // players still waiting for their special build
-
     // Room settings (chosen by the host before starting)
     this.vpToWin = VP_TO_WIN;
     this.turnTimeLimit = 90;  // seconds per turn, 0 = no limit (default 90 s)
+    this.peacePacts = true;   // «Pacto de paz» house rule (robber bribe)
     // Absolute epoch ms when whoever must act runs out of time. Managed by the
     // socket layer's turn timer (null when no timer is running).
     this.turnDeadline = null;
@@ -95,6 +93,14 @@ export class GameEngine {
     this.recentEvents = [];
     this.eventCounter = 0;
     this.nearWinAnnounced = new Set(); // players already announced at vpToWin - 2
+
+    // «Pacto de paz» of the current robber move (null = none offered yet).
+    // { id, fromId, toId, request: { res: n }, status: 'pending' | 'accepted' |
+    //   'rejected' | 'expired' | 'cancelled', deadline }. Once one exists no
+    // other can be offered until the robber is placed; an accepted one
+    // protects toId (no robber on their hexes, can't be robbed).
+    this.pact = null;
+    this.pactCounter = 0;
   }
 
   // ─── Event feed (animations) ───
@@ -121,7 +127,7 @@ export class GameEngine {
   }
 
   // ─── Room settings (host, before starting) ───
-  updateSettings({ vpToWin, turnTimeLimit } = {}) {
+  updateSettings({ vpToWin, turnTimeLimit, peacePacts } = {}) {
     if (this.phase !== PHASE.LOBBY) {
       return { success: false, error: 'La partida ya comenzó' };
     }
@@ -129,9 +135,13 @@ export class GameEngine {
     const time = turnTimeLimit === undefined ? this.turnTimeLimit : Number(turnTimeLimit);
     if (!VP_TO_WIN_OPTIONS.includes(vp)) return { success: false, error: 'Puntos para ganar no válidos' };
     if (!TURN_TIME_OPTIONS.includes(time)) return { success: false, error: 'Tiempo por turno no válido' };
+    if (peacePacts !== undefined && typeof peacePacts !== 'boolean') {
+      return { success: false, error: 'Opción de pactos de paz no válida' };
+    }
     this.vpToWin = vp;
     this.turnTimeLimit = time;
-    return { success: true, vpToWin: this.vpToWin, turnTimeLimit: this.turnTimeLimit };
+    if (peacePacts !== undefined) this.peacePacts = peacePacts;
+    return { success: true, vpToWin: this.vpToWin, turnTimeLimit: this.turnTimeLimit, peacePacts: this.peacePacts };
   }
 
   isExtended() {
@@ -164,7 +174,7 @@ export class GameEngine {
   }
 
   // ─── Player Management ───
-  addPlayer(id, name) {
+  addPlayer(id, name, avatarId = 0) {
     if (this.phase !== PHASE.LOBBY) return { success: false, error: 'La partida ya comenzó' };
     const maxPlayers = this.boardType === 'extended' ? 6 : 4;
     if (this.players[id]) return { success: false, error: 'Ya estás en esta partida' };
@@ -174,7 +184,7 @@ export class GameEngine {
 
     const index = Object.keys(this.players).length;
     const color = PLAYER_COLORS[index];
-    const player = new Player(id, name, color, index);
+    const player = new Player(id, name, color, index, avatarId);
     this.players[id] = player;
     this.playerOrder.push(id);
 
@@ -196,6 +206,7 @@ export class GameEngine {
     // During game, mark as disconnected
     if (this.players[id]) {
       this.players[id].connected = false;
+      this._pactPlayerGone(id);
     }
     return false;
   }
@@ -223,6 +234,7 @@ export class GameEngine {
     // Their pending trade offer (if any) dies with them
     const active = this.trade.getActiveTrade();
     if (active && active.proposerId === id) this.trade.cancelTrade();
+    this._pactPlayerGone(id, { left: true });
     this._checkEndVotes();
     return true;
   }
@@ -234,6 +246,13 @@ export class GameEngine {
     if (player.left) this.log(`${player.name} volvió a la partida`);
     player.left = false;
     player.connected = true;
+    return true;
+  }
+
+  setAvatar(id, avatarId) {
+    const player = this.players[id];
+    if (!player) return false;
+    player.avatarId = sanitizeAvatarId(avatarId);
     return true;
   }
 
@@ -285,16 +304,20 @@ export class GameEngine {
     return this.playerOrder[this.currentPlayerIndex];
   }
 
-  // Who may act right now: the special builder during the special building
-  // phase, otherwise the player whose turn it is.
+  // Who the game waits on right now: always the player whose turn it is.
+  // Building only happens in your own turn, after rolling the dice.
   getActingPlayerId() {
-    return this.phase === PHASE.SPECIAL_BUILD ? this.specialBuilderId : this.getCurrentPlayerId();
+    return this.getCurrentPlayerId();
+  }
+
+  _mayAct(pid) {
+    return pid === this.getCurrentPlayerId();
   }
 
   // Building (and buying dev cards) is allowed in the main phase of your own
-  // turn, or during your special build.
+  // turn, after rolling the dice.
   _isBuildPhase() {
-    return this.phase === PHASE.MAIN || this.phase === PHASE.SPECIAL_BUILD;
+    return this.phase === PHASE.MAIN;
   }
 
   // ─── Game Start ───
@@ -568,15 +591,34 @@ export class GameEngine {
     if (!this.board.hexes[hexId]) {
       return { success: false, error: 'Casilla no válida' };
     }
+    if (this.pact?.status === 'pending') {
+      return { success: false, error: 'Espera la respuesta a tu pacto de paz' };
+    }
+    if (!this.getRobberHexes().includes(hexId)) {
+      return { success: false, error: 'Esa casilla está protegida por un pacto de paz' };
+    }
+
+    // The pact ends with this robber move: its protection is applied once more
+    // (no steal from the protected player) and then forgotten
+    const protectedId = this._pactProtectedId();
+    this.pact = null;
 
     const fromHex = this.board.robberHex;
     this.board.moveRobber(hexId);
     this._pushEvent('robberMoved', { playerId, fromHex, toHex: hexId });
     this.log(`${this.getCurrentPlayer().name} movió al ladrón`);
 
+    // House rule: hidden in the desert the renegade robs nobody
+    if (this.isDesertHex(hexId)) {
+      this.log('El renegado se esconde en el desierto: no roba a nadie');
+      this.stealTargets = [];
+      this.phase = this.phaseAfterRobber;
+      return { success: true, phase: this.phase, stealTargets: [], desert: true };
+    }
+
     // Check if there are players to steal from
     const adjacentPlayers = this.board.getPlayersAdjacentToHex(hexId)
-      .filter((pid) => pid !== playerId && this.players[pid].totalResources() > 0);
+      .filter((pid) => pid !== playerId && pid !== protectedId && this.players[pid].totalResources() > 0);
 
     if (adjacentPlayers.length === 0) {
       this.phase = this.phaseAfterRobber;
@@ -601,6 +643,149 @@ export class GameEngine {
         id: pid,
         name: this.players[pid].name,
       })),
+    };
+  }
+
+  isDesertHex(hexId) {
+    const hex = this.board?.hexes?.[hexId];
+    return !!hex && (hex.terrain === 'desert' || !hex.resource);
+  }
+
+  // ─── «Pacto de paz» (house rule) ───
+  // While moving the robber (after a 7 or a Knight) the current player may
+  // offer ONE pact to ONE other player: «give me up to 2 cards and I will not
+  // attack you». Accepted: the cards change hands at once and, for this robber
+  // move, the robber can't go on a hex where that player has a building and
+  // they can't be robbed. Rejected / unanswered: the robber moves as usual.
+
+  _pactProtectedId() {
+    return this.pact?.status === 'accepted' ? this.pact.toId : null;
+  }
+
+  _pactPending() {
+    return this.pact?.status === 'pending' ? this.pact : null;
+  }
+
+  // Hexes the robber may be moved to right now (the protection of an accepted
+  // pact applied). If the protected player is on every other hex the robber
+  // may go to a desert, or as a last resort anywhere: the game never stalls.
+  getRobberHexes() {
+    if (!this.board) return [];
+    const all = Object.keys(this.board.hexes).filter((h) => h !== this.board.robberHex);
+    const protectedId = this._pactProtectedId();
+    if (!protectedId) return all;
+    const free = all.filter((h) => !this.board.getPlayersAdjacentToHex(h).includes(protectedId));
+    if (free.length > 0) return free;
+    const deserts = all.filter((h) => this.isDesertHex(h));
+    return deserts.length > 0 ? deserts : all;
+  }
+
+  // Can `pid` be offered a pact right now? Returns an error message or null.
+  _pactTargetError(pid, fromId) {
+    const target = this.players[pid];
+    if (!target || pid === fromId) return 'Elige a otro ninja';
+    if (target.left || target.connected === false) return `${target.name} no está conectado`;
+    if (target.totalResources() < 1) return `${target.name} no tiene cartas`;
+    return null;
+  }
+
+  offerPeacePact(playerId, targetId, request) {
+    if (!this.peacePacts) return { success: false, error: 'Los pactos de paz están desactivados en esta sala' };
+    if (playerId !== this.getCurrentPlayerId()) return { success: false, error: 'No es tu turno' };
+    if (this.phase !== PHASE.ROBBER_MOVE) return { success: false, error: 'Solo puedes ofrecer un pacto al mover el ladrón' };
+    if (this.pact) return { success: false, error: 'Ya ofreciste un pacto en este movimiento del ladrón' };
+    const targetError = this._pactTargetError(targetId, playerId);
+    if (targetError) return { success: false, error: targetError };
+    const clean = this._sanitizeResources(request);
+    const total = clean ? Object.values(clean).reduce((a, b) => a + b, 0) : 0;
+    if (!clean || total < 1) return { success: false, error: 'Pide al menos 1 carta' };
+    if (total > PEACE_PACT_MAX_CARDS) return { success: false, error: `Puedes pedir como máximo ${PEACE_PACT_MAX_CARDS} cartas` };
+    const target = this.players[targetId];
+    if (total > target.totalResources()) return { success: false, error: `${target.name} no tiene tantas cartas` };
+
+    this.pactCounter++;
+    this.pact = {
+      id: this.pactCounter,
+      fromId: playerId,
+      toId: targetId,
+      request: clean,
+      status: 'pending',
+      deadline: Date.now() + PEACE_PACT_MS,
+    };
+    this.log(`${this.players[playerId].name} ofrece un pacto de paz a ${target.name}`);
+    return { success: true, pactId: this.pact.id };
+  }
+
+  respondPeacePact(playerId, accept) {
+    const pact = this._pactPending();
+    if (!pact || this.phase !== PHASE.ROBBER_MOVE) return { success: false, error: 'No hay ningún pacto pendiente' };
+    if (pact.toId !== playerId) return { success: false, error: 'Ese pacto no es para ti' };
+    const from = this.players[pact.fromId];
+    const to = this.players[pact.toId];
+    if (!accept) {
+      this._endPact('rejected');
+      return { success: true, status: 'rejected' };
+    }
+    if (!to.hasResources(pact.request)) {
+      return { success: false, error: `No tienes las cartas que te pide (${this._formatResources(pact.request)})` };
+    }
+    for (const [res, n] of Object.entries(pact.request)) {
+      to.resources[res] -= n;
+      from.addResource(res, n);
+    }
+    pact.status = 'accepted';
+    pact.deadline = null;
+    this.log(`${from.name} y ${to.name} firmaron un pacto de paz (${this._formatResources(pact.request)})`);
+    // Public: who and whom, never the cards
+    this._pushEvent('peacePact', { fromId: pact.fromId, toId: pact.toId });
+    return { success: true, status: 'accepted' };
+  }
+
+  // The mover takes the offer back: no other pact this robber move
+  cancelPeacePact(playerId) {
+    const pact = this._pactPending();
+    if (!pact) return { success: false, error: 'No hay ningún pacto pendiente' };
+    if (pact.fromId !== playerId) return { success: false, error: 'Solo quien ofreció el pacto puede retirarlo' };
+    this._endPact('cancelled');
+    return { success: true };
+  }
+
+  _endPact(status) {
+    const pact = this._pactPending();
+    if (!pact) return;
+    pact.status = status;
+    pact.deadline = null;
+    const from = this.players[pact.fromId]?.name || 'Un ninja';
+    const to = this.players[pact.toId]?.name || 'un ninja';
+    if (status === 'rejected') this.log(`${to} rechazó el pacto de paz de ${from}`);
+    else if (status === 'expired') this.log(`${to} no respondió al pacto de paz de ${from}`);
+    else if (status === 'cancelled') this.log(`${from} retiró su pacto de paz`);
+  }
+
+  // A player left / disconnected: a pact offered to them is rejected at once.
+  // A mover who left has their pending offer withdrawn (the server moves the
+  // robber for them); one who only lost the connection keeps it. A signed pact
+  // always holds until the robber is placed (the cards were already paid).
+  _pactPlayerGone(id, { left = false } = {}) {
+    const pact = this._pactPending();
+    if (!pact) return;
+    if (pact.toId === id) this._endPact('rejected');
+    else if (pact.fromId === id && left) this._endPact('cancelled');
+  }
+
+  // What a viewer may know: the cards asked for only for the two players
+  // involved (and for everyone once the pact is signed: the chronicle says it)
+  _serializePact(forPlayerId) {
+    const p = this.pact;
+    if (!p) return null;
+    const involved = forPlayerId && (forPlayerId === p.fromId || forPlayerId === p.toId);
+    return {
+      id: p.id,
+      fromId: p.fromId,
+      toId: p.toId,
+      status: p.status,
+      deadline: p.deadline,
+      request: involved || p.status === 'accepted' ? p.request : null,
     };
   }
 
@@ -649,7 +834,7 @@ export class GameEngine {
 
   // ─── Building Actions (Main Phase) ───
   buildRoad(playerId, edgeId) {
-    if (playerId !== this.getActingPlayerId()) {
+    if (!this._mayAct(playerId)) {
       return { success: false, error: 'No es tu turno' };
     }
     // Free roads from Road Building can also be laid before rolling
@@ -709,7 +894,7 @@ export class GameEngine {
   }
 
   buildSettlement(playerId, vertexId) {
-    if (playerId !== this.getActingPlayerId()) {
+    if (!this._mayAct(playerId)) {
       return { success: false, error: 'No es tu turno' };
     }
     if (!this._isBuildPhase()) {
@@ -745,7 +930,7 @@ export class GameEngine {
   }
 
   buildCity(playerId, vertexId) {
-    if (playerId !== this.getActingPlayerId()) {
+    if (!this._mayAct(playerId)) {
       return { success: false, error: 'No es tu turno' };
     }
     if (!this._isBuildPhase()) {
@@ -782,7 +967,7 @@ export class GameEngine {
 
   // ─── Development Cards ───
   buyDevCard(playerId) {
-    if (playerId !== this.getActingPlayerId()) {
+    if (!this._mayAct(playerId)) {
       return { success: false, error: 'No es tu turno' };
     }
     if (!this._isBuildPhase()) {
@@ -802,9 +987,6 @@ export class GameEngine {
   }
 
   playDevCard(playerId, cardType, params = {}) {
-    if (this.phase === PHASE.SPECIAL_BUILD) {
-      return { success: false, error: 'No se pueden jugar cartas en la fase especial de construcción' };
-    }
     if (playerId !== this.getCurrentPlayerId()) {
       return { success: false, error: 'No es tu turno' };
     }
@@ -881,9 +1063,6 @@ export class GameEngine {
 
   // ─── Trading ───
   bankTrade(playerId, give, receive) {
-    if (this.phase === PHASE.SPECIAL_BUILD) {
-      return { success: false, error: 'No se puede comerciar en la fase especial de construcción' };
-    }
     if (playerId !== this.getCurrentPlayerId()) {
       return { success: false, error: 'No es tu turno' };
     }
@@ -916,9 +1095,6 @@ export class GameEngine {
   }
 
   proposeTrade(playerId, offering, requesting) {
-    if (this.phase === PHASE.SPECIAL_BUILD) {
-      return { success: false, error: 'No se puede comerciar en la fase especial de construcción' };
-    }
     if (playerId !== this.getCurrentPlayerId()) {
       return { success: false, error: 'No es tu turno' };
     }
@@ -1050,10 +1226,6 @@ export class GameEngine {
     if (expectPhase && expectPhase !== this.phase) {
       return { success: false, error: 'La fase ya cambió; revisa el tablero' };
     }
-    // During the special building phase "ending the turn" means passing
-    if (this.phase === PHASE.SPECIAL_BUILD) {
-      return this.passSpecialBuild(playerId);
-    }
     if (playerId !== this.getCurrentPlayerId()) {
       return { success: false, error: 'No es tu turno' };
     }
@@ -1070,68 +1242,31 @@ export class GameEngine {
     player.hasPlayedDevCardThisTurn = false;
     this.freeRoadsRemaining = 0;
 
-    // 5–6 player extension: special building phase. Only the OTHER players
-    // build, in turn order, and never the one whose turn comes next: that
-    // player builds in their own turn right after, which always begins by
-    // rolling the dice. Players who left or are offline are skipped.
-    if (this.isExtended()) {
-      this.specialBuildQueue = this._specialBuildOrder();
-      if (this.specialBuildQueue.length > 0) {
-        this.phase = PHASE.SPECIAL_BUILD;
-        this.log('Fase especial de construcción: los demás ninjas pueden construir por orden.');
-        this._nextSpecialBuilder();
-        return { success: true, phase: this.phase, specialBuilderId: this.specialBuilderId };
-      }
-    }
-
     return this._startNextTurn();
   }
 
-  // ─── Special Building Phase (5–6 player extension) ───
-  passSpecialBuild(playerId) {
-    if (this.phase !== PHASE.SPECIAL_BUILD) {
-      return { success: false, error: 'No hay fase especial de construcción' };
-    }
-    if (playerId !== this.specialBuilderId) {
-      return { success: false, error: 'No es tu turno de construcción' };
-    }
-    const player = this.players[playerId];
-    // Cards bought now can be played from this player's next turn on
-    player.devCardBoughtThisTurn = [];
-    this.log(`${player.name} terminó su construcción especial`);
-
-    if (this.specialBuildQueue.length > 0) {
-      this._nextSpecialBuilder();
-      return { success: true, phase: this.phase, specialBuilderId: this.specialBuilderId };
-    }
-    return this._startNextTurn();
+  // Time for whoever acts now
+  // (a pending peace pact is always timed, even in rooms without a turn limit)
+  getTimerLimitMs() {
+    const pact = this.phase === PHASE.ROBBER_MOVE ? this._pactPending() : null;
+    if (pact) return Math.max(1, pact.deadline - Date.now());
+    return (this.turnTimeLimit || 0) * 1000;
   }
 
-  // Players after the next one, ending with the one before the current player
-  _specialBuildOrder() {
-    const n = this.playerOrder.length;
-    const order = [];
-    for (let i = 2; i < n; i++) {
-      const pid = this.playerOrder[(this.currentPlayerIndex + i) % n];
-      const p = this.players[pid];
-      if (p && !p.left && p.connected !== false) order.push(pid);
-    }
-    return order;
-  }
-
-  _nextSpecialBuilder() {
-    this.specialBuilderId = this.specialBuildQueue.shift();
-    this.log(`Construcción especial: turno de ${this.players[this.specialBuilderId].name}`);
+  // While a peace pact waits for an answer the turn timer of the robber mover
+  // is paused (the socket layer keeps what is left and resumes it afterwards)
+  getPausedTimerKey() {
+    if (this.phase !== PHASE.ROBBER_MOVE || !this._pactPending()) return null;
+    return `turn:${this.turnNumber}:${this.getCurrentPlayerId()}`;
   }
 
   _startNextTurn() {
-    this.specialBuilderId = null;
-    this.specialBuildQueue = [];
-
     // Advance to next player
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.playerOrder.length;
     this.turnNumber++;
     this.phase = PHASE.ROLL_DICE;
+    this.pact = null;
+    this.stealTargets = [];
 
     this.log(`Ronda ${this.turnNumber}: turno de ${this.getCurrentPlayer().name}. ¡A tirar los dados!`);
 
@@ -1151,6 +1286,7 @@ export class GameEngine {
 
   _setGameOver() {
     this.phase = PHASE.GAME_OVER;
+    this.pact = null;
     if (!this.endedAt) this.endedAt = Date.now();
   }
 
@@ -1184,8 +1320,6 @@ export class GameEngine {
       this._setGameOver();
       this.endedByAgreement = true;
       this.freeRoadsRemaining = 0;
-      this.specialBuilderId = null;
-      this.specialBuildQueue = [];
       this.trade.cancelTrade();
       this.log('La partida terminó por acuerdo unánime.');
     }
@@ -1202,11 +1336,11 @@ export class GameEngine {
         return `setup:${this.phase}:${this.currentPlayerIndex}`;
       case PHASE.ROBBER_DISCARD:
         return `discard:${this.turnNumber}`;
-      case PHASE.SPECIAL_BUILD:
-        return `special:${this.turnNumber}:${this.specialBuilderId}`;
+      case PHASE.ROBBER_MOVE:
+        if (this._pactPending()) return `pact:${this.turnNumber}:${this.pact.id}`;
+        return `turn:${this.turnNumber}:${this.getCurrentPlayerId()}`;
       case PHASE.ROLL_DICE:
       case PHASE.MAIN:
-      case PHASE.ROBBER_MOVE:
       case PHASE.ROBBER_STEAL:
         return `turn:${this.turnNumber}:${this.getCurrentPlayerId()}`;
       default:
@@ -1248,16 +1382,16 @@ export class GameEngine {
         return { success: true };
       }
 
-      case PHASE.SPECIAL_BUILD: {
-        const pid = this.specialBuilderId;
-        note(`Se acabó el tiempo de ${this.players[pid]?.name || 'un ninja'} (construcción especial).`);
-        return this.passSpecialBuild(pid);
-      }
-
       case PHASE.ROLL_DICE:
       case PHASE.MAIN:
       case PHASE.ROBBER_MOVE:
       case PHASE.ROBBER_STEAL: {
+        // A peace pact nobody answered: it counts as rejected, and the robber
+        // mover gets their (paused) turn time back
+        if (this.phase === PHASE.ROBBER_MOVE && this._pactPending()) {
+          this._endPact('expired');
+          return { success: true, pactExpired: true };
+        }
         const pid = this.getCurrentPlayerId();
         note(`Se acabó el tiempo de ${this.players[pid].name}.`);
         // Remembered so that, if this turn needs the player again later (e.g. the
@@ -1271,8 +1405,9 @@ export class GameEngine {
           if (this.phase === PHASE.ROLL_DICE) {
             this.rollDice(pid);
           } else if (this.phase === PHASE.ROBBER_MOVE) {
-            const hexes = Object.keys(this.board.hexes).filter((h) => h !== this.board.robberHex);
-            this.moveRobber(pid, pick(hexes));
+            if (this._pactPending()) this._endPact('expired');
+            // Only legal hexes (an accepted peace pact protects its player)
+            this.moveRobber(pid, pick(this.getRobberHexes()));
           } else if (this.phase === PHASE.ROBBER_STEAL) {
             this.stealCard(pid, pick(this.stealTargets));
           } else if (this.phase === PHASE.MAIN) {
@@ -1309,9 +1444,6 @@ export class GameEngine {
   // ─── Win Check ───
   _checkWin() {
     if (this.winner) return this.winner;
-    // Nobody wins during a special build: a player who reaches 10 VP then
-    // wins as soon as their own turn starts.
-    if (this.phase === PHASE.SPECIAL_BUILD) return null;
     const winner = this.scoring.checkWinner(this.players, this.getCurrentPlayerId(), this.vpToWin);
     if (winner) {
       this._setGameOver();
@@ -1332,9 +1464,7 @@ export class GameEngine {
   getValidPlacements(playerId) {
     const isSetup = this.phase === PHASE.SETUP_FORWARD || this.phase === PHASE.SETUP_REVERSE;
     const player = this.players[playerId];
-    // Main phase, or this player's own special build
-    const canBuild = this.phase === PHASE.MAIN ||
-      (this.phase === PHASE.SPECIAL_BUILD && playerId === this.specialBuilderId);
+    const canBuild = this.phase === PHASE.MAIN;
 
     const validSettlements = [];
     const validCities = [];
@@ -1438,10 +1568,10 @@ export class GameEngine {
       devCardsRemaining: this.devCards ? this.devCards.cardsRemaining() : 0,
       activeTrade: this.trade.getActiveTrade(),
       freeRoadsRemaining: this.freeRoadsRemaining,
-      specialBuilderId: this.specialBuilderId,
-      specialBuildQueue: this.specialBuildQueue,
       vpToWin: this.vpToWin,
       turnTimeLimit: this.turnTimeLimit,
+      peacePacts: this.peacePacts,
+      peacePact: this._serializePact(forPlayerId),
       turnDeadline: this.turnDeadline,
       startedAt: this.startedAt,
       endedAt: this.endedAt,
@@ -1463,6 +1593,10 @@ export class GameEngine {
 
     if (this.phase === PHASE.ROBBER_STEAL) {
       state.stealTargets = this.stealTargets;
+    }
+    // Where the robber may go (public: a signed pact's protection is public)
+    if (this.phase === PHASE.ROBBER_MOVE && this.board) {
+      state.robberHexes = this.getRobberHexes();
     }
 
     // Add robber discard info

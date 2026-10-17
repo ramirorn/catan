@@ -113,7 +113,7 @@ function PanelBody({ className = '' }) {
 
       <div className="border-t border-ink/30 phland:border-t-0 phland:border-l">
         <div className="flex items-baseline justify-between gap-2 px-2 pt-2 pb-1">
-          <span className="label-caps !text-[9.5px] !tracking-[0.12em]">Cartas de progreso</span>
+          <span className="label-caps !text-[9.5px] !tracking-[0.12em]">Cartas de desarrollo</span>
           <span className="text-[10px] text-ink-faint shrink-0">{deckTotal} en el mazo</span>
         </div>
         <ul>
@@ -138,7 +138,7 @@ function PanelBody({ className = '' }) {
   );
 }
 
-/** Desktop / tablet: collapsible card pinned under the phase banner */
+/** Desktop / tablet: collapsible card in the bottom-left corner that opens upward */
 function DeskCard() {
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const toggle = () => {
@@ -148,7 +148,7 @@ function DeskCard() {
     });
   };
   return (
-    <div className="cost-panel-desk absolute left-3 top-[4.25rem] z-10 w-[14.5rem] max-h-[calc(100%-5.5rem)] flex flex-col paper border border-ink/70 rounded-[2px] shadow-[0_6px_14px_-4px_rgba(0,0,0,0.7)] overflow-hidden">
+    <div className="cost-panel-desk absolute left-3 bottom-3 z-10 w-[14.5rem] max-h-[calc(100%-5.5rem)] flex flex-col-reverse paper border border-ink/70 rounded-[2px] shadow-[0_6px_14px_-4px_rgba(0,0,0,0.7)] overflow-hidden">
       <button
         type="button"
         onClick={toggle}
@@ -158,10 +158,11 @@ function DeskCard() {
       >
         <SettlementIcon className="w-3.5 h-3.5 text-shu shrink-0" />
         <span className="label-caps !text-[10px] !text-ink flex-1">Costes</span>
-        <ChevronDownIcon className={`w-3.5 h-3.5 text-ink-soft transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+        {/* Points up while folded (it unfolds upward), down once open */}
+        <ChevronDownIcon className={`w-3.5 h-3.5 text-ink-soft transition-transform ${collapsed ? 'rotate-180' : ''}`} />
       </button>
       {!collapsed && (
-        <div className="min-h-0 overflow-y-auto overscroll-contain border-t border-ink/30">
+        <div className="min-h-0 overflow-y-auto overscroll-contain border-b border-ink/30">
           <PanelBody />
         </div>
       )}

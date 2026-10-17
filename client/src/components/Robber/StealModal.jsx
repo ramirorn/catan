@@ -1,7 +1,7 @@
 import { useGame } from '../../context/GameContext';
 import { Modal } from '../Shared/Modal';
-import { pieceColor } from '../../utils/theme';
-import { RobberIcon, SettlementIcon, CardsIcon } from '../Shared/Icons';
+import { RobberIcon, CardsIcon } from '../Shared/Icons';
+import { PlayerAvatar } from '../Shared/Avatar';
 import { useStageReady } from '../Effects/fxSignal';
 
 export function StealModal({ isOpen: wantOpen, onClose }) {
@@ -36,12 +36,7 @@ export function StealModal({ isOpen: wantOpen, onClose }) {
                 className="w-full min-h-[52px] flex items-center justify-between gap-2 min-[360px]:gap-3 py-2.5 px-1 hover:bg-ink/5 transition-colors cursor-pointer group"
               >
                 <span className="flex items-center gap-3 min-w-0">
-                  <span
-                    className="w-7 h-7 rounded-[3px] flex items-center justify-center shrink-0 shadow-[inset_0_-2px_0_rgba(0,0,0,0.25)]"
-                    style={{ backgroundColor: pieceColor(player.color) }}
-                  >
-                    <SettlementIcon className="w-4 h-4 text-paper-light" />
-                  </span>
+                  <PlayerAvatar player={player} size={34} />
                   <span className="font-bold text-[15px] text-ink truncate">{player.name}</span>
                 </span>
                 <span className="flex items-center gap-2 min-[360px]:gap-3 shrink-0">

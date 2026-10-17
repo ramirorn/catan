@@ -2,6 +2,7 @@
 // Both the 2D and the 3D board show exactly what these return.
 
 import { RESOURCE_NAMES } from '../../utils/constants';
+import { pactProtectedId } from './boardActions';
 
 export const TERRAIN_NAMES = {
   forest: 'Bosque',
@@ -64,6 +65,11 @@ export function hexInfo(gameState, hexId) {
     robber: !!hex.hasRobber,
     desert,
     collectors: [...byPlayer.values()].sort((a, b) => b.amount - a.amount),
+    // A signed peace pact keeps the robber away from its player's hexes
+    pactProtected: (() => {
+      const pid = pactProtectedId(gameState);
+      return pid && byPlayer.has(pid) ? playerRef(gameState, pid) : null;
+    })(),
   };
 }
 

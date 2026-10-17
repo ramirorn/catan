@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { pieceColor } from '../../utils/theme';
-import { SettlementIcon, CrownIcon, CopyIcon, HourglassIcon, EyeIcon, ExitIcon } from '../Shared/Icons';
+import { CrownIcon, CopyIcon, HourglassIcon, EyeIcon, ExitIcon } from '../Shared/Icons';
 import { ConfirmDialog } from '../Shared/ConfirmDialog';
 import { ScrollPanel } from '../Shared/ScrollPanel';
 import { BrandPlate } from '../Shared/Brand';
 import { RoomRules } from './RoomRules';
+import { PlayerAvatar } from '../Shared/Avatar';
+import { AvatarPicker } from '../Shared/AvatarPicker';
+import { SPECTATOR_RING } from '../../utils/avatars';
 
 export function WaitingRoom() {
   const {
     gameState, myPlayerId, startGame, addToast, updateRoomSettings,
     hostId, isHost, isSpectator, spectators, leaveRoom, kickPlayer,
+    avatarId, setAvatarId,
   } = useGame();
   const [confirm, setConfirm] = useState(null); // { kind: 'leave' } | { kind: 'kick', id, name }
 
@@ -65,6 +69,7 @@ export function WaitingRoom() {
             readOnly={!isHost}
             vpToWin={gameState.vpToWin}
             turnTimeLimit={gameState.turnTimeLimit}
+            peacePacts={gameState.peacePacts !== false}
             onChange={updateRoomSettings}
           />
           </div>
@@ -87,12 +92,11 @@ export function WaitingRoom() {
                 return (
                   <li key={p.id} className="flex items-center justify-between gap-3 py-2 short:py-1.5 phland:py-1.5 border-b border-ink/15">
                     <div className="flex items-center gap-3 min-w-0">
-                      <span
-                        className="w-7 h-7 rounded-[3px] flex items-center justify-center shrink-0 shadow-[inset_0_-2px_0_rgba(0,0,0,0.25)]"
-                        style={{ backgroundColor: pieceColor(p.color) }}
-                      >
-                        <SettlementIcon className="w-4.5 h-4.5 text-paper-light" />
-                      </span>
+                      {isMe ? (
+                        <AvatarPicker value={avatarId} onChange={setAvatarId} ring={pieceColor(p.color)} size={30} />
+                      ) : (
+                        <PlayerAvatar player={p} size={30} />
+                      )}
                       <span className="text-[15px] font-bold text-ink truncate">
                         {p.name}
                         {isMe && <span className="ml-1.5 font-normal italic text-ink-faint text-[13px]">(tú)</span>}
@@ -121,7 +125,7 @@ export function WaitingRoom() {
               })}
               {Array.from({ length: emptySlots }, (_, i) => (
                 <li key={`empty-${i}`} className="flex items-center gap-3 py-2 short:py-1.5 phland:py-1.5 border-b border-ink/15">
-                  <span className="w-7 h-7 rounded-[3px] border border-dashed border-ink/30 shrink-0" />
+                  <span className="w-[30px] h-[30px] rounded-full border border-dashed border-ink/30 shrink-0" />
                   <span className="text-[14px] italic text-ink-faint">Plaza libre</span>
                 </li>
               ))}
@@ -139,9 +143,14 @@ export function WaitingRoom() {
                 <ul className="border-t border-ink/15 max-h-28 overflow-y-auto">
                   {spectators.map((sp) => (
                     <li key={sp.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-ink/15">
-                      <span className="text-[14px] text-ink truncate">
-                        {sp.name}
-                        {sp.id === myPlayerId && <span className="ml-1.5 italic text-ink-faint text-[13px]">(tú)</span>}
+                      <span className="flex items-center gap-2 min-w-0 text-[14px] text-ink">
+                        {sp.id === myPlayerId ? (
+                          <AvatarPicker value={avatarId} onChange={setAvatarId} ring={SPECTATOR_RING} size={24} />
+                        ) : (
+                          <PlayerAvatar player={sp} size={24} spectator />
+                        )}
+                        <span className="truncate">{sp.name}</span>
+                        {sp.id === myPlayerId && <span className="shrink-0 italic text-ink-faint text-[13px]">(tú)</span>}
                       </span>
                       {isHost && (
                         <button

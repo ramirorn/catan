@@ -8,15 +8,16 @@ import { RoomRules } from './RoomRules';
 import { InstallAppButton } from '../Shared/Pwa';
 import { DEFAULT_VP_TO_WIN } from '../../utils/constants';
 import { EyeIcon } from '../Shared/Icons';
+import { AvatarPicker } from '../Shared/AvatarPicker';
 
 export function LobbyScreen() {
-  const { createRoom, joinRoom, spectateRoom, playerName, setPlayerName } = useGame();
+  const { createRoom, joinRoom, spectateRoom, playerName, setPlayerName, avatarId, setAvatarId } = useGame();
   const { socket, connected } = useSocket();
   const [tab, setTab] = useState('create');
   const [name, setName] = useState(playerName);
   const [roomCode, setRoomCode] = useState('');
   const [boardType, setBoardType] = useState('standard');
-  const [rules, setRules] = useState({ vpToWin: DEFAULT_VP_TO_WIN, turnTimeLimit: 90 });
+  const [rules, setRules] = useState({ vpToWin: DEFAULT_VP_TO_WIN, turnTimeLimit: 90, peacePacts: true });
   const [publicRooms, setPublicRooms] = useState([]);
   // Rooms that can be joined (waiting with a free seat) or watched (any not finished)
   const openRooms = publicRooms.filter((r) => r.phase !== 'gameOver');
@@ -123,21 +124,24 @@ export function LobbyScreen() {
           <form onSubmit={tab === 'create' ? handleCreate : (e) => handleJoin(e)} className="space-y-5 short:space-y-3.5 tiny:space-y-3 phland:space-y-3">
             <div>
               <label htmlFor="lobby-name" className="label-caps block mb-1.5">
-                Nombre del ninja
+                Nombre y avatar del ninja
               </label>
-              <input
-                id="lobby-name"
-                type="text"
-                className="field"
-                placeholder="ej. Kaito, Sombra del Este…"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setPlayerName(e.target.value);
-                }}
-                maxLength={20}
-                required
-              />
+              <div className="flex items-center gap-2.5">
+                <AvatarPicker value={avatarId} onChange={setAvatarId} size={42} />
+                <input
+                  id="lobby-name"
+                  type="text"
+                  className="field"
+                  placeholder="ej. Kaito, Sombra del Este…"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setPlayerName(e.target.value);
+                  }}
+                  maxLength={20}
+                  required
+                />
+              </div>
             </div>
 
             {tab === 'create' ? (
@@ -181,6 +185,7 @@ export function LobbyScreen() {
                     idPrefix="create"
                     vpToWin={rules.vpToWin}
                     turnTimeLimit={rules.turnTimeLimit}
+                    peacePacts={rules.peacePacts}
                     onChange={(change) => setRules((prev) => ({ ...prev, ...change }))}
                   />
                 </div>

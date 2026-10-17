@@ -13,7 +13,7 @@ import { ResourceBundle, ResourceChip } from '../Shared/ResourceCard';
 import { SegmentedControl } from '../Shared/Choice';
 
 export function DevCardModal({ isOpen, onClose }) {
-  const { gameState, myPlayer, isMyTurn, isSpecialBuild, isMySpecialBuild, buyDevCard, playDevCard } = useGame();
+  const { gameState, myPlayer, isMyTurn, buyDevCard, playDevCard } = useGame();
 
   const [selectedCard, setSelectedCard] = useState(null);
   
@@ -36,9 +36,9 @@ export function DevCardModal({ isOpen, onClose }) {
   const cardsInHand = myPlayer?.devCards || [];
   const boughtThisTurn = myPlayer?.devCardBoughtThisTurn || [];
   const alreadyPlayedCard = myPlayer?.hasPlayedDevCardThisTurn;
-  // Buying: my main phase or my special build. Playing: never during a special build.
-  const canBuyNow = (isMyTurn && gameState?.phase === 'main') || isMySpecialBuild;
-  const canPlayNow = isMyTurn && !isSpecialBuild;
+  // Buying: my main phase (after rolling). Playing: any time in my turn.
+  const canBuyNow = isMyTurn && gameState?.phase === 'main';
+  const canPlayNow = isMyTurn;
 
   const handlePlay = (cardType) => {
     if (!canPlayNow || alreadyPlayedCard) return;

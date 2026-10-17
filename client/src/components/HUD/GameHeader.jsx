@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { useSocket } from '../../context/SocketContext';
 import { pieceColor } from '../../utils/theme';
-import { SettlementIcon, FlagIcon, HourglassIcon, EyeIcon, MenuIcon } from '../Shared/Icons';
+import { FlagIcon, HourglassIcon, EyeIcon, MenuIcon } from '../Shared/Icons';
 import { formatDuration, useGameElapsed } from '../../utils/gameClock';
 import { BrandPlate } from '../Shared/Brand';
+import { Avatar } from '../Shared/Avatar';
 
 // Seconds left until the server's turn deadline (null when there is no limit)
 function useCountdown(deadline, serverOffset) {
@@ -31,7 +32,7 @@ function formatSeconds(total) {
 
 export function GameHeader() {
   const {
-    gameState, myPlayerId, isMyTurn, isSpecialBuild, isMySpecialBuild, setActiveModal, serverOffset,
+    gameState, myPlayerId, isMyTurn, setActiveModal, serverOffset,
     isSpectator, spectators,
   } = useGame();
   const elapsed = useGameElapsed(gameState?.startedAt, gameState?.endedAt, serverOffset);
@@ -45,13 +46,9 @@ export function GameHeader() {
   const { connected } = useSocket();
 
   const currentTurnPlayer = gameState?.players?.[gameState.currentPlayerId];
-  // During the special building phase the pill shows who is building
-  const specialBuilder = isSpecialBuild ? gameState?.players?.[gameState.specialBuilderId] : null;
-  const pillPlayer = specialBuilder || currentTurnPlayer;
-  const pillMine = isSpecialBuild ? isMySpecialBuild : isMyTurn;
-  const pillText = isSpecialBuild
-    ? (isMySpecialBuild ? 'Tu construcción especial' : `Construye ${specialBuilder?.name || ''}`)
-    : (isMyTurn ? 'Tu turno' : `Turno de ${currentTurnPlayer?.name}`);
+  const pillPlayer = currentTurnPlayer;
+  const pillMine = isMyTurn;
+  const pillText = isMyTurn ? 'Tu turno' : `Turno de ${currentTurnPlayer?.name}`;
 
   const turnColor = pieceColor(pillPlayer?.color);
 
@@ -102,21 +99,13 @@ export function GameHeader() {
       <div className="flex items-center justify-end gap-1.5 min-[360px]:gap-2 sm:gap-3 min-w-0">
         {pillPlayer && (
           <div
-            title={isSpecialBuild ? 'Fase especial de construcción' : undefined}
             className={`flex items-center gap-1.5 min-[360px]:gap-2 pl-1 pr-2.5 min-[360px]:pr-3 py-1 phland:py-0.5 rounded-full border min-w-0 transition-colors ${
               pillMine
                 ? 'pill-mine bg-gradient-to-b from-chakra-light to-chakra text-ink border-paper-light'
                 : 'bg-black/30 text-paper/85 border-paper/15'
             }`}
           >
-            <span
-              className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 shadow-[inset_0_-2px_0_rgba(0,0,0,0.3)] ring-1 ${
-                pillMine ? 'ring-ink/70' : 'ring-black/40'
-              }`}
-              style={{ backgroundColor: turnColor }}
-            >
-              <SettlementIcon className="w-3.5 h-3.5 text-paper-light" />
-            </span>
+            <Avatar id={pillPlayer.avatarId} size={26} ring={turnColor} className="phland:!w-[22px] phland:!h-[22px]" />
             <span className={`text-[13px] truncate ${pillMine ? 'font-extrabold sm:uppercase sm:tracking-[0.06em]' : 'font-bold'}`}>
               {pillText}
             </span>

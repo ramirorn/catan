@@ -1,11 +1,18 @@
 import { createTurnTimers } from './turnTimer.js';
+import { sanitizeAvatarId } from '../game/constants.js';
 
 const CHAT_HISTORY_LIMIT = 200;
-const CHAT_MAX_LENGTH = 500;
-const CHAT_RATE_COUNT = 5;       // at most 5 messages…
+const CHAT_MAX_LENGTH = 150;
+const CHAT_RATE_COUNT = 3;       // at most 3 messages…
 const CHAT_RATE_WINDOW = 5000;   // …every 5 seconds per player
+const CHAT_MUTE_MS = 10000;      // flooding past the limit mutes for 10 s
+const CHAT_REPEAT_MS = 15000;    // the same message again within 15 s is spam
+const CHAT_MAX_RUN = 5;          // "aaaaaaaa" → "aaaaa"
+const CHAT_RUN_RE = /(.)\1{5,}/gu; // a character repeated more than CHAT_MAX_RUN times
 
 export const MAX_SPECTATORS = 20;
+// setAvatar re-sends the room state: one change per socket every 300 ms at most
+const AVATAR_MIN_INTERVAL_MS = 300;
 // A spectator who closes the page keeps their place this long (page reloads)
 const SPECTATOR_GRACE_MS = 2 * 60 * 1000;
 // A game in progress with nobody connected is closed after this long
@@ -48,7 +55,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
   function spectatorList(room) {
     return Object.values(room.spectators)
       .filter((s) => s.connected)
-      .map((s) => ({ id: s.id, name: s.name }));
+      .map((s) => ({ id: s.id, name: s.name, avatarId: s.avatarId }));
   }
 
   // Room-level data added to every state (not part of the game engine)
@@ -283,7 +290,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
     }
 
     // ─── Lobby: Create Room ───
-    on('createRoom', ({ playerName, boardType, vpToWin, turnTimeLimit }, cb) => {
+    on('createRoom', ({ playerName, boardType, vpToWin, turnTimeLimit, peacePacts, avatarId }, cb) => {
       const name = String(playerName || '').trim().slice(0, 24);
       if (!name) return cb({ success: false, error: 'Escribe tu nombre' });
       if (playerToRoom[playerId] && lobbyManager.getRoom(playerToRoom[playerId])) {
@@ -291,9 +298,10 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
       }
       stopSpectating();
       const type = boardType === 'extended' ? 'extended' : 'standard';
-      const { roomId, engine } = lobbyManager.createRoom(playerId, name, type);
+      const { roomId, engine } = lobbyManager.createRoom(playerId, name, type, sanitizeAvatarId(avatarId));
       // Optional settings; invalid values keep the defaults
       engine.updateSettings({ vpToWin, turnTimeLimit });
+      if (typeof peacePacts === 'boolean') engine.updateSettings({ peacePacts });
       socket.join(roomId);
       playerToRoom[playerId] = roomId;
 
@@ -302,7 +310,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
     });
 
     // ─── Lobby: Join Room ───
-    on('joinRoom', ({ roomId, playerName }, cb) => {
+    on('joinRoom', ({ roomId, playerName, avatarId }, cb) => {
       const name = String(playerName || '').trim().slice(0, 24);
       if (!name) return cb({ success: false, error: 'Escribe tu nombre' });
       const room = lobbyManager.getRoom(String(roomId || '').trim().toUpperCase());
@@ -320,8 +328,9 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
       const seat = room.engine.players[playerId];
       if (seat && room.engine.phase !== 'lobby') {
         if (!room.engine.rejoinPlayer(playerId)) return cb({ success: false, error: BANNED_MESSAGE });
+        if (avatarId !== undefined) room.engine.setAvatar(playerId, avatarId);
       } else {
-        const result = room.engine.addPlayer(playerId, name);
+        const result = room.engine.addPlayer(playerId, name, sanitizeAvatarId(avatarId));
         if (!result.success) {
           if (room.engine.phase !== 'lobby') {
             return cb({ success: false, error: 'La partida ya comenzó; puedes entrar como espectador' });
@@ -343,7 +352,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
     });
 
     // ─── Lobby: Watch a room (waiting or in progress) ───
-    on('spectateRoom', ({ roomId, playerName }, cb) => {
+    on('spectateRoom', ({ roomId, playerName, avatarId }, cb) => {
       const name = String(playerName || '').trim().slice(0, 24);
       if (!name) return cb({ success: false, error: 'Escribe tu nombre' });
       const room = lobbyManager.getRoom(String(roomId || '').trim().toUpperCase());
@@ -362,12 +371,13 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
           return cb({ success: false, error: `La sala ya tiene ${MAX_SPECTATORS} espectadores` });
         }
         if (spectatorToRoom[playerId] && spectatorToRoom[playerId] !== id) stopSpectating();
-        room.spectators[playerId] = { id: playerId, name, connected: true, removeTimer: null };
+        room.spectators[playerId] = { id: playerId, name, avatarId: sanitizeAvatarId(avatarId), connected: true, removeTimer: null };
       } else {
         if (already.removeTimer) clearTimeout(already.removeTimer);
         already.removeTimer = null;
         already.connected = true;
         already.name = name;
+        already.avatarId = sanitizeAvatarId(avatarId);
       }
       spectatorToRoom[playerId] = id;
       socket.join(id);
@@ -377,6 +387,35 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
       socket.emit('chatHistory', { roomId: id, messages: room.chat });
       socket.emit('gameState', spectatorState(room));
       emitSpectators(id);
+    });
+
+    // ─── Profile avatar (players and spectators, any phase) ───
+    // Only a small index travels; repeated identical values are ignored.
+    let lastAvatarAt = 0;
+    on('setAvatar', ({ avatarId }, cb) => {
+      const now = Date.now();
+      if (now - lastAvatarAt < AVATAR_MIN_INTERVAL_MS) return cb({ success: false, error: 'Espera un momento' });
+      lastAvatarAt = now;
+      const value = sanitizeAvatarId(avatarId);
+      const seatedRoomId = playerToRoom[playerId];
+      const seatedRoom = seatedRoomId && lobbyManager.getRoom(seatedRoomId);
+      const player = seatedRoom && seatedRoom.engine.players[playerId];
+      if (player && !player.left) {
+        if (player.avatarId === value) return cb({ success: true, avatarId: value });
+        seatedRoom.engine.setAvatar(playerId, value);
+        cb({ success: true, avatarId: value });
+        return emitGameState(seatedRoomId);
+      }
+      const watchedRoomId = spectatorToRoom[playerId];
+      const watchedRoom = watchedRoomId && lobbyManager.getRoom(watchedRoomId);
+      const spec = watchedRoom && watchedRoom.spectators[playerId];
+      if (spec) {
+        if (spec.avatarId === value) return cb({ success: true, avatarId: value });
+        spec.avatarId = value;
+        cb({ success: true, avatarId: value });
+        return emitSpectators(watchedRoomId);
+      }
+      cb({ success: false, error: 'No estás en una sala' });
     });
 
     // ─── Leave the room / game and go back to the menu ───
@@ -429,13 +468,13 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
     });
 
     // ─── Lobby: Room settings (host only, before starting) ───
-    on('updateRoomSettings', ({ vpToWin, turnTimeLimit }, cb) => {
+    on('updateRoomSettings', ({ vpToWin, turnTimeLimit, peacePacts }, cb) => {
       const roomId = playerToRoom[playerId];
       const room = lobbyManager.getRoom(roomId);
       if (!room) return cb({ success: false, error: 'No estás en una sala' });
       if (!isHost(room, playerId)) return cb({ success: false, error: 'Solo el anfitrión puede cambiar las reglas' });
 
-      const result = room.engine.updateSettings({ vpToWin, turnTimeLimit });
+      const result = room.engine.updateSettings({ vpToWin, turnTimeLimit, peacePacts });
       cb(result);
       if (result.success) emitGameState(roomId);
     });
@@ -466,6 +505,10 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
     onGameAction('discardCards', (engine, { cards }) => engine.discardCards(playerId, cards));
     onGameAction('moveRobber', (engine, { hexId }) => engine.moveRobber(playerId, hexId));
     onGameAction('stealCard', (engine, { victimId }) => engine.stealCard(playerId, victimId));
+    // «Pacto de paz» (robber bribe house rule)
+    onGameAction('offerPeacePact', (engine, { targetId, request }) => engine.offerPeacePact(playerId, targetId, request));
+    onGameAction('respondPeacePact', (engine, { accept }) => engine.respondPeacePact(playerId, accept === true));
+    onGameAction('cancelPeacePact', (engine) => engine.cancelPeacePact(playerId));
     onGameAction('bankTrade', (engine, { give, receive }) => engine.bankTrade(playerId, give, receive));
     onGameAction('proposeTrade', (engine, { offering, requesting }) => engine.proposeTrade(playerId, offering, requesting));
     onGameAction('respondToTrade', (engine, { response, counterOffer }) => engine.respondToTrade(playerId, response, counterOffer));
@@ -484,21 +527,34 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
 
       const player = seatedRoomId ? room.engine.players[playerId] : null;
       const spec = !seatedRoomId ? room.spectators[playerId] : null;
-      const text = String(message || '').trim();
+      // Collapse long runs of one character and of whitespace
+      const text = String(message || '')
+        .replace(/\s+/g, ' ')
+        .replace(CHAT_RUN_RE, (m, c) => c.repeat(CHAT_MAX_RUN))
+        .trim();
       if ((!player && !spec) || !text) return cb({ success: false, error: 'Mensaje vacío' });
       if (text.length > CHAT_MAX_LENGTH) {
         return cb({ success: false, error: `El mensaje es demasiado largo (máximo ${CHAT_MAX_LENGTH} caracteres)` });
       }
 
-      // Anti-flood: max CHAT_RATE_COUNT messages per CHAT_RATE_WINDOW ms
+      // Anti-spam: rate limit (with a short mute when exceeded) and no repeats
       const now = Date.now();
-      const recent = (room.chatRate[playerId] || []).filter((t) => now - t < CHAT_RATE_WINDOW);
-      if (recent.length >= CHAT_RATE_COUNT) {
-        room.chatRate[playerId] = recent;
-        return cb({ success: false, error: 'Estás enviando mensajes muy rápido. Espera unos segundos.' });
+      const rate = room.chatRate[playerId] || (room.chatRate[playerId] = { times: [], lastText: '', lastAt: 0, mutedUntil: 0 });
+      if (now < rate.mutedUntil) {
+        const secs = Math.ceil((rate.mutedUntil - now) / 1000);
+        return cb({ success: false, error: `Demasiados mensajes. Podrás escribir en ${secs} s.` });
       }
-      recent.push(now);
-      room.chatRate[playerId] = recent;
+      rate.times = rate.times.filter((t) => now - t < CHAT_RATE_WINDOW);
+      if (rate.times.length >= CHAT_RATE_COUNT) {
+        rate.mutedUntil = now + CHAT_MUTE_MS;
+        return cb({ success: false, error: `Estás enviando mensajes muy rápido. Espera ${CHAT_MUTE_MS / 1000} s.` });
+      }
+      if (text.toLowerCase() === rate.lastText && now - rate.lastAt < CHAT_REPEAT_MS) {
+        return cb({ success: false, error: 'No repitas el mismo mensaje.' });
+      }
+      rate.times.push(now);
+      rate.lastText = text.toLowerCase();
+      rate.lastAt = now;
 
       room.chatCounter += 1;
       const msg = {
@@ -507,6 +563,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}) {
         // Spectators are marked in the name (and a neutral colour) in every chat view
         playerName: player ? player.name : `${spec.name} (espectador)`,
         playerColor: player ? player.color : SPECTATOR_CHAT_COLOR,
+        avatarId: player ? player.avatarId : spec.avatarId,
         spectator: !player,
         message: text,
         timestamp: now,

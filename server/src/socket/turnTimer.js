@@ -24,17 +24,32 @@ export function createTurnTimers({
   function sync(roomId, room) {
     if (!room) return;
     const engine = room.engine;
-    const limitMs = (engine.turnTimeLimit || 0) * 1000;
+    const limitMs = engine.getTimerLimitMs ? engine.getTimerLimitMs() : (engine.turnTimeLimit || 0) * 1000;
     const key = limitMs > 0 ? engine.getTimerKey() : null;
 
     if (!key) {
       clear(room);
+      room.pausedTimer = null;
       return;
     }
     if (room.turnTimer && room.turnTimer.key === key) return; // same player still acting
 
+    // Pause: while e.g. a peace pact waits for an answer, the turn timer it
+    // interrupts keeps what was left and resumes with it afterwards
+    const pausedKey = engine.getPausedTimerKey ? engine.getPausedTimerKey() : null;
+    if (pausedKey && room.turnTimer && room.turnTimer.key === pausedKey && engine.turnDeadline) {
+      room.pausedTimer = { key: pausedKey, remainingMs: Math.max(0, engine.turnDeadline - now()) };
+    }
     clear(room);
-    const ms = key === engine.timedOutKey ? Math.min(TIMEOUT_GRACE_MS, limitMs) : limitMs;
+    let ms = key === engine.timedOutKey ? Math.min(TIMEOUT_GRACE_MS, limitMs) : limitMs;
+    const paused = room.pausedTimer;
+    if (paused && paused.key === key) {
+      // Resume, with a short minimum so nobody loses the turn the moment it comes back
+      ms = Math.min(limitMs, Math.max(paused.remainingMs, Math.min(TIMEOUT_GRACE_MS, limitMs)));
+      room.pausedTimer = null;
+    } else if (paused && paused.key !== pausedKey) {
+      room.pausedTimer = null; // the paused turn is over
+    }
     engine.turnDeadline = now() + ms;
     const timer = { key, handle: null };
     timer.handle = setTimer(() => {

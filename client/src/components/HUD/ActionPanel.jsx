@@ -8,26 +8,15 @@ export function ActionPanel() {
     gameState,
     myPlayer,
     isMyTurn,
-    isSpecialBuild,
-    isMySpecialBuild,
     buildMode,
     setBuildMode,
     setActiveModal,
     endTurn,
-    myPlayerId,
   } = useGame();
 
-  // Special build: the player whose turn comes next does not build now (they
-  // build in their own turn, right after rolling); tell them they are up next
-  const order = gameState?.playerOrder || [];
-  const nextPlayerId = order.length
-    ? order[(order.indexOf(gameState?.currentPlayerId) + 1) % order.length]
-    : null;
-  const iAmNext = isSpecialBuild && !isMySpecialBuild && nextPlayerId === myPlayerId;
-
   const isMainPhase = gameState?.phase === PHASE.MAIN && isMyTurn;
-  // Building is allowed in my main phase or during my special build
-  const canBuild = isMainPhase || isMySpecialBuild;
+  // Building only in my own turn, after rolling
+  const canBuild = isMainPhase;
   const freeRoads = gameState?.freeRoadsRemaining || 0;
   // Road Building can be played before rolling, so its free roads too
   const canLayFreeRoads = freeRoads > 0 && isMyTurn && gameState?.phase === PHASE.ROLL_DICE;
@@ -102,7 +91,7 @@ export function ActionPanel() {
         label="Comercio"
       />
       <ActionButton
-        disabled={isSpecialBuild ? !isMySpecialBuild : !isMyTurn}
+        disabled={!isMyTurn}
         onClick={() => setActiveModal('devCard')}
         title="Cartas de Desarrollo"
         icon={<CardsIcon className="w-5 h-5" />}
@@ -125,29 +114,6 @@ export function ActionPanel() {
         </button>
       )}
 
-      {iAmNext && (
-        <span
-          className="ml-1 sm:ml-2 px-2 py-1 text-[12px] leading-tight font-bold text-chakra-light whitespace-nowrap"
-          title="Cuando terminen de construir los demás, empieza tu turno y tiras los dados"
-        >
-          <span className="sm:hidden">Luego tiras tú</span>
-          <span className="hidden sm:inline">Después tiras tú los dados</span>
-        </span>
-      )}
-
-      {/* Special build (another player's turn just ended): pass to the next ninja */}
-      {isMySpecialBuild && !isMyTurn && (
-        <button
-          type="button"
-          onClick={endTurn}
-          className="btn btn-primary hud-cta ml-1 sm:ml-2 px-3 sm:px-4 text-sm whitespace-nowrap"
-          title="Termina tu fase especial de construcción"
-        >
-          <span className="sm:hidden phland:inline">Listo</span>
-          <span className="hidden sm:inline phland:hidden">Terminar construcción</span>
-          <ArrowRightIcon className="w-4 h-4" />
-        </button>
-      )}
     </div>
   );
 }

@@ -811,6 +811,102 @@ a { touch-action: manipulation; }
   box-shadow: inset 0 0 0 1.5px rgba(251, 241, 224, 0.55), 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
+/* Profile avatar: round ink-framed portrait; the padding shows the ring
+   (player colour) and a hairline of ink separates it from the art */
+.avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border-radius: 999px;
+  vertical-align: middle;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.avatar-clip {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(31, 27, 23, 0.9);
+}
+.avatar-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Avatar picker: round trigger + a slip of paper with the portraits */
+.avatar-btn {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.avatar-btn:hover:not(:disabled) { transform: scale(1.05); }
+.avatar-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.avatar-btn:focus-visible,
+.avatar-btn.is-open { outline: 2px solid var(--color-chakra); outline-offset: 2px; }
+.avatar-btn-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 17px;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--color-shu);
+  color: #fbf1e0;
+  font-size: 10px;
+  line-height: 1;
+  box-shadow: 0 0 0 1.5px var(--color-paper-light), 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.avatar-pop {
+  z-index: 80;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--color-ink);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255, 252, 244, 0.6), 0 10px 22px -6px rgba(0, 0, 0, 0.6), 0 2px 0 #1f1b17;
+}
+.avatar-pop-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 6px;
+  min-height: 32px;
+}
+.avatar-pop-name {
+  font-family: var(--font-serif);
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.15;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.avatar-grid { display: grid; gap: 4px; }
+.avatar-grid:focus,
+.avatar-grid:focus-visible { outline: none; }
+.avatar-opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.avatar-opt.is-active { background: rgba(226, 113, 29, 0.18); box-shadow: inset 0 0 0 1px rgba(226, 113, 29, 0.55); }
+.avatar-grid:focus-visible .avatar-opt.is-active { box-shadow: inset 0 0 0 2px var(--color-chakra); }
+.avatar-opt.is-selected .avatar { box-shadow: 0 0 0 2px var(--color-paper-light), 0 0 0 4px var(--color-shu); }
+
 /* Forehead-plate steel */
 .steel-plate {
   background: linear-gradient(180deg, #e8ecef 0%, #b9c1c8 45%, #8d97a1 100%);
@@ -828,8 +924,20 @@ a { touch-action: manipulation; }
   .dd-option { min-height: 42px; }
   .seg-chip { min-height: 38px; }
   .seg-chip.res-pick { min-width: 42px; min-height: 42px; }
+  .seg-chip.rules-pact-chip { min-height: 42px; }
 }
 }
+
+/* Peace pact: resource cards to tap (one more each tap) */
+.pact-pick { position: relative; border-radius: 4px; cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.pact-pick:hover:not(:disabled) { transform: translateY(-2px); }
+.pact-pick:focus-visible { outline: 2px solid var(--color-chakra); outline-offset: 2px; }
+.pact-pick.is-on { box-shadow: 0 0 0 2px var(--color-shu); }
+.pact-pick:disabled { opacity: 0.45; cursor: not-allowed; }
+.pact-pick.is-on:disabled { opacity: 1; }
+
+/* Room rules: the «Pactos» Sí / No chips as tall as the dropdowns beside them */
+.seg-chip.rules-pact-chip { min-height: 36px; min-width: 36px; padding: 0.25rem 0.5rem; font-size: 13.5px; }
 
 /* ─── Animations (purposeful, short) ─── */
 @keyframes diceTumble {
@@ -1016,6 +1124,14 @@ a { touch-action: manipulation; }
   pointer-events: none;
 }
 .hex-tile.clickable .robber-target { opacity: 0.7; animation: breathe 1.8s ease-in-out infinite; }
+.hex-tile .pact-shield {
+  fill: rgba(255, 255, 255, 0.22);
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-dasharray: 2 4;
+  stroke-linecap: round;
+  pointer-events: none;
+}
 .hex-tile.clickable:hover .robber-target { stroke: #ffd29a; opacity: 1; animation: none; stroke-width: 3.2; }
 
 .number-token { pointer-events: none; }
@@ -1239,6 +1355,7 @@ a { touch-action: manipulation; }
 }
 .fx-caption.is-hero .fx-caption-sub { font-size: 15px; color: var(--fx-color); filter: brightness(1.35); }
 .fx-caption.is-static { top: 36%; bottom: auto; }
+.fx-caption-who { display: flex; align-items: center; gap: 0.45rem; max-width: 100%; min-width: 0; }
 @keyframes fxCaption {
   0% { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.96); }
   12% { opacity: 1; transform: translateX(-50%); }
