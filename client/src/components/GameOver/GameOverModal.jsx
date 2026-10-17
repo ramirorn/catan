@@ -2,7 +2,8 @@ import { useGame } from '../../context/GameContext';
 import { resetPlayerId } from '../../context/SocketContext';
 import { PHASE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
-import { CoinsIcon, CrownIcon, RoadIcon, SwordsIcon } from '../Shared/Icons';
+import { CoinsIcon, CrownIcon, RoadIcon, SwordsIcon, HourglassIcon } from '../Shared/Icons';
+import { formatDuration } from '../../utils/gameClock';
 import { PlayerAvatar } from '../Shared/Avatar';
 import { ScrollPanel } from '../Shared/ScrollPanel';
 
@@ -54,6 +55,24 @@ export function GameOverModal() {
             ? 'Todos los ninjas acordaron terminar la partida. Así quedaron los puntos:'
             : `La misión ha concluido: alguien alcanzó ${gameState.vpToWin ?? 10} o más Puntos de Victoria.`}
         </p>
+
+        {/* How long the game lasted (server clock: start → game over) */}
+        {gameState.startedAt && gameState.endedAt && (
+          <div className="flex items-center justify-center gap-4 mb-5 text-[13px] text-ink-soft">
+            <span className="inline-flex items-center gap-1.5">
+              <HourglassIcon className="w-4 h-4 text-chakra" />
+              Duración:{' '}
+              <strong className="font-serif font-extrabold text-[16px] text-ink tabular-nums">
+                {formatDuration(gameState.endedAt - gameState.startedAt)}
+              </strong>
+            </span>
+            {gameState.turnNumber > 0 && (
+              <span>
+                Turnos: <strong className="font-serif font-extrabold text-[16px] text-ink tabular-nums">{gameState.turnNumber}</strong>
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Final Standings */}
         <div className="text-left mb-6">
