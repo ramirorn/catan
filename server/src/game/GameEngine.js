@@ -1520,7 +1520,7 @@ export class GameEngine {
         if (this.board.canPlaceSettlement(vertexId, playerId, true)) {
           validSettlements.push(vertexId);
         }
-      } else if (!isSetup && canBuild) {
+      } else if (!isSetup && canBuild && player.canBuildMoreSettlements()) {
         if (this.board.canPlaceSettlement(vertexId, playerId)) {
           validSettlements.push(vertexId);
         }
@@ -1528,7 +1528,7 @@ export class GameEngine {
     }
 
     // Cities
-    if (canBuild) {
+    if (canBuild && player.canBuildMoreCities()) {
       for (const vertexId of Object.keys(this.board.vertices)) {
         if (this.board.canUpgradeToCity(vertexId, playerId)) {
           validCities.push(vertexId);
@@ -1542,7 +1542,7 @@ export class GameEngine {
         if (this.board.canPlaceRoad(edgeId, playerId, true, player.lastSetupVertex)) {
           validRoads.push(edgeId);
         }
-      } else if (!isSetup && canBuild) {
+      } else if (!isSetup && canBuild && player.canBuildMoreRoads()) {
         if (this.board.canPlaceRoad(edgeId, playerId)) {
           validRoads.push(edgeId);
         }

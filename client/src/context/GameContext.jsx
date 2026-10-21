@@ -207,6 +207,16 @@ export function GameProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTradeId, activeTradeProposer, myTradeResponse, myPlayerId, activeModal, isSpectator, canPayActiveTrade]);
 
+  // The offer went away (cancelled, traded with someone else) or my turn ended:
+  // with nothing to answer and no trading of my own the Comercio window would be
+  // left empty, so close it
+  const canTradeNow = isMyTurn && gameState?.phase === PHASE.MAIN;
+  useEffect(() => {
+    if (activeTradeId === null && !canTradeNow) {
+      setActiveModal((m) => (m === 'trade' ? null : m));
+    }
+  }, [activeTradeId, canTradeNow]);
+
   // Robber: the victim learns what was taken, the thief what they got.
   // Everyone else only reads «le robó una carta» in the chronicle.
   const stealId = gameState?.lastSteal?.id ?? null;

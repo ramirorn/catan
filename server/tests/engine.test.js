@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { GameEngine } from '../src/game/GameEngine.js';
-import { PHASE } from '../src/game/constants.js';
+import { PHASE, MAX_ROADS, MAX_SETTLEMENTS, MAX_CITIES } from '../src/game/constants.js';
 import { createTurnTimers } from '../src/socket/turnTimer.js';
 
 const results = [];
@@ -731,6 +731,22 @@ test('before rolling only the Knight can be played; other cards after the roll',
   }
   assert.equal(e.freeRoadsRemaining, 0);
   assert.ok(e.playDevCard(pid, 'knight', {}).success);
+});
+
+test('no valid placements are offered for a piece the player has run out of', () => {
+  const e = newGame(3, 'standard');
+  playSetup(e);
+  const pid = e.getCurrentPlayerId();
+  withDice([3, 3], () => assert.ok(e.rollDice(pid).success));
+  assert.equal(e.phase, PHASE.MAIN);
+  const p = e.players[pid];
+  assert.ok(e.getValidPlacements(pid).validRoads.length > 0);
+  assert.ok(e.getValidPlacements(pid).validCities.length > 0);
+  p.roadsBuilt = MAX_ROADS;
+  p.settlementsBuilt = MAX_SETTLEMENTS;
+  p.citiesBuilt = MAX_CITIES;
+  const vp = e.getValidPlacements(pid);
+  assert.deepEqual([vp.validRoads, vp.validSettlements, vp.validCities], [[], [], []]);
 });
 
 // ─── Report ───

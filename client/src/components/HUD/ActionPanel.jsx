@@ -6,6 +6,7 @@ import { ResourceBundle } from '../Shared/ResourceCard';
 export function ActionPanel() {
   const {
     gameState,
+    myPlayerId,
     myPlayer,
     isMyTurn,
     buildMode,
