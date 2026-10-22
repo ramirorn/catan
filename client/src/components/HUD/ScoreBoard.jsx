@@ -4,12 +4,15 @@ import { ResourceChip } from '../Shared/ResourceCard';
 import { RESOURCE_NAMES } from '../../utils/constants';
 import { useLogExpanded, setLogExpanded } from './logLayout';
 import { PlayerAvatar } from '../Shared/Avatar';
+import { payoutCount, usePendingPayout } from './revealSignal';
 
 const BANK_ORDER = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
 
 export function ScoreBoard() {
   const { gameState, myPlayerId } = useGame();
   const logExpanded = useLogExpanded();
+  // My new cards (and what they took from the bank) show up with "Recursos recibidos"
+  const pending = usePendingPayout(gameState);
 
   if (!gameState?.players) return null;
 
@@ -39,8 +42,9 @@ export function ScoreBoard() {
           const isCurrentTurn = p.id === gameState.currentPlayerId;
           const isMe = p.id === myPlayerId;
           const totalCards =
-            p.totalResources ??
-            (p.resources ? Object.values(p.resources).reduce((a, b) => a + b, 0) : 0);
+            (p.totalResources ??
+              (p.resources ? Object.values(p.resources).reduce((a, b) => a + b, 0) : 0)) -
+            (isMe ? payoutCount(pending) : 0);
 
           return (
             <li
@@ -119,7 +123,7 @@ export function ScoreBoard() {
           <span className="label-caps !text-[10px] !tracking-[0.1em] shrink-0">Banco</span>
           <ul className="flex-1 min-w-0 flex flex-wrap items-center justify-end gap-x-1 gap-y-1">
             {BANK_ORDER.map((r) => {
-              const left = gameState.bank[r] ?? 0;
+              const left = (gameState.bank[r] ?? 0) + (pending?.[r] || 0);
               const low = left <= 3;
               return (
                 <li

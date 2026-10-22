@@ -3,6 +3,7 @@ import { useGame } from '../../context/GameContext';
 import { Modal } from '../Shared/Modal';
 import { ResourceCard } from '../Shared/ResourceCard';
 import { whenStageIdle } from '../Effects/fxSignal';
+import { payoutKey, revealPayout } from './revealSignal';
 
 // Second setup settlement: a short beat after the piece lands
 const SHOW_DELAY_MS = 700;
@@ -27,14 +28,18 @@ export function ProductionModal() {
   const mineKey = JSON.stringify(production?.mine ?? null);
   const source = production?.source ?? null;
   const roll = production?.roll ?? null;
+  // Until this card opens, the hand bar & co. hide these cards (revealSignal)
+  const key = payoutKey(gameState);
 
   const [shown, setShown] = useState(null);
   const seenIdRef = useRef(undefined);
 
   useEffect(() => {
     if (seenIdRef.current === undefined) {
-      // First state received (fresh game or reconnect): nothing new yet
+      // First state received (fresh game or reconnect): nothing new yet, so
+      // whatever payout is already there is shown in the hand right away
       seenIdRef.current = productionId;
+      revealPayout(key);
       return undefined;
     }
     if (productionId === null || productionId === seenIdRef.current) return undefined;
@@ -48,11 +53,15 @@ export function ProductionModal() {
     const show = () => {
       if (done) return;
       done = true;
+      revealPayout(key);
       setShown({ mine, source, roll });
     };
     if (source !== 'roll') {
       const timer = setTimeout(show, SHOW_DELAY_MS);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        if (!done) revealPayout(key);
+      };
     }
     let after = null;
     let cancelWait = () => {};
@@ -68,8 +77,10 @@ export function ProductionModal() {
       clearTimeout(after);
       clearTimeout(cap);
       cancelWait();
+      // Superseded or unmounted before the card opened: never leave cards hidden
+      if (!done) revealPayout(key);
     };
-  }, [productionId, mineKey, source, roll]);
+  }, [productionId, mineKey, source, roll, key]);
 
   if (!shown) return null;
 

@@ -1,10 +1,13 @@
 import { useGame } from '../../context/GameContext';
 import { RESOURCE } from '../../utils/constants';
 import { ResourceCard } from '../Shared/ResourceCard';
+import { hidePayout, usePendingPayout } from './revealSignal';
 
 export function ResourceBar() {
-  const { myPlayer } = useGame();
-  const resources = myPlayer?.resources || {
+  const { myPlayer, gameState } = useGame();
+  // The cards of a roll appear when "Recursos recibidos" opens, not mid-throw
+  const pending = usePendingPayout(gameState);
+  const resources = hidePayout(myPlayer?.resources, pending) || {
     [RESOURCE.WOOD]: 0,
     [RESOURCE.BRICK]: 0,
     [RESOURCE.SHEEP]: 0,

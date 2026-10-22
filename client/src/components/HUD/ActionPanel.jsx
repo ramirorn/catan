@@ -2,6 +2,7 @@ import { useGame } from '../../context/GameContext';
 import { PHASE, BUILD_COSTS, RESOURCE } from '../../utils/constants';
 import { RoadIcon, SettlementIcon, CityIcon, TradeIcon, CardsIcon, ArrowRightIcon } from '../Shared/Icons';
 import { ResourceBundle } from '../Shared/ResourceCard';
+import { hidePayout, usePendingPayout } from './revealSignal';
 
 export function ActionPanel() {
   const {
@@ -20,7 +21,9 @@ export function ActionPanel() {
   const canBuild = isMainPhase;
   const freeRoads = gameState?.freeRoadsRemaining || 0;
 
-  const res = myPlayer?.resources || {};
+  // A payout still behind the dice must not light up the build buttons
+  const pending = usePendingPayout(gameState);
+  const res = hidePayout(myPlayer?.resources, pending) || {};
 
   const canAffordRoad =
     freeRoads > 0 ||

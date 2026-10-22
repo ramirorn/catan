@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { BUILD_COSTS } from '../../utils/constants';
 import { ResourceChip } from '../Shared/ResourceCard';
+import { hidePayout, usePendingPayout } from '../HUD/revealSignal';
 import {
   RoadIcon,
   SettlementIcon,
@@ -72,7 +73,9 @@ function CostChips({ cost, have }) {
 
 function PanelBody({ className = '' }) {
   const { gameState, myPlayer } = useGame();
-  const have = myPlayer?.resources || null;
+  // Same spoiler guard as the hand bar while the dice are still rolling
+  const pending = usePendingPayout(gameState);
+  const have = hidePayout(myPlayer?.resources, pending) || null;
   const extended = gameState?.boardType === 'extended';
   const deckTotal = DEV_CARDS.reduce((a, c) => a + (extended ? c.ext : c.std), 0);
 
