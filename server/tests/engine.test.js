@@ -697,6 +697,84 @@ for (const [boardType, n] of [['standard', 4], ['extended', 6]]) {
   });
 }
 
+for (const [boardType, n] of [['standard', 4], ['extended', 6]]) {
+  test(`pacto + desierto (${boardType}): the desert stays open for a protected player who touches it, and robs nobody`, () => {
+    const e = toRobberMove(n, boardType);
+    const [a, b, c] = e.playerOrder;
+    const deserts = Object.keys(e.board.hexes).filter((h) => e.isDesertHex(h));
+    // b (the one protected) and c both touch every desert
+    const real = e.board.getPlayersAdjacentToHex.bind(e.board);
+    e.board.getPlayersAdjacentToHex = (h) => (e.isDesertHex(h) ? [...new Set([...real(h), b, c])] : real(h));
+    // The robber starts in a desert: take it away first (empty hands, nobody robbed)
+    const away = producingHexes(e)[0];
+    assert.ok(e.moveRobber(a, away).success);
+    e.phase = PHASE.ROBBER_MOVE;
+    e.phaseAfterRobber = PHASE.MAIN;
+    e.players[b].resources.wheat = 2;
+    e.players[c].resources.ore = 2;
+    assert.ok(e.offerPeacePact(a, b, { wheat: 1 }).success);
+    assert.ok(e.respondPeacePact(b, true).success);
+    const legal = e.getRobberHexes();
+    for (const d of deserts) assert.ok(legal.includes(d), `desert ${d} is legal`);
+    for (const h of hexesOf(e, b).filter((h) => !e.isDesertHex(h))) assert.ok(!legal.includes(h), `hex ${h} of b is protected`);
+    assert.deepEqual(e.serialize(a).robberHexes.sort(), legal.sort());
+    const totals = () => e.playerOrder.map((p) => e.players[p].totalResources());
+    const before = totals();
+    const r = e.moveRobber(a, deserts[0]);
+    assert.ok(r.success, r.error);
+    assert.equal(r.desert, true);
+    assert.deepEqual(r.stealTargets, []);
+    assert.equal(e.phase, PHASE.MAIN);
+    assert.deepEqual(totals(), before, 'nobody touching the desert was robbed');
+  });
+}
+
+for (const [boardType, n] of [['standard', 4], ['extended', 6]]) {
+  test(`banco (${boardType}): a resource the bank can't cover goes to nobody, and each one owed is told`, () => {
+    const e = newGame(n, boardType);
+    playSetup(e);
+    const [a, b, c] = e.playerOrder;
+    const roller = e.getCurrentPlayerId();
+    const hex = Object.values(e.board.hexes).find((h) => h.number && h.resource && !h.hasRobber);
+    const res = hex.resource;
+    // Every roll pays only that hex: a city of a (2) and a settlement of b (1)
+    e.board.getHexesForRoll = () => [hex];
+    e.board.getBuildingsAdjacentToHex = (id) => (id === hex.id
+      ? [{ playerId: a, type: 'city' }, { playerId: b, type: 'settlement' }]
+      : []);
+    for (const p of Object.values(e.players)) p.resources = EMPTY();
+    // 3 are owed, 2 left in the bank → nobody collects
+    e.players[c].resources[res] = e.bankSize() - 2;
+    assert.ok(withDice([2, 3], () => e.rollDice(roller)).success);
+    assert.equal(e.players[a].resources[res], 0);
+    assert.equal(e.players[b].resources[res], 0);
+    assert.equal(e.bankCount(res), 2, 'the bank never goes below zero');
+    assert.deepEqual(e.serialize(a).lastProduction.short, { [res]: { owed: 2, paid: 0 } });
+    assert.deepEqual(e.serialize(b).lastProduction.short, { [res]: { owed: 1, paid: 0 } });
+    assert.equal(e.serialize(c).lastProduction.short, null, 'only the ones owed are told');
+    assert.equal(e.serialize(null).lastProduction.short, null, 'spectators see no shortage');
+    assert.ok(e.gameLog.some((l) => l.message.startsWith('El banco no tiene suficiente')));
+
+    // Only one player owed: they take what is left (and are told what was missing)
+    e.board.getBuildingsAdjacentToHex = (id) => (id === hex.id ? [{ playerId: a, type: 'city' }] : []);
+    e.players[c].resources[res] = e.bankSize() - 1;
+    e.phase = PHASE.ROLL_DICE;
+    assert.ok(withDice([2, 3], () => e.rollDice(roller)).success);
+    assert.equal(e.players[a].resources[res], 1);
+    assert.equal(e.bankCount(res), 0);
+    assert.deepEqual(e.serialize(a).lastProduction.mine, { [res]: 1 });
+    assert.deepEqual(e.serialize(a).lastProduction.short, { [res]: { owed: 2, paid: 1 } });
+
+    // Enough in the bank: paid in full, no shortage
+    e.players[c].resources[res] = 0;
+    e.players[a].resources[res] = 0;
+    e.phase = PHASE.ROLL_DICE;
+    assert.ok(withDice([2, 3], () => e.rollDice(roller)).success);
+    assert.equal(e.players[a].resources[res], 2);
+    assert.equal(e.serialize(a).lastProduction.short, null);
+  });
+}
+
 test('players who left the game no longer collect resources from the dice', () => {
   const e = newGame(3, 'standard');
   playSetup(e);

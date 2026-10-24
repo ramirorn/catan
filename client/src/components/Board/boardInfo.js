@@ -66,9 +66,10 @@ export function hexInfo(gameState, hexId) {
     desert,
     collectors: [...byPlayer.values()].sort((a, b) => b.amount - a.amount),
     // A signed peace pact keeps the robber away from its player's hexes
+    // (not the desert: the renegade robs nobody there, so it stays open)
     pactProtected: (() => {
       const pid = pactProtectedId(gameState);
-      return pid && byPlayer.has(pid) ? playerRef(gameState, pid) : null;
+      return pid && !desert && byPlayer.has(pid) ? playerRef(gameState, pid) : null;
     })(),
   };
 }

@@ -221,7 +221,7 @@ export function PeacePactModal({ isOpen, onClose }) {
   } else {
     const accepted = mine.status === 'accepted';
     const msg = accepted
-      ? `¡${target?.name} aceptó! Te dio ${requestText(mine.request)}. Sus casillas quedan protegidas: elige otro hexágono para el ladrón.`
+      ? `¡${target?.name} aceptó! Te dio ${requestText(mine.request)}. Sus casillas quedan protegidas: elige otro hexágono para el ladrón (el desierto sigue libre: allí no roba a nadie).`
       : mine.status === 'expired'
         ? `${target?.name} no respondió a tiempo. Mueve al ladrón como quieras.`
         : mine.status === 'cancelled'

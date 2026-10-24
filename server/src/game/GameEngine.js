@@ -497,8 +497,8 @@ export class GameEngine {
     }
 
     // Distribute resources
-    const distributions = this._distributeResources(roll);
-    this._recordProduction('roll', roll, distributions);
+    const { distributions, shortages } = this._distributeResources(roll);
+    this._recordProduction('roll', roll, distributions, shortages);
     this.phase = PHASE.MAIN;
 
     return {
@@ -509,9 +509,10 @@ export class GameEngine {
     };
   }
 
-  _recordProduction(source, roll, byPlayer) {
+  // shortByPlayer: what the bank could not pay, playerId → { resource: { owed, paid } }
+  _recordProduction(source, roll, byPlayer, shortByPlayer = {}) {
     this.productionCounter++;
-    this.lastProduction = { id: this.productionCounter, source, roll, byPlayer };
+    this.lastProduction = { id: this.productionCounter, source, roll, byPlayer, shortByPlayer };
   }
 
   _distributeResources(roll) {
@@ -533,7 +534,9 @@ export class GameEngine {
 
     // Bank shortage rule: if the bank can't pay everyone a resource, nobody gets it,
     // unless only one player is owed it — then that player gets what is left.
+    // Everyone left short is told so (each player only learns their own share).
     const distributions = {}; // playerId → { resource: amount }
+    const shortages = {}; // playerId → { resource: { owed, paid } }
     for (const [res, perPlayer] of Object.entries(owed)) {
       const totalOwed = Object.values(perPlayer).reduce((a, b) => a + b, 0);
       const available = this.bankCount(res);
@@ -544,6 +547,10 @@ export class GameEngine {
           payout = { [recipients[0]]: available };
         } else {
           payout = {};
+        }
+        for (const [pid, amount] of Object.entries(perPlayer)) {
+          if (!shortages[pid]) shortages[pid] = {};
+          shortages[pid][res] = { owed: amount, paid: payout[pid] || 0 };
         }
         this.log(`El banco no tiene suficiente ${RESOURCE_ES[res] || res}`);
       }
@@ -558,7 +565,7 @@ export class GameEngine {
       this.log(`${this.players[pid].name} recibió ${this._formatResources(res)}`);
     }
 
-    return distributions;
+    return { distributions, shortages };
   }
 
   _handleRollSeven() {
@@ -698,17 +705,17 @@ export class GameEngine {
   }
 
   // Hexes the robber may be moved to right now (the protection of an accepted
-  // pact applied). If the protected player is on every other hex the robber
-  // may go to a desert, or as a last resort anywhere: the game never stalls.
+  // pact applied). A desert is always allowed: hidden there the renegade robs
+  // nobody, so it never breaks a pact even if the protected player touches it.
+  // If the protected player is on every other hex, as a last resort anywhere:
+  // the game never stalls.
   getRobberHexes() {
     if (!this.board) return [];
     const all = Object.keys(this.board.hexes).filter((h) => h !== this.board.robberHex);
     const protectedId = this._pactProtectedId();
     if (!protectedId) return all;
-    const free = all.filter((h) => !this.board.getPlayersAdjacentToHex(h).includes(protectedId));
-    if (free.length > 0) return free;
-    const deserts = all.filter((h) => this.isDesertHex(h));
-    return deserts.length > 0 ? deserts : all;
+    const free = all.filter((h) => this.isDesertHex(h) || !this.board.getPlayersAdjacentToHex(h).includes(protectedId));
+    return free.length > 0 ? free : all;
   }
 
   // Can `pid` be offered a pact right now? Returns an error message or null.
@@ -1596,6 +1603,8 @@ export class GameEngine {
             source: this.lastProduction.source,
             roll: this.lastProduction.roll,
             mine: this.lastProduction.byPlayer[forPlayerId] || null,
+            // What the empty bank could not pay me: { resource: { owed, paid } }
+            short: this.lastProduction.shortByPlayer?.[forPlayerId] || null,
           }
         : null,
       lastCompletedTrade: this.lastCompletedTrade,
