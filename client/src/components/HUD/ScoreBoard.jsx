@@ -4,7 +4,7 @@ import { ResourceChip } from '../Shared/ResourceCard';
 import { RESOURCE_NAMES } from '../../utils/constants';
 import { useLogExpanded, setLogExpanded } from './logLayout';
 import { PlayerAvatar } from '../Shared/Avatar';
-import { payoutCount, usePendingPayout } from './revealSignal';
+import { payoutCount, useHandDelta } from './revealSignal';
 
 const BANK_ORDER = ['wood', 'brick', 'sheep', 'wheat', 'ore'];
 
@@ -12,7 +12,7 @@ export function ScoreBoard() {
   const { gameState, myPlayerId } = useGame();
   const logExpanded = useLogExpanded();
   // My new cards (and what they took from the bank) show up with "Recursos recibidos"
-  const pending = usePendingPayout(gameState);
+  const { delta: handDelta, payout: pending } = useHandDelta(gameState, myPlayerId);
 
   if (!gameState?.players) return null;
 
@@ -44,7 +44,7 @@ export function ScoreBoard() {
           const totalCards =
             (p.totalResources ??
               (p.resources ? Object.values(p.resources).reduce((a, b) => a + b, 0) : 0)) -
-            (isMe ? payoutCount(pending) : 0);
+            (isMe ? payoutCount(handDelta) : 0);
 
           return (
             <li

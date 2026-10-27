@@ -1,12 +1,13 @@
 import { useGame } from '../../context/GameContext';
 import { RESOURCE } from '../../utils/constants';
 import { ResourceCard } from '../Shared/ResourceCard';
-import { hidePayout, usePendingPayout } from './revealSignal';
+import { hidePayout, useHandDelta } from './revealSignal';
 
 export function ResourceBar() {
-  const { myPlayer, gameState } = useGame();
-  // The cards of a roll appear when "Recursos recibidos" opens, not mid-throw
-  const pending = usePendingPayout(gameState);
+  const { myPlayer, gameState, myPlayerId } = useGame();
+  // The cards of a roll appear when "Recursos recibidos" opens, and a robbed
+  // card when "te robó / le robaste" shows: never mid-animation
+  const { delta: pending } = useHandDelta(gameState, myPlayerId);
   const resources = hidePayout(myPlayer?.resources, pending) || {
     [RESOURCE.WOOD]: 0,
     [RESOURCE.BRICK]: 0,

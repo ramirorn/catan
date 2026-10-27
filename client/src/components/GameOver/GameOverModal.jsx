@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { resetPlayerId } from '../../context/SocketContext';
 import { PHASE } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
-import { CoinsIcon, CrownIcon, RoadIcon, SwordsIcon, HourglassIcon } from '../Shared/Icons';
+import { ChevronDownIcon, CoinsIcon, CrownIcon, RoadIcon, SwordsIcon, HourglassIcon } from '../Shared/Icons';
 import { formatDuration } from '../../utils/gameClock';
 import { PlayerAvatar } from '../Shared/Avatar';
 import { ScrollPanel } from '../Shared/ScrollPanel';
@@ -10,8 +11,12 @@ import { ScrollPanel } from '../Shared/ScrollPanel';
 export function GameOverModal() {
   const { gameState, myPlayerId, leaveRoom, coinsAward, isSpectator } = useGame();
   const { user, accountsEnabled, coinName, status } = useAuth();
+  // "Ver el tablero": fold the results into a small button to look at how the
+  // map ended. Keyed by the game's end time, so a new game opens it again.
+  const [minimizedFor, setMinimizedFor] = useState(null);
 
   if (gameState?.phase !== PHASE.GAME_OVER) return null;
+  const endKey = gameState.endedAt ?? gameState.roomId;
 
   const winnerId = gameState.scoring?.winnerId || gameState.winner?.id;
   const winner = winnerId ? gameState.players?.[winnerId] : null;
@@ -28,9 +33,34 @@ export function GameOverModal() {
     window.location.reload();
   };
 
+  if (minimizedFor === endKey) {
+    // Board stays fully visible and interactive (pan, zoom, 2D/3D, tooltips)
+    return (
+      <div className="fixed z-50 left-1/2 -translate-x-1/2 bottom-[max(1rem,env(safe-area-inset-bottom))] animate-fade-in">
+        <button
+          type="button"
+          onClick={() => setMinimizedFor(null)}
+          className="btn btn-primary min-h-[44px] px-4 py-2 text-[14px] shadow-[0_10px_24px_-8px_rgba(0,0,0,0.8)]"
+        >
+          <CrownIcon className="w-4 h-4" />
+          {gameState.endedByAgreement ? 'Ver resultados' : `Ver resultados · ganó ${winner?.name || 'un ninja'}`}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="modal-wrap fixed inset-0 z-50 flex items-center justify-center bg-[#070a12]/80 animate-fade-in">
-      <ScrollPanel as="div" className="animate-modal-pop max-w-md w-full" bodyClassName="modal-sheet px-5 sm:px-8 pt-7 phland:pt-4 pb-6 phland:pb-4 text-center overflow-y-auto">
+      <ScrollPanel as="div" className="animate-modal-pop max-w-md w-full relative" bodyClassName="modal-sheet px-5 sm:px-8 pt-7 phland:pt-4 pb-6 phland:pb-4 text-center overflow-y-auto">
+        <button
+          type="button"
+          onClick={() => setMinimizedFor(endKey)}
+          className="absolute top-3 right-3 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-[3px] text-[12px] font-bold text-ink-soft hover:text-ink hover:bg-ink/5 cursor-pointer"
+          title="Minimizar para ver cómo quedó el tablero"
+        >
+          <ChevronDownIcon className="w-4 h-4" />
+          Ver el tablero
+        </button>
         {/* Crest: the winner's portrait with a crown seal (or just the seal) */}
         {winner && !gameState.endedByAgreement ? (
           <div className="relative mx-auto mb-3 w-16 h-16 phland:w-12 phland:h-12">

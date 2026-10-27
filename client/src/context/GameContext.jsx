@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { whenStageIdle } from '../components/Effects/fxSignal';
+import { revealSteal, stealKey } from '../components/HUD/revealSignal';
 import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
 import { PHASE, RESOURCE_NAMES } from '../utils/constants';
@@ -220,16 +221,21 @@ export function GameProvider({ children }) {
   // Robber: the victim learns what was taken, the thief what they got.
   // Everyone else only reads «le robó una carta» in the chronicle.
   const stealId = gameState?.lastSteal?.id ?? null;
+  const currentStealKey = stealKey(gameState);
   const seenStealRef = useRef(undefined);
   useEffect(() => {
     if (seenStealRef.current === undefined) {
       seenStealRef.current = stealId; // a robbery from before we joined
+      revealSteal(currentStealKey);
       return;
     }
     if (stealId === null || stealId === seenStealRef.current) return;
     seenStealRef.current = stealId;
     const steal = gameState?.lastSteal;
-    if (!steal?.resource) return;
+    if (!steal?.resource) {
+      revealSteal(currentStealKey);
+      return;
+    }
     const res = RESOURCE_NAMES[steal.resource] || steal.resource;
     const thief = gameState?.players?.[steal.thiefId]?.name || 'Un ninja';
     const victim = gameState?.players?.[steal.victimId]?.name || 'un ninja';
@@ -240,12 +246,17 @@ export function GameProvider({ children }) {
     } else if (steal.thiefId === myPlayerId) {
       message = [`Le robaste 1 ${res} a ${victim}`, 'success', 5000];
     }
-    if (!message) return;
-    // Tell it after the dice / robber / steal animations, so it isn't spoiled
+    if (!message) {
+      revealSteal(currentStealKey);
+      return;
+    }
+    // Tell it after the dice / robber / steal animations, so it isn't spoiled;
+    // the hand bar shows the card (gained or lost) at that same moment
     let done = false;
     const show = () => {
       if (done) return;
       done = true;
+      revealSteal(currentStealKey);
       addToast(...message);
     };
     let cancelWait = () => {};
@@ -257,6 +268,7 @@ export function GameProvider({ children }) {
       clearTimeout(start);
       clearTimeout(cap);
       cancelWait();
+      if (!done) revealSteal(currentStealKey);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stealId]);

@@ -40,10 +40,50 @@ export function usePendingPayout(gameState) {
   return Object.values(production.mine).some((n) => n > 0) ? production.mine : null;
 }
 
+// ─── Robber steals (7 or Knight) ───
+// The thief's new card and the victim's lost card change the hand as soon as
+// the state arrives; they stay hidden until the "te robó / le robaste" notice
+// shows (after the robber and steal animations).
+let revealedSteal;
+
+export function revealSteal(key) {
+  if (key == null || revealedSteal === key) return;
+  revealedSteal = key;
+  for (const fn of [...listeners]) fn();
+}
+
+export const stealKey = (gameState) =>
+  gameState?.lastSteal ? `${gameState.roomId}:${gameState.lastSteal.id}` : null;
+
+const getRevealedSteal = () => revealedSteal;
+
+/**
+ * What to take off my hand right now: the unrevealed dice payout (cards to
+ * hide) and an unrevealed steal (+1 to hide for the thief, −1 for the victim,
+ * i.e. the lost card is still shown). `payout` alone is what the bank misses.
+ */
+export function useHandDelta(gameState, myPlayerId) {
+  const payout = usePendingPayout(gameState);
+  useSyncExternalStore(subscribe, getRevealedSteal, getRevealedSteal);
+  const steal = gameState?.lastSteal;
+  const key = stealKey(gameState);
+  if (revealedSteal === undefined) revealedSteal = key;
+  let delta = payout ? { ...payout } : null;
+  if (steal && steal.resource && key !== revealedSteal && myPlayerId) {
+    const sign = steal.thiefId === myPlayerId ? 1 : steal.victimId === myPlayerId ? -1 : 0;
+    if (sign) {
+      delta = delta || {};
+      delta[steal.resource] = (delta[steal.resource] || 0) + sign;
+    }
+  }
+  return { delta, payout };
+}
+
 /** My resources as they should look right now (a pending payout hidden) */
 export function hidePayout(resources, pending) {
   if (!pending || !resources) return resources;
   const shown = { ...resources };
+  // n > 0 hides cards just received; n < 0 still shows a card just lost
   for (const [res, n] of Object.entries(pending)) shown[res] = Math.max(0, (shown[res] || 0) - n);
   return shown;
 }
