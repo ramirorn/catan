@@ -539,3 +539,74 @@ export function createAccentMaterials(id) {
       })
   );
 }
+
+/* ─── Shared look of the 3D pieces (board, tutorial, shop preview) ─── */
+
+/**
+ * Ink line around every piece, in screen pixels (× dpr, then scaled with the
+ * zoom by the board's OutlineScaler). Thin, so the set's own design reads;
+ * separation from the terrain comes from the contact shadow underneath and
+ * the line's colour: a very dark shade of the player colour (ink with a hint
+ * of the owner), plus a faint pale rim of that colour, never a white one.
+ */
+export const PIECE_OUTLINE_PX = 1.7;
+
+export function pieceOutlineColor(color) {
+  return new THREE.Color(color).lerp(new THREE.Color('#120e0b'), 0.8);
+}
+
+/** Faint light rim just outside the ink line: a pale tint of the owner's colour */
+export const PIECE_RIM_PX = 2.9;
+export const PIECE_RIM_OPACITY = 0.4;
+
+export function pieceRimColor(color) {
+  return new THREE.Color(color).lerp(new THREE.Color('#fff8ea'), 0.6);
+}
+
+/** Footprint (x, z in world units) of the soft contact shadow of each kind */
+export const PIECE_SHADOW_SIZE = {
+  settlement: [0.62, 0.62],
+  city: [0.84, 0.84],
+  road: [ROAD_LEN + 0.16, 0.3],
+};
+
+/**
+ * Soft contact shadow (ambient occlusion blob) laid on the tile under a
+ * piece: one unit plane + a radial-gradient texture, shared by every piece.
+ */
+export function createPieceShadow() {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, 'rgba(0,0,0,1)');
+  g.addColorStop(0.45, 'rgba(0,0,0,0.8)');
+  g.addColorStop(0.75, 'rgba(0,0,0,0.3)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const geometry = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const material = new THREE.MeshBasicMaterial({
+    map,
+    color: '#000000',
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    toneMapped: false,
+  });
+  // the texture goes with the material
+  const dispose = material.dispose.bind(material);
+  material.dispose = () => {
+    map.dispose();
+    dispose();
+  };
+  return { geometry, material };
+}
+
+/** Raycast stub: the shadow never catches pointer events (tooltips, clicks) */
+export const NO_RAYCAST = () => null;

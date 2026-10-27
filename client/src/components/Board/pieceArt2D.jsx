@@ -1,8 +1,11 @@
 // 2D player pieces of every shop piece set (settlement, city, road). Each set
 // has its own silhouette and materials, but the main surfaces are always in
 // the player's colour so players stay distinguishable. Pieces are drawn as:
-//   offset shadow → player-colour base plate → light rim + thick ink outline
-//   of the silhouette → fills.
+//   offset shadow → player-colour base plate → soft halo in a light tint of
+//   the player colour + thin ink outline of the silhouette → fills.
+// No white rim: the ink line and the shadow separate the piece from the
+// terrain, the faint tinted halo only lifts it off dark tiles, so the set's
+// own design stays the first thing you see.
 // Plain shapes only (no SVG filters, which re-rasterise on zoom).
 import { memo } from 'react';
 import { shade } from '../../utils/theme';
@@ -10,6 +13,10 @@ import { pieceSetOf } from '../../utils/cosmetics';
 
 export const PIECE_INK = '#120e0b';
 export const PIECE_RIM = '#fff4dc';
+
+/** Soft halo around a piece: a light tint of the owner's colour, low opacity */
+const HALO_OPACITY = 0.38;
+const halo = (color) => shade(color, 0.55);
 
 const circ = (cx, cy, r) => `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0 Z`;
 const ell = (cx, cy, rx, ry) => `M ${cx - rx} ${cy} a ${rx} ${ry} 0 1 0 ${2 * rx} 0 a ${rx} ${ry} 0 1 0 ${-2 * rx} 0 Z`;
@@ -291,7 +298,7 @@ function BasePlate({ rx, color, city = false }) {
       <>
         <ellipse cx="0" cy="9.8" rx="19.6" ry="6.4" fill={PIECE_INK} />
         <ellipse cx="0" cy="9.2" rx="18" ry="5.2" fill={color} />
-        <ellipse cx="0" cy="9.2" rx="15.6" ry="4.1" fill="none" stroke={PIECE_RIM} strokeWidth="1.3" />
+        <ellipse cx="0" cy="9.2" rx="15.6" ry="4.1" fill="none" stroke={shade(color, 0.4)} strokeOpacity="0.7" strokeWidth="1" />
         <ellipse cx="0" cy="8.6" rx="11.5" ry="2.6" fill={shade(color, 0.3)} opacity="0.55" />
       </>
     );
@@ -305,11 +312,11 @@ function BasePlate({ rx, color, city = false }) {
   );
 }
 
-function Outline({ d }) {
+function Outline({ d, color }) {
   return (
     <>
-      <path d={d} fill="none" stroke={PIECE_RIM} strokeWidth="6.4" strokeLinejoin="round" />
-      <path d={d} fill={PIECE_INK} stroke={PIECE_INK} strokeWidth="3.6" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke={halo(color)} strokeOpacity={HALO_OPACITY} strokeWidth="4.8" strokeLinejoin="round" />
+      <path d={d} fill={PIECE_INK} stroke={PIECE_INK} strokeWidth="2.6" strokeLinejoin="round" />
     </>
   );
 }
@@ -344,7 +351,7 @@ function ClassicSettlement({ color }) {
       <ellipse cx="2.2" cy="11" rx="14" ry="4.6" fill="#05070c" opacity="0.5" />
       <path d={SETTLEMENT_SIL} transform="translate(2.4 3)" fill="#05070c" opacity="0.45" />
       <BasePlate rx={12} color={color} />
-      <Outline d={SETTLEMENT_SIL} />
+      <Outline d={SETTLEMENT_SIL} color={color} />
       <path d="M -8 0 H 8 V 9 H -8 Z" fill={color} />
       <path d="M 3.5 0 H 8 V 9 H 3.5 Z" fill={shade(color, -0.18)} />
       <rect x="-2" y="3.4" width="4" height="5.6" rx="0.6" fill={PIECE_INK} />
@@ -364,7 +371,7 @@ function ClassicCity({ color }) {
       <ellipse cx="2.4" cy="12" rx="20" ry="5.6" fill="#05070c" opacity="0.5" />
       <path d={CITY_SIL} transform="translate(2.6 3.2)" fill="#05070c" opacity="0.45" />
       <BasePlate city color={color} />
-      <Outline d={CITY_SIL} />
+      <Outline d={CITY_SIL} color={color} />
       <path d="M -9 0 H 9 V 10 H -9 Z" fill={color} />
       <path d="M 4.5 0 H 9 V 10 H 4.5 Z" fill={side} />
       <rect x="-2.3" y="3.6" width="4.6" height="6.4" rx="0.6" fill={PIECE_INK} />
@@ -393,7 +400,7 @@ function SetBuilding({ def, color, city, glow }) {
       <ellipse cx="2.4" cy={city ? 12 : 11} rx={city ? 20 : 14} ry={city ? 5.6 : 4.6} fill="#05070c" opacity="0.5" />
       <path d={def.sil} transform="translate(2.4 3)" fill="#05070c" opacity="0.45" />
       <BasePlate rx={12} city={city} color={color} />
-      <Outline d={def.sil} />
+      <Outline d={def.sil} color={color} />
       <Layers layers={def.layers} color={color} />
     </g>
   );
@@ -414,11 +421,11 @@ export const CityArt = memo(function CityArt({ set, color }) {
 
 /* ─── Roads (drawn along local x, centred; L = length) ─── */
 
-function StripBase({ L, h = 12.5 }) {
+function StripBase({ L, h = 12.5, color }) {
   return (
     <>
-      <line x1={-L / 2} y1={0} x2={L / 2} y2={0} stroke={PIECE_RIM} strokeWidth={h + 3} strokeLinecap="round" />
-      <line x1={-L / 2} y1={0} x2={L / 2} y2={0} stroke={PIECE_INK} strokeWidth={h} strokeLinecap="round" />
+      <line x1={-L / 2} y1={0} x2={L / 2} y2={0} stroke={halo(color)} strokeOpacity={HALO_OPACITY} strokeWidth={h + 1.2} strokeLinecap="round" />
+      <line x1={-L / 2} y1={0} x2={L / 2} y2={0} stroke={PIECE_INK} strokeWidth={h - 1} strokeLinecap="round" />
     </>
   );
 }
@@ -427,8 +434,8 @@ function Dotted({ points, r, fill, light }) {
   return points.map(([x, y], i) => (
     <g key={i}>
       <circle cx={x + 1.4} cy={y + 2.8} r={r + 1.4} fill="#05070c" opacity="0.45" />
-      <circle cx={x} cy={y} r={r + 2.6} fill={PIECE_RIM} />
-      <circle cx={x} cy={y} r={r + 1.4} fill={PIECE_INK} />
+      <circle cx={x} cy={y} r={r + 2.2} fill={halo(fill)} opacity={HALO_OPACITY} />
+      <circle cx={x} cy={y} r={r + 1.1} fill={PIECE_INK} />
       <circle cx={x} cy={y} r={r} fill={fill} />
       {light && <circle cx={x - r * 0.3} cy={y - r * 0.3} r={r * 0.45} fill={light} opacity="0.8" />}
     </g>
@@ -441,7 +448,7 @@ function RoadShape({ set, L, color }) {
     case 'pieces:temple':
       return (
         <>
-          <StripBase L={L} h={13} />
+          <StripBase L={L} h={13} color={color} />
           <line x1={-half} y1={0} x2={half} y2={0} stroke={WOOD} strokeWidth="7" strokeLinecap="round" />
           <line x1={-half} y1={0} x2={half} y2={0} stroke={WOOD_DARK} strokeWidth="7" strokeDasharray="1.2 4" />
           <line x1={-half} y1={-4.2} x2={half} y2={-4.2} stroke={color} strokeWidth="2.6" strokeLinecap="round" />
@@ -451,7 +458,7 @@ function RoadShape({ set, L, color }) {
     case 'pieces:scrolls':
       return (
         <>
-          <StripBase L={L - 4} h={12} />
+          <StripBase L={L - 4} h={12} color={color} />
           <rect x={-half + 2} y={-4.6} width={L - 4} height={9.2} fill={PAPER} />
           <line x1={-half + 6} y1={0} x2={half - 6} y2={0} stroke={shade(color, -0.2)} strokeWidth="1.6" strokeDasharray="5 2.5" />
           {[-1, 1].map((k) => (
@@ -462,7 +469,7 @@ function RoadShape({ set, L, color }) {
     case 'pieces:sand':
       return (
         <>
-          <StripBase L={L} h={12.5} />
+          <StripBase L={L} h={12.5} color={color} />
           <line x1={-half} y1={0} x2={half} y2={0} stroke={SAND} strokeWidth="8.6" strokeLinecap="round" />
           <line x1={-half + 1} y1={0} x2={half - 1} y2={0} stroke={color} strokeWidth="8.6" strokeDasharray="4.2 3.4" />
           <line x1={-half} y1={2.6} x2={half} y2={2.6} stroke={SAND_DARK} strokeWidth="1.4" />
@@ -471,7 +478,7 @@ function RoadShape({ set, L, color }) {
     case 'pieces:kunai':
       return (
         <>
-          <StripBase L={L} h={12} />
+          <StripBase L={L} h={12} color={color} />
           <line x1={-half} y1={0} x2={half} y2={0} stroke={color} strokeWidth="8" strokeLinecap="round" />
           <path d={`M ${-half + 6} 0 L ${-half + 15} -3.4 L ${half - 9} -1.4 L ${half - 3} 0 L ${half - 9} 1.4 L ${-half + 15} 3.4 Z`} fill={STEEL} stroke={PIECE_INK} strokeWidth="1" strokeLinejoin="round" />
           <path d={`M ${-half + 6} 0 L ${half - 3} 0 L ${half - 9} -1.4 L ${-half + 15} -3.4 Z`} fill={STEEL_LIGHT} />
@@ -482,8 +489,8 @@ function RoadShape({ set, L, color }) {
       const pts = [-0.32, 0, 0.32].map((t) => [t * L, 0]);
       return (
         <>
-          <line x1={-half} y1={0} x2={half} y2={0} stroke={PIECE_RIM} strokeWidth="5" strokeLinecap="round" />
-          <line x1={-half} y1={0} x2={half} y2={0} stroke={WOOD_DARK} strokeWidth="2.6" strokeLinecap="round" />
+          <line x1={-half} y1={0} x2={half} y2={0} stroke={PIECE_INK} strokeWidth="4" strokeLinecap="round" />
+          <line x1={-half} y1={0} x2={half} y2={0} stroke={WOOD} strokeWidth="2" strokeLinecap="round" />
           {pts.map(([x], i) => <circle key={i} cx={x} cy="0" r="7" fill={shade(color, 0.35)} opacity="0.3" />)}
           <Dotted points={pts} r={3.6} fill={color} light={shade(color, 0.6)} />
         </>
@@ -492,7 +499,7 @@ function RoadShape({ set, L, color }) {
     case 'pieces:crimson':
       return (
         <>
-          <StripBase L={L} h={13} />
+          <StripBase L={L} h={13} color={color} />
           <line x1={-half} y1={0} x2={half} y2={0} stroke={BLACK} strokeWidth="9.4" strokeLinecap="round" />
           <line x1={-half} y1={-3.6} x2={half} y2={-3.6} stroke={color} strokeWidth="2.2" strokeLinecap="round" />
           <line x1={-half} y1={3.6} x2={half} y2={3.6} stroke={color} strokeWidth="2.2" strokeLinecap="round" />
@@ -506,10 +513,10 @@ function RoadShape({ set, L, color }) {
     default:
       return (
         <>
-          <StripBase L={L} />
+          <StripBase L={L} color={color} />
           <line x1={-half} y1={0} x2={half} y2={0} stroke={color} strokeWidth="8.6" strokeLinecap="round" />
           <line x1={-half} y1={0} x2={half} y2={0} stroke={shade(color, -0.45)} strokeWidth="8.6" strokeDasharray="1.2 4.2" strokeDashoffset="-2" />
-          <line x1={-half} y1={0} x2={half} y2={0} stroke={shade(color, 0.5)} strokeOpacity="0.7" strokeWidth="1.8" strokeLinecap="round" />
+          <line x1={-half} y1={0} x2={half} y2={0} stroke={shade(color, 0.5)} strokeOpacity="0.5" strokeWidth="1.6" strokeLinecap="round" />
         </>
       );
   }

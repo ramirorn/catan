@@ -7,10 +7,11 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Outlines } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { buildPieceGeometry, createAccentMaterials, createPlayerMaterial } from '../Board3D/pieceSets';
-import { BoardResources, INK, PX, TILE_H, TILE_SCALE, hexSideGeometry, hexTopGeometry } from '../Board3D/resources';
+import { buildPieceGeometry, createAccentMaterials, createPieceShadow, createPlayerMaterial } from '../Board3D/pieceSets';
+import { PieceLook } from '../Board3D/PieceLook';
+import { BoardResources, PX, TILE_H, TILE_SCALE, hexSideGeometry, hexTopGeometry } from '../Board3D/resources';
 import { TextureStore } from '../Board3D/textures';
 import { ThemeAccents3D } from '../Board3D/ThemeAccents3D';
 import { Lights } from '../Board3D/Scene3D';
@@ -18,22 +19,19 @@ import { computeBoardBounds, HEX_SIZE, SQRT3 } from '../../utils/hexMath';
 import { TERRAIN_BASE, shade } from '../../utils/theme';
 import { isLowPowerDevice } from '../Board/boardViewMode';
 
-const OUTLINE_PX = 2.2;
-
 /* ─── Pieces on a hex ─── */
 
-function PreviewPiece({ setId, kind, color, position, rotation = 0 }) {
+function PreviewPiece({ setId, kind, color, position, rotation = 0, shadow }) {
   const geometry = useMemo(() => buildPieceGeometry(setId, kind), [setId, kind]);
   const accents = useMemo(() => createAccentMaterials(setId), [setId]);
   const player = useMemo(() => createPlayerMaterial(setId, color), [setId, color]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => accents.forEach((m) => m.dispose()), [accents]);
   useEffect(() => () => player.dispose(), [player]);
-  const dpr = useThree((s) => s.viewport.dpr);
   const materials = useMemo(() => [player, ...accents], [player, accents]);
   return (
     <mesh geometry={geometry} material={materials} position={position} rotation-y={rotation}>
-      <Outlines thickness={OUTLINE_PX * dpr} color={INK} />
+      <PieceLook kind={kind} color={color} shadow={shadow} />
     </mesh>
   );
 }
@@ -47,14 +45,17 @@ function PiecesScene({ setId, color }) {
     }),
     []
   );
+  const shadow = useMemo(() => createPieceShadow(), []);
   useEffect(
     () => () => {
       geo.top.dispose();
       geo.side.dispose();
       mats.top.dispose();
       mats.side.dispose();
+      shadow.geometry.dispose();
+      shadow.material.dispose();
     },
-    [geo, mats]
+    [geo, mats, shadow]
   );
   return (
     <group position-y={-0.2}>
@@ -63,9 +64,9 @@ function PiecesScene({ setId, color }) {
       <mesh geometry={geo.side} material={mats.side} />
       <mesh geometry={geo.top} material={mats.top} position-y={TILE_H} />
       <group position-y={TILE_H} scale={1.45}>
-        <PreviewPiece setId={setId} kind="settlement" color={color} position={[-0.36, 0, -0.18]} rotation={0.5} />
-        <PreviewPiece setId={setId} kind="city" color={color} position={[0.3, 0, -0.2]} rotation={-0.35} />
-        <PreviewPiece setId={setId} kind="road" color={color} position={[0, 0, 0.4]} rotation={0.08} />
+        <PreviewPiece setId={setId} kind="settlement" color={color} shadow={shadow} position={[-0.36, 0, -0.18]} rotation={0.5} />
+        <PreviewPiece setId={setId} kind="city" color={color} shadow={shadow} position={[0.3, 0, -0.2]} rotation={-0.35} />
+        <PreviewPiece setId={setId} kind="road" color={color} shadow={shadow} position={[0, 0, 0.4]} rotation={0.08} />
       </group>
     </group>
   );

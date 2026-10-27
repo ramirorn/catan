@@ -55,7 +55,7 @@ export const Edge = memo(function Edge({ edge }) {
         </g>
       )}
 
-      {/* Built road in the owner's shop set (light rim + ink edges so it reads
+      {/* Built road in the owner's shop set (thin ink edges + soft tinted halo so it reads
           on any terrain). No SVG filter: a filter on a perfectly vertical /
           horizontal line has a zero-size bounding box and gets dropped. */}
       {road && (

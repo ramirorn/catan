@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { TERRAIN_BASE, shade } from '../../utils/theme';
 import { boardTheme, pieceSetOf } from '../../utils/cosmetics';
 import { LAND_TERRAINS } from './textures';
-import { ROAD_LEN, buildPieceGeometry, createAccentMaterials, createPlayerMaterial } from './pieceSets';
+import { ROAD_LEN, buildPieceGeometry, createAccentMaterials, createPieceShadow, createPlayerMaterial } from './pieceSets';
 
 export const PX = 1 / 60; // SVG board px → world units
 export const TILE_H = 0.14; // tile thickness
@@ -135,6 +135,11 @@ export class BoardResources {
       paper: lambert({ color: '#efe7d6' }),
     };
     applyTileTheme(this.mat, theme);
+
+    // Soft contact shadow under every piece (one plane + material for all)
+    this.pieceShadow = createPieceShadow();
+    keep(this.pieceShadow.geometry);
+    keep(this.pieceShadow.material);
   }
 
   /** Geometry of a piece ('settlement' | 'city' | 'road') of a shop set, built once */

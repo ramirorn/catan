@@ -7,10 +7,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Outlines } from '@react-three/drei';
 import * as THREE from 'three';
-import { BoardResources, INK, PX, TILE_H, TILE_SCALE } from '../Board3D/resources';
+import { BoardResources, PX, TILE_H, TILE_SCALE } from '../Board3D/resources';
 import { TextureStore } from '../Board3D/textures';
+import { PieceLook } from '../Board3D/PieceLook';
 import { Lights, Robber3D } from '../Board3D/Scene3D';
 import { SceneContext } from '../Board3D/sceneContext';
 import { Dice, GatedDice, warmDice } from '../Dice3D/DiceScene';
@@ -19,8 +19,6 @@ import { isLowPowerDevice } from '../Board/boardViewMode';
 import { TutorialAssets } from './tutorialAssets';
 import { BLUE, HEX, HEXES, PORTS, RED, SCENES, V } from './tutorialScenes';
 
-const OUTLINE_PX = 2.4;
-const RIM_PX = 4.2;
 const FOV = 32;
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
@@ -237,7 +235,6 @@ function Port({ port, pulseAt }) {
 function Piece({ spec }) {
   const res = useRes();
   const time = useStepTime();
-  const dpr = useThree((s) => s.viewport.dpr);
   const ref = useRef(null);
   const { kind, color, at, until, rise } = spec;
   useFrame(() => {
@@ -284,8 +281,7 @@ function Piece({ spec }) {
         material={res.pieceMaterials(null, color)}
         visible={at === undefined}
       >
-        <Outlines thickness={OUTLINE_PX * dpr} color={INK} />
-        <Outlines thickness={RIM_PX * dpr} color="#fff4dc" />
+        <PieceLook kind={kind} color={color} shadow={res.pieceShadow} />
       </mesh>
     </group>
   );

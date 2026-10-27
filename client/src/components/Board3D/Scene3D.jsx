@@ -17,6 +17,7 @@ import {
   pactProtectedId,
 } from '../Board/boardActions';
 import { PX, TILE_H, TILE_SCALE, INK } from './resources';
+import { PieceLook } from './PieceLook';
 import { boardTheme } from '../../utils/cosmetics';
 import { ThemeAccents3D } from './ThemeAccents3D';
 
@@ -27,7 +28,6 @@ const useScene = () => useContext(SceneContext);
 
 // drei <Outlines> thickness is in device pixels (constant on screen)
 const OUTLINE_PX = 2.4;
-const RIM_PX = 4.2;
 const useOutlinePx = () => useThree((s) => s.viewport.dpr);
 
 /** Hover state + pointer cursor for an interactive mesh */
@@ -317,14 +317,14 @@ export function Robber3D({ x, z }) {
 const easeOutBack = (t) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
 
 /**
- * A building / road in a player's colour, with an ink outline; drops in when
+ * A building / road in a player's colour, with a thin ink outline and a soft
+ * contact shadow; drops in when
  * placed. A city being upgraded waits hidden while the upgrade animation
  * starts (fxKey), then rises out of the ground with a turn.
  */
 const Piece = memo(function Piece({ set, kind, color, tipId, fxKey = null, rise = false }) {
   const { res, bornAt } = useScene();
   const tip = tipId ? tipHandlers3D('vertex', tipId) : null;
-  const dpr = useOutlinePx();
   const invalidate = useThree((s) => s.invalidate);
   const ref = useRef(null);
   const anim = useRef(null);
@@ -380,9 +380,7 @@ const Piece = memo(function Piece({ set, kind, color, tipId, fxKey = null, rise 
       receiveShadow
       {...tip}
     >
-      {/* ink line + a thin washi rim around it, like the 2D pieces */}
-      <Outlines thickness={OUTLINE_PX * dpr} color={INK} />
-      <Outlines thickness={RIM_PX * dpr} color="#fff4dc" />
+      <PieceLook kind={kind} color={color} shadow={res.pieceShadow} />
     </mesh>
   );
 });
