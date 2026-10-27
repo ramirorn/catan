@@ -119,10 +119,10 @@ export function MenuShell({ children, onProfile, onLogin, compactTitle = false, 
 
           <ScrollPanel
             className={`w-full max-w-md mx-auto lg:mx-0 phland:mx-0 phland:max-w-none animate-modal-pop lg:max-h-full lg:min-h-0 lg:flex lg:flex-col phland:max-h-full phland:min-h-0 phland:flex phland:flex-col ${panelClassName}`}
-            bodyClassName="px-4 min-[360px]:px-5 sm:px-8 pt-5 short:pt-4 tiny:pt-3 pb-6 short:pb-5 tiny:pb-4 phland:px-5 phland:pt-3 phland:pb-3.5 lg:min-h-0 lg:overflow-y-auto phland:min-h-0 phland:overflow-y-auto"
+            bodyClassName="px-4 min-[360px]:px-5 sm:px-8 pt-5 short:pt-4 tiny:pt-3 lowdesk:pt-4 pb-6 short:pb-5 tiny:pb-4 lowdesk:pb-4 phland:px-5 phland:pt-3 phland:pb-3.5 lg:min-h-0 lg:overflow-y-auto phland:min-h-0 phland:overflow-y-auto"
           >
             {children}
-            <div className="mt-5 short:mt-3.5 tiny:mt-2.5 phland:mt-2.5 flex items-center gap-2 text-[12px] text-ink-faint">
+            <div className="mt-5 short:mt-3.5 tiny:mt-2.5 phland:mt-2.5 lowdesk:mt-3 flex items-center gap-2 text-[12px] text-ink-faint">
               <span className={`w-2 h-2 rounded-full ${connected ? 'bg-leaf' : 'bg-shu-light'}`} />
               {connected ? 'Conectado al servidor' : 'Sin conexión con el servidor'}
               <InstallAppButton className="ml-auto" />

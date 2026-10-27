@@ -225,7 +225,7 @@ const CLOAK_PROFILE = [
   [0.0, 0.37],
 ].map(([x, y]) => new THREE.Vector2(x, y));
 
-function Robber3D({ x, z }) {
+export function Robber3D({ x, z }) {
   const { res } = useScene();
   const dpr = useOutlinePx();
   const invalidate = useThree((s) => s.invalidate);

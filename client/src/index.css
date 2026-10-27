@@ -29,6 +29,12 @@
     @slot;
   }
 }
+/* lowdesk: desktop / laptop windows with little height (menu fits without scrolling) */
+@custom-variant lowdesk {
+  @media (min-width: 1024px) and (max-height: 720px) {
+    @slot;
+  }
+}
 @custom-variant phland {
   @media (orientation: landscape) and (max-height: 540px) and (max-width: 1000px) {
     @slot;

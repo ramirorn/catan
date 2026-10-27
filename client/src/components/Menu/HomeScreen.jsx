@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useGame } from '../../context/GameContext';
 import { LobbyScreen } from '../Lobby/LobbyScreen';
@@ -7,6 +7,9 @@ import { ShopScreen } from './ShopScreen';
 import { ProfileScreen } from './ProfileScreen';
 import { RankingScreen } from './RankingScreen';
 import { LoginModal } from './LoginModal';
+
+// The tutorial (text + 3D lessons) is its own lazy chunk
+const TutorialScreen = lazy(() => import('../Tutorial/TutorialScreen'));
 
 /**
  * Everything before a room: the main menu and its screens. `screen` lives in
@@ -35,6 +38,12 @@ export function HomeScreen({ screen, onScreen }) {
     content = <ShopScreen onBack={toMenu} onLogin={openLogin} onProfile={() => go('profile')} />;
   } else if (screen === 'ranking') {
     content = <RankingScreen onBack={toMenu} onLogin={openLogin} onProfile={() => go('profile')} />;
+  } else if (screen === 'tutorial') {
+    content = (
+      <Suspense fallback={<div className="night-surface h-dvh w-full" aria-busy="true" />}>
+        <TutorialScreen onBack={toMenu} onPlay={() => go('play')} />
+      </Suspense>
+    );
   } else if (screen === 'profile') {
     // Re-mounted when the account changes so the form shows the saved profile
     content = <ProfileScreen key={user ? user.id : 'guest'} onBack={toMenu} onLogin={openLogin} onShop={() => go('shop')} />;
