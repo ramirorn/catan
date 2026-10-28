@@ -7,6 +7,9 @@
 //   ./routes/users.js     Usuarios (accounts in Postgres)
 //   ./routes/insights.js  Estadísticas + Sistema
 //   ./routes/audit.js     Registro (admin_actions)
+//   ./routes/moderation.js  Moderación (chat, silencios, palabras, reportes)
+//   ./routes/economy.js     Tienda y economía
+//   ./routes/ranking.js     Ranking (exclusiones, reinicio semanal)
 // Each one exports `register(router, ctx)`; ctx is built below.
 import express from 'express';
 import { createRateLimiter } from '../accounts/rateLimit.js';
@@ -17,6 +20,13 @@ import { registerLiveRoutes } from './routes/live.js';
 import { registerUserRoutes } from './routes/users.js';
 import { registerInsightRoutes } from './routes/insights.js';
 import { registerAuditRoutes } from './routes/audit.js';
+import { registerModerationRoutes } from './routes/moderation.js';
+import { registerEconomyRoutes } from './routes/economy.js';
+import { registerRankingRoutes } from './routes/ranking.js';
+import { createPgReportStore } from './moderationStore.js';
+import { createPgEconomyStore } from './economyStore.js';
+import { createRuntime } from './runtime.js';
+import { createMutes } from './moderation.js';
 
 export const NOT_FOUND = { error: 'No encontrado' };
 // Every admin request carries this header: a cross-site page cannot send it
@@ -56,11 +66,19 @@ export function createAdminGuard(accounts) {
  * `live` is the object returned by registerSocketHandlers, `settings` the
  * maintenance store (createSettings), `errorLog` { recentErrors, clearErrors }.
  * `store` can be injected (tests); by default it is the Postgres one.
+ * Phase B: `runtime` (admin/runtime.js, defaults to accounts.runtime),
+ * `mutes` (createMutes), `reports` / `economy` stores (Postgres by default).
  */
-export function createAdmin({ accounts, live, settings, errorLog, store = null }) {
+export function createAdmin({ accounts, live, settings, errorLog, store = null, runtime = null, mutes = null, reports, economy }) {
   const router = express.Router();
   const enabled = !!(accounts && accounts.enabled);
   const adminStore = store || (enabled ? createPgAdminStore(accounts.pool) : null);
+  const phaseB = {
+    runtime: runtime || (accounts && accounts.runtime) || createRuntime(),
+    mutes: mutes || createMutes(),
+    reports: reports !== undefined ? reports : (enabled ? createPgReportStore(accounts.pool) : null),
+    economy: economy !== undefined ? economy : (enabled ? createPgEconomyStore(accounts.pool) : null),
+  };
   const service = adminStore ? createAdminService(adminStore) : null;
   const limit = createRateLimiter();
 
@@ -102,7 +120,7 @@ export function createAdmin({ accounts, live, settings, errorLog, store = null }
     }
   };
 
-  const ctx = { accounts, live, settings, errorLog, store: adminStore, service, audit, handle };
+  const ctx = { accounts, live, settings, errorLog, store: adminStore, service, audit, handle, ...phaseB };
 
   router.get('/me', (req, res) => {
     res.json({ admin: req.admin });
@@ -112,6 +130,9 @@ export function createAdmin({ accounts, live, settings, errorLog, store = null }
   registerUserRoutes(router, ctx);
   registerInsightRoutes(router, ctx);
   registerAuditRoutes(router, ctx);
+  registerModerationRoutes(router, ctx);
+  registerEconomyRoutes(router, ctx);
+  registerRankingRoutes(router, ctx);
 
   router.use((req, res) => res.status(404).json(NOT_FOUND));
 

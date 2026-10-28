@@ -112,3 +112,76 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at timestamptz NOT NULL DEFAULT now(),
   updated_by uuid REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- ─── Admin panel (phase B) ───
+-- Chat mutes of accounts (guests are muted in memory only). A mute "until
+-- the game ends" keeps the room code; it is lifted when that game ends and
+-- also carries a safety end date.
+CREATE TABLE IF NOT EXISTS chat_mutes (
+  user_id     uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  muted_until timestamptz NOT NULL,
+  room_id     text CHECK (room_id IS NULL OR char_length(room_id) <= 16),
+  reason      text CHECK (reason IS NULL OR char_length(reason) <= 300),
+  muted_by    uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Player reports sent from a game ("Reportar"). The target may be a guest
+-- (only target_player_id), the chat excerpt is a snapshot taken when sent.
+CREATE TABLE IF NOT EXISTS reports (
+  id                 bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  reporter_user_id   uuid REFERENCES users(id) ON DELETE SET NULL,
+  reporter_player_id text NOT NULL CHECK (char_length(reporter_player_id) BETWEEN 1 AND 64),
+  reporter_name      text NOT NULL CHECK (char_length(reporter_name) <= 40),
+  target_user_id     uuid REFERENCES users(id) ON DELETE SET NULL,
+  target_player_id   text NOT NULL CHECK (char_length(target_player_id) BETWEEN 1 AND 64),
+  target_name        text NOT NULL CHECK (char_length(target_name) <= 40),
+  room_id            text NOT NULL CHECK (char_length(room_id) <= 16),
+  reason             text NOT NULL CHECK (reason IN ('insultos', 'trampa', 'spam', 'nombre', 'otro')),
+  details            text CHECK (details IS NULL OR char_length(details) <= 300),
+  chat_excerpt       jsonb NOT NULL DEFAULT '[]'::jsonb,
+  status             text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
+  resolved_by        uuid REFERENCES users(id) ON DELETE SET NULL,
+  resolved_at        timestamptz,
+  notes              text CHECK (notes IS NULL OR char_length(notes) <= 300),
+  created_at         timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS reports_status_idx ON reports (status, id DESC);
+CREATE INDEX IF NOT EXISTS reports_target_idx ON reports (target_user_id, id DESC);
+
+-- Shop changes made from the panel, on top of the catalogue in code
+-- (server/src/shop/catalog.js). No row = the item as defined in code.
+CREATE TABLE IF NOT EXISTS shop_item_overrides (
+  item_id      text PRIMARY KEY CHECK (char_length(item_id) BETWEEN 1 AND 64),
+  price        integer CHECK (price IS NULL OR price BETWEEN 1 AND 100000),
+  enabled      boolean NOT NULL DEFAULT true,
+  sale_percent smallint CHECK (sale_percent IS NULL OR sale_percent BETWEEN 5 AND 90),
+  sale_starts  timestamptz,
+  sale_ends    timestamptz,
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  updated_by   uuid REFERENCES users(id) ON DELETE SET NULL,
+  CHECK (sale_percent IS NULL OR (sale_starts IS NOT NULL AND sale_ends IS NOT NULL AND sale_ends > sale_starts))
+);
+
+-- One row per purchase (written in the same transaction as the charge)
+CREATE TABLE IF NOT EXISTS shop_purchases (
+  id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  item_id      text NOT NULL CHECK (char_length(item_id) BETWEEN 1 AND 64),
+  price_paid   integer NOT NULL CHECK (price_paid >= 0),
+  list_price   integer NOT NULL CHECK (list_price >= 0),
+  sale_percent smallint,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS shop_purchases_created_idx ON shop_purchases (created_at DESC);
+CREATE INDEX IF NOT EXISTS shop_purchases_item_idx ON shop_purchases (item_id);
+
+-- Ranking: results left out of the leaderboards by an admin (the Ryō paid
+-- and the account counters stay as they were)
+ALTER TABLE game_results ADD COLUMN IF NOT EXISTS excluded boolean NOT NULL DEFAULT false;
+ALTER TABLE game_results ADD COLUMN IF NOT EXISTS excluded_reason text CHECK (excluded_reason IS NULL OR char_length(excluded_reason) <= 300);
+ALTER TABLE game_results ADD COLUMN IF NOT EXISTS excluded_at timestamptz;
+CREATE INDEX IF NOT EXISTS game_results_game_idx ON game_results (game_id);
+-- app_settings keys used by phase B: 'banned_words' { words: [] },
+-- 'rewards' { finish, win, perVp, minVoteMinutes } and 'ranking'
+-- { weekResetAt } (the weekly ranking only counts results after it).

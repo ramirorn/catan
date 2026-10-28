@@ -137,13 +137,22 @@ export async function getStats(pool, userId) {
 // The weekly ranking restarts every Monday at 00:00, Argentina time
 const WEEK_START_SQL = `(date_trunc('week', now() AT TIME ZONE 'America/Argentina/Buenos_Aires') AT TIME ZONE 'America/Argentina/Buenos_Aires')`;
 
+/** WHERE clause of the leaderboard: exclusions and the period start ($1) */
+export function leaderboardFilter(period) {
+  // $1 = weekly reset (always null for 'all'); referenced in both so its type is known
+  const start = period === 'week' ? WEEK_START_SQL : "'-infinity'::timestamptz";
+  const since = `GREATEST(${start}, COALESCE($1::timestamptz, '-infinity'::timestamptz))`;
+  return `NOT excluded AND played_at >= ${since}`;
+}
+
 /**
  * Players with the most wins ('all' time or this 'week'), ties broken by
  * fewer games played. `rank` repeats on ties (1, 2, 2, 4…). With a userId,
  * also returns that player's own row (null if they have no wins yet).
+ * Results excluded by an admin never count; `weekResetAt` (admin "reiniciar
+ * ranking semanal") moves the start of this week's ranking later.
  */
-export async function getLeaderboard(pool, period, { limit = 20, userId = null } = {}) {
-  const since = period === 'week' ? WEEK_START_SQL : `'-infinity'::timestamptz`;
+export async function getLeaderboard(pool, period, { limit = 20, userId = null, weekResetAt = null } = {}) {
   const ranked = `
     WITH ranked AS (
       SELECT user_id,
@@ -151,18 +160,19 @@ export async function getLeaderboard(pool, period, { limit = 20, userId = null }
              count(*)::int AS games,
              rank() OVER (ORDER BY count(*) FILTER (WHERE won) DESC, count(*) ASC)::int AS pos
         FROM game_results
-       WHERE played_at >= ${since}
+       WHERE ${leaderboardFilter(period)}
        GROUP BY user_id
       HAVING count(*) FILTER (WHERE won) > 0
     )`;
+  const reset = period === 'week' && weekResetAt ? weekResetAt : null;
   const cols = 'r.pos, r.wins, r.games, u.id, u.display_name, u.avatar_id';
   const top = await pool.query(
-    `${ranked} SELECT ${cols} FROM ranked r JOIN users u ON u.id = r.user_id ORDER BY r.pos, u.display_name LIMIT $1`,
-    [limit],
+    `${ranked} SELECT ${cols} FROM ranked r JOIN users u ON u.id = r.user_id ORDER BY r.pos, u.display_name LIMIT $2`,
+    [reset, limit],
   );
   let me = null;
   if (userId) {
-    const mine = await pool.query(`${ranked} SELECT ${cols} FROM ranked r JOIN users u ON u.id = r.user_id WHERE r.user_id = $1`, [userId]);
+    const mine = await pool.query(`${ranked} SELECT ${cols} FROM ranked r JOIN users u ON u.id = r.user_id WHERE r.user_id = $2`, [reset, userId]);
     me = mine.rows[0] ? toRankRow(mine.rows[0]) : null;
   }
   return { rows: top.rows.map(toRankRow), me };

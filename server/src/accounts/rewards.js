@@ -16,6 +16,36 @@ export const REWARD_RULES = {
     : 15,
 };
 
+// Rules an admin may change from "Tienda y economía" (app_settings 'rewards')
+export const REWARD_LIMITS = {
+  finish: [0, 500],
+  win: [0, 1000],
+  perVp: [0, 100],
+  minVoteMinutes: [0, 180],
+};
+
+/**
+ * Validated editable rules: { rules } with only the known keys (integers in
+ * range) or { error } in Spanish. `partial` may omit keys.
+ */
+export function cleanRewardRules(partial) {
+  const rules = {};
+  if (!partial || typeof partial !== 'object') return { rules };
+  for (const [key, [min, max]] of Object.entries(REWARD_LIMITS)) {
+    if (partial[key] === undefined || partial[key] === null || partial[key] === '') continue;
+    const n = typeof partial[key] === 'string' && /^\d+$/.test(partial[key].trim()) ? Number(partial[key]) : partial[key];
+    if (!Number.isInteger(n) || n < min || n > max) return { error: `«${key}» debe ser un entero entre ${min} y ${max}` };
+    rules[key] = n;
+  }
+  return { rules };
+}
+
+/** Defaults with the stored overrides on top */
+export function mergeRewardRules(stored) {
+  const { rules } = cleanRewardRules(stored);
+  return { ...REWARD_RULES, ...rules };
+}
+
 /**
  * Summary of a finished game, taken from the engine. `accounts` maps a
  * seat's playerId to the account id bound to it (logged-in players only).

@@ -6,12 +6,13 @@ import express from 'express';
 import { getPool } from '../db/pool.js';
 import { createNeonAuth } from './neonAuth.js';
 import { createRateLimiter } from './rateLimit.js';
-import { COIN_NAME, REWARD_RULES, computeRewards } from './rewards.js';
+import { COIN_NAME, computeRewards } from './rewards.js';
 import { cleanDisplayName, ensureUser, getAccess, getLeaderboard, getStats, getUser, recordGame, updateProfile } from './store.js';
 import { blockedMessage, parseAdminEmails } from '../admin/access.js';
 import { createShopService, ShopError } from '../shop/service.js';
 import { createPgShopStore } from '../shop/store.js';
 import { DEFAULT_ITEMS } from '../shop/catalog.js';
+import { createRuntime } from '../admin/runtime.js';
 
 const DISABLED_MESSAGE = 'Las cuentas no están disponibles en este servidor. Puedes jugar como invitado.';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -52,13 +53,27 @@ function authErrorMessage(res) {
   }
 }
 
-export function createAccounts(env = process.env) {
+// `runtime` (optional): live admin settings (admin/runtime.js) — reward rules,
+// shop overrides, banned words, weekly ranking reset. One is created when
+// not given.
+export function createAccounts(env = process.env, { runtime: givenRuntime = null } = {}) {
   const enabled = !!(env.DATABASE_URL && env.NEON_AUTH_BASE_URL);
   const pool = enabled ? getPool() : null;
   const auth = enabled ? createNeonAuth(env.NEON_AUTH_BASE_URL) : null;
   const limit = createRateLimiter();
   const router = express.Router();
-  const shop = createShopService(enabled ? createPgShopStore(pool) : null);
+  const runtime = givenRuntime || createRuntime({ pool });
+  const shop = createShopService(enabled ? createPgShopStore(pool) : null, { pricing: runtime });
+  // Display names go through the banned-words filter too
+  const cleanName = (value) => {
+    const name = cleanDisplayName(value);
+    return name ? cleanDisplayName(runtime.filterText(name).text) : '';
+  };
+  // Current Ryō rules as shown to players
+  const rewardInfo = () => {
+    const r = runtime.getRewardRules();
+    return { finish: r.finish, win: r.win, perVp: r.perVp, minVoteMinutes: r.minVoteMinutes };
+  };
   // ADMIN_EMAILS: accounts that become admins when they sign in
   const adminEmails = parseAdminEmails(env.ADMIN_EMAILS);
   const ensure = (authUser, opts = {}) => ensureUser(pool, authUser, { ...opts, adminEmails });
@@ -114,12 +129,7 @@ export function createAccounts(env = process.env) {
       google: enabled,
       message: enabled ? null : DISABLED_MESSAGE,
       coinName: COIN_NAME,
-      rewards: {
-        finish: REWARD_RULES.finish,
-        win: REWARD_RULES.win,
-        perVp: REWARD_RULES.perVp,
-        minVoteMinutes: REWARD_RULES.minVoteMinutes,
-      },
+      rewards: rewardInfo(),
     });
   });
 
@@ -132,7 +142,7 @@ export function createAccounts(env = process.env) {
         const authUser = await auth.getSessionUser(req.get('cookie'), originOf(req));
         if (authUser) userId = authUser.id;
       }
-      res.json(await shop.view(userId));
+      res.json({ ...(await shop.view(userId)), rewards: rewardInfo() });
     } catch (err) {
       console.error('API GET /shop failed:', err.message);
       // The catalogue itself never depends on the database
@@ -207,7 +217,7 @@ export function createAccounts(env = process.env) {
   router.post('/auth/register', limit('register', 5, 15 * 60_000), handle(async (req, res) => {
     const { email, password, displayName, avatarId } = req.body || {};
     const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    const name = cleanDisplayName(displayName);
+    const name = cleanName(displayName);
     if (!EMAIL_RE.test(cleanEmail) || cleanEmail.length > 254) return res.status(400).json({ error: 'Escribe un correo válido' });
     if (typeof password !== 'string' || password.length < PASSWORD_MIN) {
       return res.status(400).json({ error: `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres` });
@@ -326,7 +336,7 @@ export function createAccounts(env = process.env) {
     const { displayName, avatarId } = req.body || {};
     const change = {};
     if (displayName !== undefined) {
-      const name = cleanDisplayName(displayName);
+      const name = cleanName(displayName);
       if (!name) return res.status(400).json({ error: 'Escribe tu nombre de ninja' });
       change.displayName = name;
     }
@@ -351,16 +361,18 @@ export function createAccounts(env = process.env) {
   // database; the caller's own position is a cheap extra query.
   const LEADERBOARD_TTL_MS = 60_000;
   const leaderboardCache = new Map(); // period → { at, rows }
+  const invalidateLeaderboard = () => leaderboardCache.clear();
+  const boardOpts = (extra) => ({ ...extra, weekResetAt: runtime.getWeekResetAt() });
   router.get('/leaderboard', limit('leaderboard', 30, 60_000), handle(async (req, res) => {
     const period = req.query.period === 'week' ? 'week' : 'all';
     const session = await currentUser(req).catch(() => null);
     const userId = session ? session.authUser.id : null;
     const hit = leaderboardCache.get(period);
     if (hit && Date.now() - hit.at < LEADERBOARD_TTL_MS) {
-      const me = userId ? (hit.rows.find((r) => r.userId === userId) || (await getLeaderboard(pool, period, { limit: 0, userId })).me) : null;
+      const me = userId ? (hit.rows.find((r) => r.userId === userId) || (await getLeaderboard(pool, period, boardOpts({ limit: 0, userId }))).me) : null;
       return res.json({ period, rows: hit.rows, me });
     }
-    const board = await getLeaderboard(pool, period, { limit: 20, userId });
+    const board = await getLeaderboard(pool, period, boardOpts({ limit: 20, userId }));
     leaderboardCache.set(period, { at: Date.now(), rows: board.rows });
     res.json({ period, rows: board.rows, me: board.me });
   }));
@@ -379,8 +391,8 @@ export function createAccounts(env = process.env) {
   });
 
   router.post('/shop/buy', limit('shop-buy', 20, 60_000), shopHandle(async (req, res, userId) => {
-    const { itemId } = req.body || {};
-    const result = await shop.buy(userId, itemId);
+    const { itemId, expectedPrice } = req.body || {};
+    const result = await shop.buy(userId, itemId, expectedPrice);
     res.json({ ...result, ...(await shop.view(userId)) });
   }));
 
@@ -403,7 +415,7 @@ export function createAccounts(env = process.env) {
    * { eligible, reason, paid: [{ playerId, userId, coins, total }] }.
    */
   async function awardGame(summary) {
-    const result = computeRewards(summary);
+    const result = computeRewards(summary, runtime.getRewardRules());
     if (!enabled || !result.eligible || !result.awards.length) return { ...result, paid: [] };
     const rows = await recordGame(pool, summary, result.awards);
     const byUser = new Map(rows.map((r) => [r.userId, r]));
@@ -439,6 +451,9 @@ export function createAccounts(env = process.env) {
     enabled,
     router,
     pool,
+    runtime,
+    invalidateLeaderboard,
+    leaderboard: (period, opts = {}) => getLeaderboard(pool, period, boardOpts(opts)),
     adminEmails,
     sessionUser,
     ensureUser: (authUser) => (enabled ? ensure(authUser) : null),

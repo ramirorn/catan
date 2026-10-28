@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { useGame } from '../../context/GameContext';
 import { pieceColor, shade } from '../../utils/theme';
-import { ScrollIcon, ChatIcon, ChevronDownIcon } from '../Shared/Icons';
+import { ScrollIcon, ChatIcon, ChevronDownIcon, FlagIcon } from '../Shared/Icons';
 import { useLogExpanded, setLogExpanded } from './logLayout';
 import { Avatar } from '../Shared/Avatar';
+import { ReportDialog } from './ReportDialog';
 
 export function GameLog() {
-  const { gameState, chatMessages, sendChatMessage, spectators } = useGame();
+  const { gameState, chatMessages, sendChatMessage, spectators, myPlayerId } = useGame();
   const [activeTab, setActiveTab] = useState('log');
+  const [reporting, setReporting] = useState(null); // { id, name, messageId, message }
   const [text, setText] = useState('');
   const scrollRef = useRef(null);
   const expanded = useLogExpanded();
@@ -122,11 +124,29 @@ export function GameLog() {
                   </span>{' '}
                   <span className="text-ink">{msg.message}</span>
                 </span>
+                {msg.playerId !== myPlayerId && msg.id != null && (
+                  <button
+                    type="button"
+                    onClick={() => setReporting({
+                      id: msg.playerId,
+                      name: String(msg.playerName || '').replace(/ (espectador)$/, ''),
+                      messageId: msg.id,
+                      message: msg.message,
+                    })}
+                    className="shrink-0 w-7 h-7 -my-1 flex items-center justify-center text-ink-faint/70 hover:text-shu cursor-pointer rounded-[2px]"
+                    title="Reportar este mensaje"
+                    aria-label={`Reportar el mensaje de ${msg.playerName}`}
+                  >
+                    <FlagIcon className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </li>
             ))}
           </ol>
         )}
       </div>
+
+      {reporting && <ReportDialog target={reporting} onClose={() => setReporting(null)} />}
 
       {/* Chat input form */}
       {activeTab === 'chat' && (

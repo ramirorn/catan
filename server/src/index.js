@@ -11,6 +11,8 @@ import { registerSocketHandlers } from './socket/handlers.js';
 import { createAccounts } from './accounts/index.js';
 import { createAdmin } from './admin/index.js';
 import { createSettings } from './admin/settings.js';
+import { createMutes } from './admin/moderation.js';
+import { createPgReportStore } from './admin/moderationStore.js';
 
 // Last ~50 server errors for the admin "Sistema" tab
 installErrorLog();
@@ -47,6 +49,12 @@ console.log(accounts.enabled ? 'Accounts enabled (Neon)' : 'Accounts disabled: s
 // Server-wide switches (maintenance mode), persisted when there is a database
 const settings = createSettings({ pool: accounts.enabled ? accounts.pool : null });
 settings.load();
+// Live admin settings (banned words, Ryō rules, shop overrides, weekly ranking
+// reset) and chat mutes, loaded from the database when there is one
+accounts.runtime.load();
+const mutes = createMutes({ pool: accounts.enabled ? accounts.pool : null });
+mutes.load();
+const reports = accounts.enabled ? createPgReportStore(accounts.pool) : null;
 
 // Register all socket event handlers. The admin panel is created right after
 // (it needs the live-control API they return); the socket side reaches it
@@ -54,10 +62,13 @@ settings.load();
 let admin = null;
 const live = registerSocketHandlers(io, lobbyManager, {}, accounts, {
   settings,
+  runtime: accounts.runtime,
+  mutes,
+  reports,
   isAdmin: (userId) => (admin ? admin.isAdmin(userId) : Promise.resolve(false)),
   onAdminAction: (...args) => admin && admin.logSocketAction(...args),
 });
-admin = createAdmin({ accounts, live, settings, errorLog: { recentErrors, clearErrors } });
+admin = createAdmin({ accounts, live, settings, errorLog: { recentErrors, clearErrors }, mutes, reports });
 
 // Hidden admin panel API (404 for everyone who is not an admin), then the
 // public accounts API

@@ -373,10 +373,31 @@ test('avatars: validated index, public in every view', () => {
 // ─── «Pacto de paz» (robber bribe) and the desert rule ───
 const EMPTY = () => ({ wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 });
 
+// Small seeded PRNG (mulberry32): the pact scenarios run on a fixed board,
+// so they never depend on where the random generator put the deserts
+function withSeed(seed, fn) {
+  const original = Math.random;
+  let t = seed >>> 0;
+  Math.random = () => {
+    t = (t + 0x6d2b79f5) >>> 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+  try {
+    return fn();
+  } finally {
+    Math.random = original;
+  }
+}
+
 // Setup done, empty hands, then the current player rolls a 7 (nobody discards)
-function toRobberMove(n, boardType) {
-  const e = newGame(n, boardType);
-  playSetup(e);
+function toRobberMove(n, boardType, seed = 7) {
+  const e = withSeed(seed, () => {
+    const g = newGame(n, boardType);
+    playSetup(g);
+    return g;
+  });
   for (const p of Object.values(e.players)) p.resources = EMPTY();
   const pid = e.getCurrentPlayerId();
   const res = withDice([3, 4], () => e.rollDice(pid));
@@ -414,9 +435,13 @@ for (const [boardType, n] of [['standard', 4], ['extended', 6]]) {
     assert.deepEqual({ fromId: ev.fromId, toId: ev.toId }, { fromId: a, toId: b });
     assert.equal(ev.request, undefined);
     assert.ok(e.gameLog.at(-1).message.includes('firmaron un pacto de paz (1 trigo)'));
-    // Every hex with a building of b is off limits, in the state too
+    // Every hex with a building of b is off limits, in the state too. A
+    // desert is the exception (the renegade robs nobody there: see the
+    // «pacto + desierto» test), so it is left out here.
     const legal = e.serialize(c).robberHexes;
-    for (const h of hexesOf(e, b)) {
+    const guarded = hexesOf(e, b).filter((h) => !e.isDesertHex(h));
+    assert.ok(guarded.some((h) => h !== e.board.robberHex), 'b has at least one protected producing hex');
+    for (const h of guarded) {
       assert.ok(!legal.includes(h), `hex ${h} should be protected`);
       if (h !== e.board.robberHex) assert.equal(e.moveRobber(a, h).success, false);
     }

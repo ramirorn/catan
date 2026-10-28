@@ -93,6 +93,17 @@ export function GameProvider({ children }) {
       });
     };
 
+    // A moderator removed a message from the room chat
+    const handleChatDeleted = ({ id } = {}) => {
+      if (id == null) return;
+      setChatMessages((prev) => prev.filter((m) => m.id !== id));
+    };
+
+    // Private notice from a moderator (muted / unmuted…)
+    const handleModerationNotice = ({ message, severity } = {}) => {
+      if (typeof message === 'string' && message) addToast(message, severity === 'info' ? 'info' : 'error', 7000);
+    };
+
     // Only the spectator list changed (someone started / stopped watching)
     const handleRoomSpectators = ({ roomId: rid, spectators } = {}) => {
       if (!Array.isArray(spectators)) return;
@@ -112,6 +123,8 @@ export function GameProvider({ children }) {
     socket.on('gameState', handleGameState);
     socket.on('chatMessage', handleChatMessage);
     socket.on('chatHistory', handleChatHistory);
+    socket.on('chatMessageDeleted', handleChatDeleted);
+    socket.on('moderationNotice', handleModerationNotice);
     socket.on('roomSpectators', handleRoomSpectators);
     socket.on('kicked', handleKicked);
     // Ryō paid when the game ended (only sent to logged-in players)
@@ -128,6 +141,8 @@ export function GameProvider({ children }) {
       socket.off('gameState', handleGameState);
       socket.off('chatMessage', handleChatMessage);
       socket.off('chatHistory', handleChatHistory);
+      socket.off('chatMessageDeleted', handleChatDeleted);
+      socket.off('moderationNotice', handleModerationNotice);
       socket.off('roomSpectators', handleRoomSpectators);
       socket.off('kicked', handleKicked);
       socket.off('roomClosed', handleRoomClosed);
@@ -619,6 +634,16 @@ export function GameProvider({ children }) {
     });
   }, [socket, addToast]);
 
+  // «Reportar»: a player or spectator of this room, for a reason (+ optional
+  // text and the chat message it is about). Resolves { success, error }.
+  const reportPlayer = useCallback((targetId, reason, text = '', messageId = null) => new Promise((resolve) => {
+    if (!socket) return resolve({ success: false, error: 'No hay conexión con el servidor' });
+    socket.timeout(10000).emit('reportPlayer', { targetId, reason, text, messageId }, (err, res) => {
+      if (err) resolve({ success: false, error: 'El servidor no respondió. Inténtalo de nuevo.' });
+      else resolve(res || { success: false, error: 'No se pudo enviar el reporte' });
+    });
+  }), [socket]);
+
   const value = useMemo(() => ({
     gameState,
     roomId,
@@ -677,6 +702,7 @@ export function GameProvider({ children }) {
     endTurn,
     voteEndGame,
     sendChatMessage,
+    reportPlayer,
   }), [
     gameState, roomId, playerName, avatarId, setAvatarId, myPlayerId, myPlayer, isMyTurn,
     isSpectator, spectators, hostId, isHost, spectateRoom, leaveRoom, resetToMenu, kickPlayer,
@@ -686,7 +712,7 @@ export function GameProvider({ children }) {
     createRoom, joinRoom, startGame, rollDice, setupPlaceSettlement, setupPlaceRoad,
     buildRoad, buildSettlement, buildCity, buyDevCard, playDevCard, discardCards,
     moveRobber, stealCard, offerPeacePact, respondPeacePact, cancelPeacePact, bankTrade, proposeTrade, respondToTrade, acceptTrade,
-    cancelTrade, endTurn, voteEndGame, sendChatMessage
+    cancelTrade, endTurn, voteEndGame, sendChatMessage, reportPlayer
   ]);
 
   return (

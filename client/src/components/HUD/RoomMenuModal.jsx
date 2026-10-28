@@ -6,6 +6,7 @@ import { PlayerAvatar } from '../Shared/Avatar';
 import { PHASE } from '../../utils/constants';
 import { formatDuration, useGameElapsed } from '../../utils/gameClock';
 import { CrownIcon, EyeIcon, ExitIcon, FlagIcon } from '../Shared/Icons';
+import { ReportDialog } from './ReportDialog';
 
 /**
  * Room menu (header ☰): game info, who is playing / watching, the host's
@@ -17,6 +18,7 @@ export function RoomMenuModal({ isOpen, onClose }) {
     leaveRoom, kickPlayer, setActiveModal,
   } = useGame();
   const [confirm, setConfirm] = useState(null); // { kind: 'leave' } | { kind: 'kick', id, name }
+  const [reporting, setReporting] = useState(null); // { id, name }
   const elapsed = useGameElapsed(gameState?.startedAt, gameState?.endedAt, serverOffset);
 
   if (!isOpen || !gameState) return null;
@@ -24,6 +26,22 @@ export function RoomMenuModal({ isOpen, onClose }) {
   const inLobby = gameState.phase === PHASE.LOBBY;
   const gameOver = gameState.phase === PHASE.GAME_OVER;
   const order = gameState.playerOrder || [];
+
+  if (reporting) return <ReportDialog target={reporting} onClose={() => setReporting(null)} />;
+
+  // «Reportar» next to everyone but yourself
+  const reportButton = (id, name) => (
+    <button
+      type="button"
+      className="btn btn-ghost min-h-[34px] px-2 py-1 text-[12px] shrink-0"
+      onClick={() => setReporting({ id, name })}
+      title={`Reportar a ${name}`}
+      aria-label={`Reportar a ${name}`}
+    >
+      <FlagIcon className="w-3.5 h-3.5" />
+      <span className="hidden min-[380px]:inline">Reportar</span>
+    </button>
+  );
 
   if (confirm) {
     const close = () => setConfirm(null);
@@ -140,15 +158,18 @@ export function RoomMenuModal({ isOpen, onClose }) {
                 {pid === hostId && <CrownIcon className="w-4 h-4 text-chakra shrink-0" aria-label="Anfitrión" />}
                 {status && <span className="text-[12px] italic text-ink-faint shrink-0">{status}</span>}
               </span>
-              {isHost && pid !== myPlayerId && !p.left && (
-                <button
-                  type="button"
-                  className="btn btn-ghost min-h-[34px] px-2.5 py-1 text-[12px] shrink-0"
-                  onClick={() => setConfirm({ kind: 'kick', id: pid, name: p.name })}
-                >
-                  Expulsar
-                </button>
-              )}
+              <span className="flex items-center gap-1 shrink-0">
+                {pid !== myPlayerId && reportButton(pid, p.name)}
+                {isHost && pid !== myPlayerId && !p.left && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost min-h-[34px] px-2.5 py-1 text-[12px] shrink-0"
+                    onClick={() => setConfirm({ kind: 'kick', id: pid, name: p.name })}
+                  >
+                    Expulsar
+                  </button>
+                )}
+              </span>
             </li>
           );
         })}
@@ -168,15 +189,18 @@ export function RoomMenuModal({ isOpen, onClose }) {
                 <span className="truncate">{s.name}</span>
                 {s.id === myPlayerId && <span className="shrink-0 italic text-ink-faint text-[12px]">(tú)</span>}
               </span>
-              {isHost && (
-                <button
-                  type="button"
-                  className="btn btn-ghost min-h-[34px] px-2.5 py-1 text-[12px] shrink-0"
-                  onClick={() => setConfirm({ kind: 'kick', id: s.id, name: s.name, spectator: true })}
-                >
-                  Expulsar
-                </button>
-              )}
+              <span className="flex items-center gap-1 shrink-0">
+                {s.id !== myPlayerId && reportButton(s.id, s.name)}
+                {isHost && s.id !== myPlayerId && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost min-h-[34px] px-2.5 py-1 text-[12px] shrink-0"
+                    onClick={() => setConfirm({ kind: 'kick', id: s.id, name: s.name, spectator: true })}
+                  >
+                    Expulsar
+                  </button>
+                )}
+              </span>
             </li>
           ))}
         </ul>

@@ -52,3 +52,7 @@ await import('./tests/shop.test.js');
 
 // Admin panel: authorization, maintenance, coins, roles, blocked accounts
 await import('./tests/admin.test.js');
+
+// Admin panel phase B: moderation, banned words, reports, shop overrides,
+// reward rules, ranking exclusions
+await import('./tests/adminB.test.js');

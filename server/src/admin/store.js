@@ -4,7 +4,7 @@ import { DEFAULT_ITEMS, getItem } from '../shop/catalog.js';
 
 const TZ = 'America/Argentina/Buenos_Aires';
 
-async function withTx(pool, fn) {
+export async function withTx(pool, fn) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -19,7 +19,7 @@ async function withTx(pool, fn) {
   }
 }
 
-function insertAudit(db, audit) {
+export function insertAudit(db, audit) {
   return db.query(
     `INSERT INTO admin_actions (admin_id, action, target_type, target_id, details)
      VALUES ($1, $2, $3, $4, $5::jsonb)`,
@@ -34,7 +34,7 @@ function insertAudit(db, audit) {
 }
 
 // "100%_off" → "100\%\_off" for LIKE
-function likeEscape(text) {
+export function likeEscape(text) {
   return text.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 

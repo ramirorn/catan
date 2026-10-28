@@ -8,6 +8,9 @@ import { NoticesTab } from './tabs/NoticesTab';
 import { StatsTab } from './tabs/StatsTab';
 import { SystemTab } from './tabs/SystemTab';
 import { AuditTab } from './tabs/AuditTab';
+import { ModerationTab } from './tabs/ModerationTab';
+import { EconomyTab } from './tabs/EconomyTab';
+import { RankingTab } from './tabs/RankingTab';
 import { ObserveView } from './ObserveView';
 import { ShurikenIcon } from '../components/Shared/Icons';
 
@@ -17,6 +20,9 @@ import { ShurikenIcon } from '../components/Shared/Icons';
 const TABS = [
   { id: 'partidas', label: 'Partidas', Component: GamesTab },
   { id: 'usuarios', label: 'Usuarios', Component: UsersTab },
+  { id: 'moderacion', label: 'Moderación', Component: ModerationTab },
+  { id: 'tienda', label: 'Tienda y economía', Component: EconomyTab },
+  { id: 'ranking', label: 'Ranking', Component: RankingTab },
   { id: 'avisos', label: 'Avisos y mantenimiento', Component: NoticesTab },
   { id: 'estadisticas', label: 'Estadísticas', Component: StatsTab },
   { id: 'sistema', label: 'Sistema', Component: SystemTab },

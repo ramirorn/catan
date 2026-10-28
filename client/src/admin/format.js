@@ -94,6 +94,21 @@ export const ACTION_LABELS = {
   'user.role.grant': 'Dio rol de admin',
   'user.role.revoke': 'Quitó rol de admin',
   'system.errors.clear': 'Vació la lista de errores',
+  'chat.delete': 'Borró un mensaje del chat',
+  'chat.mute': 'Silenció a un jugador',
+  'chat.unmute': 'Quitó un silencio',
+  'chat.words': 'Cambió las palabras prohibidas',
+  'report.resolve': 'Resolvió un reporte',
+  'report.dismiss': 'Descartó un reporte',
+  'report.reopen': 'Reabrió un reporte',
+  'shop.item': 'Cambió un objeto de la tienda',
+  'economy.rewards': 'Cambió las recompensas de Ryō',
+  'ranking.exclude.game': 'Excluyó una partida del ranking',
+  'ranking.exclude.user': 'Excluyó a un jugador del ranking',
+  'ranking.restore.game': 'Restauró una partida en el ranking',
+  'ranking.restore.user': 'Restauró a un jugador en el ranking',
+  'ranking.week.reset': 'Reinició el ranking semanal',
+  'ranking.week.undo': 'Deshizo el reinicio semanal',
 };
 
 /** Account status as seen now (an expired suspension is active again) */

@@ -189,12 +189,14 @@ export function AuthProvider({ children }) {
   const shopUserRef = useRef(undefined);
   const acceptShop = useCallback((data) => {
     if (!data || !Array.isArray(data.catalog)) return;
-    setShop({
+    setShop((prev) => ({
       catalog: data.catalog,
       signedIn: !!data.signedIn,
       owned: Array.isArray(data.owned) ? data.owned : [],
       equipped: data.equipped || {},
-    });
+      // Current Ryō rules (only sent with GET /shop)
+      rewards: data.rewards || (prev ? prev.rewards : null),
+    }));
     if (data.signedIn && Number.isInteger(data.coins)) setUser((u) => (u ? { ...u, coins: data.coins } : u));
   }, [setUser]);
 
@@ -215,7 +217,8 @@ export function AuthProvider({ children }) {
     return res.ok ? { success: true, ...res.data } : { success: false, error: res.data.error || 'No se pudo completar. Inténtalo de nuevo.' };
   }, [acceptShop, setUser]);
 
-  const buyItem = useCallback((itemId) => shopAction('/shop/buy', { itemId }), [shopAction]);
+  // expectedPrice: the price the player saw (a sale that just ended → 409, no charge)
+  const buyItem = useCallback((itemId, expectedPrice) => shopAction('/shop/buy', { itemId, expectedPrice }), [shopAction]);
   const equipItem = useCallback((slot, itemId) => shopAction('/shop/equip', { slot, itemId }), [shopAction]);
 
   // The inventory belongs to an account: reload it when the account changes

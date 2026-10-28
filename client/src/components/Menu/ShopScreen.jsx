@@ -115,6 +115,41 @@ function StatusBadge({ equipped, owned }) {
   return null;
 }
 
+const saleEndFmt = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+/** "hasta el 3 nov, 23:59" for a sale end */
+function saleUntil(iso) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : `hasta el ${saleEndFmt.format(d)}`;
+}
+
+/** Price of a paid item: on sale → the old price struck through + the new one */
+function PriceTag({ item, coinName, large = false }) {
+  if (item.available === false) {
+    return <span className="text-[11.5px] font-bold text-ink-faint">Ya no se vende</span>;
+  }
+  if (!item.salePercent) {
+    return large ? (
+      <span className="inline-flex items-center gap-1 font-bold text-chakra-dark tabular-nums">
+        <CoinsIcon className="w-4 h-4" />
+        {item.price}
+      </span>
+    ) : (
+      <>{item.price} {coinName}</>
+    );
+  }
+  return (
+    <span className={`inline-flex flex-wrap items-center gap-x-1 ${large ? 'justify-end' : ''}`}>
+      <s className="text-ink-faint font-semibold" aria-label={`Antes ${item.listPrice} ${coinName}`}>{item.listPrice}</s>
+      <span className={`inline-flex items-center gap-1 font-bold text-shu tabular-nums ${large ? '' : 'text-[11.5px]'}`}>
+        {large && <CoinsIcon className="w-4 h-4" />}
+        {item.price}{large ? '' : ` ${coinName}`}
+      </span>
+      <span className="shop-badge !bg-shu !text-paper-light !border-shu">-{item.salePercent}%</span>
+    </span>
+  );
+}
+
 export function ShopScreen({ onBack, onLogin, onProfile }) {
   const { user, coinName, accountsEnabled, status, shop, loadShop, buyItem, equipItem } = useAuth();
   const { addToast } = useGame();
@@ -141,10 +176,13 @@ export function ShopScreen({ onBack, onLogin, onProfile }) {
   const doBuy = async (item) => {
     setConfirm(null);
     setBusy(true);
-    const res = await buyItem(item.id);
+    const res = await buyItem(item.id, item.price);
     setBusy(false);
     if (res.success) addToast(res.alreadyOwned ? `${item.name} ya era tuyo` : `¡Compraste ${item.name}!`, 'success');
-    else addToast(res.error, 'error', 4000);
+    else {
+      addToast(res.error, 'error', 4000);
+      if (res.priceChanged) loadShop();
+    }
   };
 
   const doEquip = async (item) => {
@@ -225,10 +263,10 @@ export function ShopScreen({ onBack, onLogin, onProfile }) {
                   {selected.isDefault ? (
                     <span className="text-[12px] font-bold text-ink-faint">Gratis</span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 font-bold text-chakra-dark tabular-nums">
-                      <CoinsIcon className="w-4 h-4" />
-                      {selected.price}
-                    </span>
+                    <PriceTag item={selected} coinName={coinName} large />
+                  )}
+                  {!selected.isDefault && selected.salePercent && selected.saleEndsAt && (
+                    <p className="text-[11px] text-shu font-semibold mt-0.5">Oferta {saleUntil(selected.saleEndsAt)}</p>
                   )}
                   <div className="mt-1">
                     <StatusBadge equipped={isEquipped(selected) && (!!user || selected.isDefault)} owned={isOwned(selected) && !!user} />
@@ -284,7 +322,7 @@ export function ShopScreen({ onBack, onLogin, onProfile }) {
                     </span>
                     <span className="block font-bold text-[12.5px] leading-tight text-ink mt-1 truncate">{item.name}</span>
                     <span className="block text-[11.5px] tabular-nums text-chakra-dark font-bold">
-                      {item.isDefault ? 'Gratis' : `${item.price} ${coinName}`}
+                      {item.isDefault ? 'Gratis' : <PriceTag item={item} coinName={coinName} />}
                     </span>
                   </button>
                 </li>
@@ -293,7 +331,7 @@ export function ShopScreen({ onBack, onLogin, onProfile }) {
           </ul>
 
           <p className="text-[12px] text-ink-faint mt-3 leading-snug">
-            Gana {coinName} jugando: +20 por partida, +30 si ganas y +2 por punto. Tus fichas las ven todos los ninjas de la partida.
+            Gana {coinName} jugando: +{shop.rewards?.finish ?? 20} por partida, +{shop.rewards?.win ?? 30} si ganas y +{shop.rewards?.perVp ?? 2} por punto. Tus fichas las ven todos los ninjas de la partida.
           </p>
         </>
       )}

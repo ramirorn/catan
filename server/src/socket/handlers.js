@@ -2,6 +2,10 @@ import { createTurnTimers } from './turnTimer.js';
 import { sanitizeAvatarId } from '../game/constants.js';
 import { summarizeGame } from '../accounts/rewards.js';
 import { getItem } from '../shop/catalog.js';
+import {
+  REPORT_EXCERPT, REPORT_REASONS, REPORT_TEXT_MAX, createReportLimiter, muteMessage,
+} from '../admin/moderation.js';
+import { cleanMessage } from '../admin/settings.js';
 
 const CHAT_HISTORY_LIMIT = 200;
 const CHAT_MAX_LENGTH = 150;
@@ -41,10 +45,19 @@ const ANNOUNCEMENT_TTL_MS = 15 * 60 * 1000;
 //
 // `extras` (optional): { settings } for maintenance mode (createSettings),
 // { isAdmin(userId) -> Promise<boolean> } for the hidden admin observer and
-// { onAdminAction(adminId, action, targetType, targetId, details) } (audit).
+// { onAdminAction(adminId, action, targetType, targetId, details) } (audit),
+// { runtime } (banned-words filter, createRuntime), { mutes } (createMutes)
+// and { reports: { create(report) → Promise<{ id }> } } for «Reportar».
 // Returns the live-control API used by the admin panel.
 export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, accounts = null, extras = {}) {
   const settings = extras.settings || null;
+  const runtime = extras.runtime || null;
+  const mutes = extras.mutes || null;
+  const reportStore = extras.reports || null;
+  const reportLimit = extras.reportLimiter || createReportLimiter();
+  // Banned words → *** (chat and names)
+  const filterText = (text) => (runtime ? runtime.filterText(text).text : text);
+  const cleanName = (value) => filterText(String(value || '').trim().slice(0, 24));
   const maintenance = () => (settings ? settings.getMaintenance() : { on: false, message: '' });
   // Since the last restart (the admin "Estadísticas" tab)
   const counters = { started: 0, victory: 0, vote: 0, abandoned: 0, closedByAdmin: 0, since: Date.now() };
@@ -165,11 +178,21 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       const engine = room.engine;
       if (engine.endedByAgreement || !engine.winner) counters.vote += 1;
       else counters.victory += 1;
+      if (mutes) mutes.endRoom(roomId);
       handleGameOver(roomId);
     };
   }
 
   // ─── Helpers ───
+  // Account of whoever writes / reports from a seat or as a spectator
+  function writerAccount(room, pid) {
+    if (room.accounts[pid]) return room.accounts[pid];
+    for (const s of io.of('/').sockets.values()) {
+      if (s.data.playerId === pid && s.data.user) return s.data.user.id;
+    }
+    return null;
+  }
+
   function spectatorList(room) {
     return Object.values(room.spectators)
       .filter((s) => s.connected)
@@ -287,6 +310,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       detachSockets(pid, roomId);
     }
     turnTimers.clear(room);
+    if (mutes) mutes.endRoom(roomId);
     lobbyManager.removeRoom(roomId);
     console.log(`Room ${roomId} closed`);
   }
@@ -437,7 +461,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
 
     // ─── Lobby: Create Room ───
     on('createRoom', ({ playerName, boardType, vpToWin, turnTimeLimit, peacePacts, avatarId }, cb) => {
-      const name = String(playerName || '').trim().slice(0, 24);
+      const name = cleanName(playerName);
       if (!name) return cb({ success: false, error: 'Escribe tu nombre' });
       const maint = maintenance();
       if (maint.on) return cb({ success: false, error: maint.message, maintenance: true });
@@ -462,7 +486,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
 
     // ─── Lobby: Join Room ───
     on('joinRoom', ({ roomId, playerName, avatarId }, cb) => {
-      const name = String(playerName || '').trim().slice(0, 24);
+      const name = cleanName(playerName);
       if (!name) return cb({ success: false, error: 'Escribe tu nombre' });
       const room = lobbyManager.getRoom(String(roomId || '').trim().toUpperCase());
       if (!room) {
@@ -513,7 +537,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
 
     // ─── Lobby: Watch a room (waiting or in progress) ───
     on('spectateRoom', ({ roomId, playerName, avatarId }, cb) => {
-      const name = String(playerName || '').trim().slice(0, 24);
+      const name = cleanName(playerName);
       if (!name) return cb({ success: false, error: 'Escribe tu nombre' });
       const room = lobbyManager.getRoom(String(roomId || '').trim().toUpperCase());
       if (!room) return cb({ success: false, error: 'No existe esa sala' });
@@ -732,6 +756,9 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       if (text.length > CHAT_MAX_LENGTH) {
         return cb({ success: false, error: `El mensaje es demasiado largo (máximo ${CHAT_MAX_LENGTH} caracteres)` });
       }
+      // Muted by a moderator (account or, for guests, this playerId)
+      const muted = mutes && mutes.find({ userId: writerAccount(room, playerId), playerId });
+      if (muted) return cb({ success: false, error: muteMessage(muted), muted: true });
 
       // Anti-spam: rate limit (with a short mute when exceeded) and no repeats
       const now = Date.now();
@@ -761,7 +788,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
         playerColor: player ? player.color : SPECTATOR_CHAT_COLOR,
         avatarId: player ? player.avatarId : spec.avatarId,
         spectator: !player,
-        message: text,
+        message: filterText(text),
         timestamp: now,
       };
       room.chat.push(msg);
@@ -770,6 +797,56 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       cb({ success: true });
       // Every socket of the room's players and spectators joined the roomId room
       io.to(roomId).emit('chatMessage', msg);
+    });
+
+    // ─── «Reportar» a player or spectator of the same room ───
+    on('reportPlayer', ({ targetId, reason, text, messageId }, cb) => {
+      const seatedRoomId = playerToRoom[playerId];
+      const roomId = seatedRoomId || spectatorToRoom[playerId];
+      const room = lobbyManager.getRoom(roomId);
+      if (!room) return cb({ success: false, error: 'No estás en una sala' });
+      if (!reportStore) return cb({ success: false, error: 'Los reportes no están disponibles en este servidor' });
+      if (typeof targetId !== 'string' || !targetId || targetId.length > 64 || targetId === playerId) {
+        return cb({ success: false, error: 'Elige a otro ninja' });
+      }
+      if (!REPORT_REASONS.includes(reason)) return cb({ success: false, error: 'Elige un motivo' });
+      const target = room.engine.players[targetId] || room.spectators[targetId];
+      // A message of someone who already left can still be reported
+      const fromChat = room.chat.find((m) => m.playerId === targetId);
+      if (!target && !fromChat) return cb({ success: false, error: 'Ese ninja no está en la sala' });
+      const me = room.engine.players[playerId] || room.spectators[playerId];
+      const reporterUser = writerAccount(room, playerId);
+      const limited = reportLimit(reporterUser ? `u:${reporterUser}` : `p:${playerId}`, targetId);
+      if (limited) return cb({ success: false, error: limited });
+      // Snapshot of the chat: the last messages, plus the one reported
+      const excerpt = room.chat.slice(-REPORT_EXCERPT);
+      const picked = Number.isInteger(messageId) ? room.chat.find((m) => m.id === messageId) : null;
+      if (picked && !excerpt.includes(picked)) excerpt.unshift(picked);
+      const report = {
+        reporterUserId: reporterUser,
+        reporterPlayerId: playerId,
+        reporterName: me ? me.name : 'Ninja',
+        targetUserId: room.accounts[targetId] || writerAccount(room, targetId),
+        targetPlayerId: targetId,
+        targetName: target ? target.name : String(fromChat.playerName || 'Ninja').replace(/ \(espectador\)$/, ''),
+        roomId,
+        reason,
+        details: cleanMessage(typeof text === 'string' ? text : '', REPORT_TEXT_MAX) || null,
+        chatExcerpt: excerpt.map((m) => ({
+          id: m.id,
+          playerId: m.playerId,
+          playerName: m.playerName,
+          message: m.message,
+          timestamp: m.timestamp,
+          reported: !!picked && m.id === picked.id,
+        })),
+      };
+      Promise.resolve(reportStore.create(report))
+        .then((r) => cb({ success: true, id: r && r.id }))
+        .catch((err) => {
+          console.error('Could not save a report:', err.message);
+          cb({ success: false, error: 'No se pudo enviar el reporte. Inténtalo de nuevo.' });
+        });
     });
 
     // ─── Account sign-in / sign-out from the menu (no reconnect needed) ───
@@ -1055,8 +1132,61 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
     return closed;
   }
 
+  /** Chat history of a room (moderation viewer), or null */
+  function roomChat(roomId) {
+    const room = lobbyManager.getRoom(roomId);
+    if (!room) return null;
+    const e = room.engine;
+    const people = [
+      ...e.playerOrder.filter((pid) => e.players[pid]).map((pid) => ({
+        id: pid, name: e.players[pid].name, spectator: false, accountId: room.accounts[pid] || null, left: !!e.players[pid].left,
+      })),
+      ...Object.values(room.spectators).map((sp) => ({
+        id: sp.id, name: sp.name, spectator: true, accountId: writerAccount(room, sp.id), left: !sp.connected,
+      })),
+    ];
+    return { roomId: e.roomId, phase: e.phase, messages: room.chat, people };
+  }
+
+  /** Removes one message from the history and tells every client to hide it */
+  function adminDeleteChat(roomId, messageId) {
+    const room = lobbyManager.getRoom(roomId);
+    if (!room) return null;
+    const i = room.chat.findIndex((m) => m.id === messageId);
+    if (i < 0) return null;
+    const [msg] = room.chat.splice(i, 1);
+    io.to(roomId).emit('chatMessageDeleted', { roomId, id: messageId });
+    return msg;
+  }
+
+  /** Who a playerId is in a room (for a mute): { playerId, userId, name } or null */
+  function roomPerson(roomId, pid) {
+    const room = lobbyManager.getRoom(roomId);
+    if (!room) return null;
+    const p = room.engine.players[pid] || room.spectators[pid];
+    if (!p) return null;
+    return { playerId: pid, userId: writerAccount(room, pid), name: p.name };
+  }
+
+  /** A private notice for one player (e.g. "te silenciaron") */
+  function notifyPlayer(pid, message, severity = 'warning') {
+    io.to(pid).emit('moderationNotice', { message, severity });
+  }
+
+  /** Same, for every socket signed in with that account */
+  function notifyAccount(userId, message, severity = 'warning') {
+    for (const sk of io.of('/').sockets.values()) {
+      if (sk.data.user && sk.data.user.id === userId) sk.emit('moderationNotice', { message, severity });
+    }
+  }
+
   return {
     liveRooms,
+    roomChat,
+    adminDeleteChat,
+    roomPerson,
+    notifyPlayer,
+    notifyAccount,
     connections,
     counters: () => ({ ...counters }),
     adminCloseRoom,

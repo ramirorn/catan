@@ -1,7 +1,8 @@
 // Postgres side of the shop (user_items / user_equipped). Parameterized
 // queries only. Implements the store interface used by ./service.js:
 //   inventory(userId) → { coins, owned: string[], equipped: { pieces, board } } | null
-//   buy(userId, itemId, price) → { status: 'bought' | 'owned' | 'insufficient' | 'nouser', coins }
+//   buy(userId, itemId, price, { listPrice, salePercent }) → { status: 'bought' | 'owned' | 'insufficient' | 'nouser', coins }
+//     (a purchase also writes its shop_purchases row in the same transaction)
 //   equip(userId, slot, itemId | null) → boolean (false = item not owned)
 
 export function createPgShopStore(pool) {
@@ -23,7 +24,7 @@ export function createPgShopStore(pool) {
    * covers the price (CHECK coins >= 0 is the last guard). Anything that
    * fails rolls the claim back.
    */
-  async function buy(userId, itemId, price) {
+  async function buy(userId, itemId, price, { listPrice = price, salePercent = null } = {}) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
@@ -55,6 +56,10 @@ export function createPgShopStore(pool) {
         const { rows } = await pool.query('SELECT coins FROM users WHERE id = $1', [userId]);
         return { status: 'insufficient', coins: rows[0] ? rows[0].coins : 0 };
       }
+      await client.query(
+        `INSERT INTO shop_purchases (user_id, item_id, price_paid, list_price, sale_percent) VALUES ($1, $2, $3, $4, $5)`,
+        [userId, itemId, price, listPrice, salePercent],
+      );
       await client.query('COMMIT');
       return { status: 'bought', coins: debit.rows[0].coins };
     } catch (err) {
