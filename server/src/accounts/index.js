@@ -7,7 +7,8 @@ import { getPool } from '../db/pool.js';
 import { createNeonAuth } from './neonAuth.js';
 import { createRateLimiter } from './rateLimit.js';
 import { COIN_NAME, REWARD_RULES, computeRewards } from './rewards.js';
-import { cleanDisplayName, ensureUser, getLeaderboard, getStats, getUser, recordGame, updateProfile } from './store.js';
+import { cleanDisplayName, ensureUser, getAccess, getLeaderboard, getStats, getUser, recordGame, updateProfile } from './store.js';
+import { blockedMessage, parseAdminEmails } from '../admin/access.js';
 import { createShopService, ShopError } from '../shop/service.js';
 import { createPgShopStore } from '../shop/store.js';
 import { DEFAULT_ITEMS } from '../shop/catalog.js';
@@ -58,6 +59,38 @@ export function createAccounts(env = process.env) {
   const limit = createRateLimiter();
   const router = express.Router();
   const shop = createShopService(enabled ? createPgShopStore(pool) : null);
+  // ADMIN_EMAILS: accounts that become admins when they sign in
+  const adminEmails = parseAdminEmails(env.ADMIN_EMAILS);
+  const ensure = (authUser, opts = {}) => ensureUser(pool, authUser, { ...opts, adminEmails });
+
+  // Role / moderation status of an account, cached a few seconds (every
+  // socket connection and API call checks it). Admin actions call
+  // invalidateAccess so a ban applies at once.
+  const ACCESS_TTL_MS = 10_000;
+  const accessCache = new Map(); // userId → { access, at }
+  async function loadAccess(userId, { fresh = false } = {}) {
+    if (!enabled || !userId) return null;
+    const hit = accessCache.get(userId);
+    if (!fresh && hit && Date.now() - hit.at < ACCESS_TTL_MS) return hit.access;
+    const access = await getAccess(pool, userId);
+    if (accessCache.size >= 2000) accessCache.delete(accessCache.keys().next().value);
+    accessCache.set(userId, { access, at: Date.now() });
+    return access;
+  }
+  const invalidateAccess = (userId) => {
+    if (userId) accessCache.delete(userId);
+    else accessCache.clear();
+  };
+  // Spanish message when the account may not play (null = fine). A database
+  // hiccup never locks anyone out.
+  async function accountBlock(userId) {
+    try {
+      return blockedMessage(await loadAccess(userId));
+    } catch (err) {
+      console.warn('Could not check the account status:', err.message);
+      return null;
+    }
+  }
 
   // Our own origin as the browser sees it (Render terminates https: trust proxy)
   const originOf = (req) => `${req.protocol}://${req.get('host')}`;
@@ -129,7 +162,10 @@ export function createAccounts(env = process.env) {
 
   async function currentUser(req) {
     const authUser = await auth.getSessionUser(req.get('cookie'), originOf(req));
-    return authUser ? { authUser } : null;
+    if (!authUser) return null;
+    // Suspended / banned accounts are signed out everywhere
+    if (await accountBlock(authUser.id)) return null;
+    return { authUser };
   }
 
   // ─── Session ───
@@ -142,12 +178,18 @@ export function createAccounts(env = process.env) {
     if (!r.ok || !r.data || !r.data.user) return res.json({ user: null });
     let user;
     try {
-      user = await ensureUser(pool, r.data.user);
+      user = await ensure(r.data.user);
     } catch (err) {
       // Signed in, but our database is slow to wake: tell the client to retry
       // instead of making it look signed out
       console.warn('ensureUser failed in /me:', err.message);
       return res.status(503).json({ user: null, retry: true });
+    }
+    const blocked = await accountBlock(user.id);
+    if (blocked) {
+      auth.forgetSession(cookie);
+      sendCookies(res, CLEAR_COOKIES);
+      return res.json({ user: null, blocked });
     }
     res.json({ user });
   }));
@@ -156,6 +198,8 @@ export function createAccounts(env = process.env) {
   router.get('/auth/token', limit('token', 60, 60_000), handle(async (req, res) => {
     const cookie = req.get('cookie');
     if (!auth.sessionToken(cookie)) return res.json({ token: null });
+    const authUser = await auth.getSessionUser(cookie, originOf(req));
+    if (authUser && (await accountBlock(authUser.id))) return res.json({ token: null });
     const r = await auth.call('token', { cookie, origin: originOf(req) });
     res.json({ token: r.ok && r.data && typeof r.data.token === 'string' ? r.data.token : null });
   }));
@@ -178,7 +222,7 @@ export function createAccounts(env = process.env) {
     });
     if (!r.ok || !r.data || !r.data.user) return res.status(r.status >= 500 ? 502 : 400).json({ error: authErrorMessage(r) });
     sendCookies(res, r.cookies);
-    const user = await ensureUser(pool, r.data.user, { avatarId: isAvatarId(avatarId) ? avatarId : undefined });
+    const user = await ensure(r.data.user, { avatarId: isAvatarId(avatarId) ? avatarId : undefined });
     res.json({ user });
   }));
 
@@ -194,8 +238,11 @@ export function createAccounts(env = process.env) {
       body: { email: cleanEmail, password, rememberMe: true },
     });
     if (!r.ok || !r.data || !r.data.user) return res.status(r.status >= 500 ? 502 : 401).json({ error: authErrorMessage(r) });
+    const user = await ensure(r.data.user, { avatarId: isAvatarId(avatarId) ? avatarId : undefined });
+    // A suspended / banned account gets no session cookie (stays a guest)
+    const blocked = await accountBlock(user.id);
+    if (blocked) return res.status(403).json({ error: blocked, blocked: true });
     sendCookies(res, r.cookies);
-    const user = await ensureUser(pool, r.data.user, { avatarId: isAvatarId(avatarId) ? avatarId : undefined });
     res.json({ user });
   }));
 
@@ -260,14 +307,15 @@ export function createAccounts(env = process.env) {
       console.warn('Google callback: no session after the verifier exchange', r && r.status);
       return res.redirect(302, '/?login=error');
     }
-    sendCookies(res, r.cookies);
-    // The session cookie is already set: a slow database must not undo the
-    // sign-in (the profile row is created on the next /me anyway)
+    // A slow database must not undo the sign-in (the profile row is created
+    // on the next /me anyway)
     try {
-      await ensureUser(pool, r.data.user);
+      await ensure(r.data.user);
     } catch (err) {
       console.warn('ensureUser failed in the Google callback:', err.message);
     }
+    if (await accountBlock(r.data.user.id)) return res.redirect(302, '/?login=blocked');
+    sendCookies(res, r.cookies);
     res.redirect(302, '/?login=google');
   }));
 
@@ -286,7 +334,7 @@ export function createAccounts(env = process.env) {
       if (!isAvatarId(avatarId)) return res.status(400).json({ error: 'Avatar no válido' });
       change.avatarId = avatarId;
     }
-    await ensureUser(pool, session.authUser);
+    await ensure(session.authUser);
     const user = await updateProfile(pool, session.authUser.id, change);
     res.json({ user });
   }));
@@ -321,7 +369,7 @@ export function createAccounts(env = process.env) {
   const shopHandle = (fn) => handle(async (req, res) => {
     const session = await currentUser(req);
     if (!session) return res.status(401).json({ error: 'Inicia sesión para comprar' });
-    await ensureUser(pool, session.authUser);
+    await ensure(session.authUser);
     try {
       await fn(req, res, session.authUser.id);
     } catch (err) {
@@ -381,9 +429,22 @@ export function createAccounts(env = process.env) {
     return shop.owns(enabled ? userId : null, itemId);
   }
 
+  /** Signed-in Neon Auth user of a request (null when signed out) */
+  async function sessionUser(req) {
+    if (!enabled || !auth.sessionToken(req.get('cookie'))) return null;
+    return auth.getSessionUser(req.get('cookie'), originOf(req));
+  }
+
   return {
     enabled,
     router,
+    pool,
+    adminEmails,
+    sessionUser,
+    ensureUser: (authUser) => (enabled ? ensure(authUser) : null),
+    getAccess: loadAccess,
+    invalidateAccess,
+    accountBlock: (userId) => (enabled && userId ? accountBlock(userId) : Promise.resolve(null)),
     verifySocketToken,
     awardGame,
     getLoadout,

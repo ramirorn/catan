@@ -69,6 +69,7 @@ export function AuthProvider({ children }) {
     const p = typeof window === 'undefined' ? null : takeLoginParam();
     if (p === 'google') return { type: 'success', text: '¡Sesión iniciada con Google!' };
     if (p === 'error') return { type: 'error', text: 'No se pudo iniciar sesión con Google. Inténtalo de nuevo.' };
+    if (p === 'blocked') return { type: 'error', text: 'Tu cuenta ninja está suspendida o bloqueada. Puedes seguir jugando como invitado.' };
     return null;
   });
   const readyRef = useRef(null);
@@ -106,6 +107,8 @@ export function AuthProvider({ children }) {
       return null;
     }
     const next = me.ok ? me.data.user || null : null;
+    // Suspended / banned: the server signed the account out, say why
+    if (me.ok && typeof me.data.blocked === 'string') setNotice({ type: 'error', text: me.data.blocked });
     setUser(next);
     setStatus(next ? 'user' : cfg.ok ? 'guest' : 'disabled');
     return next;

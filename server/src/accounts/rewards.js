@@ -27,6 +27,7 @@ export function summarizeGame(engine, accounts = {}) {
   return {
     gameId: engine.gameId,
     roomId: engine.roomId,
+    boardType: engine.boardType,
     endedBy: engine.endedByAgreement || !winnerId ? 'vote' : 'victory',
     durationS: Math.max(0, Math.round((endedAt - startedAt) / 1000)),
     players: engine.playerOrder.map((pid) => {

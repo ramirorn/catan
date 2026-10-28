@@ -28,11 +28,27 @@ const BANNED_MESSAGE = 'El anfitrión te expulsó de esta sala; no puedes volver
 
 // Socket.io room that only the spectators of a game join
 const specRoom = (roomId) => `spec:${roomId}`;
+// Socket.io room of the admins observing a game (hidden: never listed, never
+// counted as spectators, read-only)
+const admRoom = (roomId) => `adm:${roomId}`;
+const ADMIN_NOT_FOUND = 'No encontrado';
+// How long a broadcast stays visible for people who connect after it was sent
+const ANNOUNCEMENT_TTL_MS = 15 * 60 * 1000;
 
 // `accounts` (optional) links seats to logged-in accounts and pays the Ryō
 // when a game ends: { enabled, verifySocketToken(token), awardGame(summary) }.
 // Without it (tests, no database) everyone plays as a guest.
-export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, accounts = null) {
+//
+// `extras` (optional): { settings } for maintenance mode (createSettings),
+// { isAdmin(userId) -> Promise<boolean> } for the hidden admin observer and
+// { onAdminAction(adminId, action, targetType, targetId, details) } (audit).
+// Returns the live-control API used by the admin panel.
+export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, accounts = null, extras = {}) {
+  const settings = extras.settings || null;
+  const maintenance = () => (settings ? settings.getMaintenance() : { on: false, message: '' });
+  // Since the last restart (the admin "Estadísticas" tab)
+  const counters = { started: 0, victory: 0, vote: 0, abandoned: 0, closedByAdmin: 0, since: Date.now() };
+  let announcement = null; // last admin broadcast { id, message, severity, at, expiresAt }
   // Players are identified by a persistent playerId sent by the client in the
   // handshake (survives page reloads / reconnects), not by the volatile socket.id.
   const playerToRoom = {};     // playerId → roomId (seated players)
@@ -69,6 +85,14 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
         socket.data.user = await accounts.verifySocketToken(token);
       } catch {
         socket.data.user = null;
+      }
+      // A suspended / banned account connects as a guest and is told why
+      if (socket.data.user && typeof accounts.accountBlock === 'function') {
+        const blocked = await accounts.accountBlock(socket.data.user.id);
+        if (blocked) {
+          socket.data.user = null;
+          socket.data.blocked = blocked;
+        }
       }
     }
     next();
@@ -137,7 +161,12 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
 
   function watchGameOver(room) {
     const roomId = room.engine.roomId;
-    room.engine.onGameOver = () => handleGameOver(roomId);
+    room.engine.onGameOver = () => {
+      const engine = room.engine;
+      if (engine.endedByAgreement || !engine.winner) counters.vote += 1;
+      else counters.victory += 1;
+      handleGameOver(roomId);
+    };
   }
 
   // ─── Helpers ───
@@ -178,9 +207,19 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       io.to(playerId).emit('gameState', { ...engine.serialize(playerId), ...extras });
     }
     // One public view (no hands, no dev cards, no placements) for all spectators
-    if (extras.spectators.length > 0) {
-      io.to(specRoom(roomId)).emit('gameState', { ...engine.serialize(null), ...extras, spectator: true });
+    const watchers = adminWatchers(roomId);
+    if (extras.spectators.length > 0 || watchers > 0) {
+      const publicState = { ...engine.serialize(null), ...extras, spectator: true };
+      if (extras.spectators.length > 0) io.to(specRoom(roomId)).emit('gameState', publicState);
+      if (watchers > 0) io.to(admRoom(roomId)).emit('gameState', publicState);
     }
+  }
+
+  // Admin sockets observing a room (counted from the adapter: always exact)
+  function adminWatchers(roomId) {
+    const rooms = io.sockets && io.sockets.adapter && io.sockets.adapter.rooms;
+    const set = rooms ? rooms.get(admRoom(roomId)) : null;
+    return set ? set.size : 0;
   }
 
   // Light update when only the spectator list changed (no full state)
@@ -224,10 +263,21 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
     io.in(id).socketsLeave([roomId, specRoom(roomId)]);
   }
 
-  function closeRoom(roomId, message = 'La sala se cerró') {
+  // `notifyAll`: also tell the seated players (an admin closed the room)
+  function closeRoom(roomId, message = 'La sala se cerró', { notifyAll = false, cause = null } = {}) {
     const room = lobbyManager.getRoom(roomId);
     if (!room) return;
+    const phase = room.engine.phase;
+    if (cause === 'abandoned' && phase !== 'lobby' && phase !== 'gameOver') counters.abandoned += 1;
+    if (cause === 'admin') counters.closedByAdmin += 1;
+    if (notifyAll) {
+      for (const pid of room.engine.playerOrder) {
+        if (!room.engine.players[pid]?.left) io.to(pid).emit('roomClosed', { roomId, message });
+      }
+    }
     io.to(specRoom(roomId)).emit('roomClosed', { roomId, message });
+    io.to(admRoom(roomId)).emit('roomClosed', { roomId, message });
+    io.in(admRoom(roomId)).socketsLeave([roomId, admRoom(roomId)]);
     for (const id of Object.keys(room.spectators)) {
       removeSpectator(room, id);
       detachSockets(id, roomId);
@@ -262,7 +312,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       const r = lobbyManager.getRoom(roomId);
       if (!r) return;
       const back = r.engine.playerOrder.some((pid) => r.engine.players[pid]?.connected && !r.engine.players[pid]?.left);
-      if (!back) closeRoom(roomId, 'La partida se cerró: no quedan ninjas conectados');
+      if (!back) closeRoom(roomId, 'La partida se cerró: no quedan ninjas conectados', { cause: 'abandoned' });
     }, abandonMs);
     if (typeof room.abandonTimer.unref === 'function') room.abandonTimer.unref();
   }
@@ -282,7 +332,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
 
     const remaining = engine.phase === 'lobby' ? engine.playerOrder : engine.activePlayerIds();
     if (remaining.length === 0) {
-      closeRoom(roomId, 'La sala se cerró: no quedan ninjas');
+      closeRoom(roomId, 'La sala se cerró: no quedan ninjas', { cause: 'abandoned' });
       return;
     }
     reassignHost(room);
@@ -296,7 +346,13 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       ? authId
       : socket.id;
     socket.join(playerId);
+    socket.data.playerId = playerId;
     console.log(`Player connected: ${playerId} (socket ${socket.id})`);
+
+    // Server notices: maintenance banner, the last broadcast, a blocked account
+    socket.emit('serverStatus', serverStatus());
+    if (announcement && announcement.expiresAt > Date.now()) socket.emit('announcement', announcement);
+    if (socket.data.blocked) socket.emit('accountBlocked', { message: socket.data.blocked });
 
     // ─── Reconnection: put the player back into their game ───
     const previousRoomId = playerToRoom[playerId];
@@ -383,6 +439,8 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
     on('createRoom', ({ playerName, boardType, vpToWin, turnTimeLimit, peacePacts, avatarId }, cb) => {
       const name = String(playerName || '').trim().slice(0, 24);
       if (!name) return cb({ success: false, error: 'Escribe tu nombre' });
+      const maint = maintenance();
+      if (maint.on) return cb({ success: false, error: maint.message, maintenance: true });
       if (playerToRoom[playerId] && lobbyManager.getRoom(playerToRoom[playerId])) {
         return cb({ success: false, error: 'Ya estás en una sala' });
       }
@@ -423,6 +481,10 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
 
       // Back to a seat left during the game
       const seat = room.engine.players[playerId];
+      // Maintenance: running games go on (a seat can be taken back), but
+      // nobody new sits down anywhere
+      const maint = maintenance();
+      if (maint.on && !seat) return cb({ success: false, error: maint.message, maintenance: true });
       if (seat && room.engine.phase !== 'lobby') {
         if (!room.engine.rejoinPlayer(playerId)) return cb({ success: false, error: BANNED_MESSAGE });
         if (avatarId !== undefined) room.engine.setAvatar(playerId, avatarId);
@@ -518,6 +580,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
 
     // ─── Leave the room / game and go back to the menu ───
     on('leaveRoom', (_, cb) => {
+      stopAdminObserving();
       const specRoomId = spectatorToRoom[playerId];
       if (specRoomId) {
         stopSpectating();
@@ -620,6 +683,7 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
 
       const result = room.engine.startGame();
       if (!result.success) return cb(result);
+      counters.started += 1;
 
       cb({ success: true });
       emitGameState(roomId);
@@ -719,11 +783,66 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
         return cb({ success: true, signedIn: false });
       }
       accounts.verifySocketToken(token)
-        .then((user) => {
+        .then(async (user) => {
+          const blocked = user && typeof accounts.accountBlock === 'function' ? await accounts.accountBlock(user.id) : null;
+          if (blocked) {
+            socket.data.user = null;
+            socket.data.blocked = blocked;
+            socket.emit('accountBlocked', { message: blocked });
+            return cb({ success: false, signedIn: false, error: blocked, blocked: true });
+          }
           socket.data.user = user;
           cb({ success: !!user, signedIn: !!user });
         })
         .catch(() => cb({ success: false, signedIn: false }));
+    });
+
+    // ─── Admin: observe a room as a hidden, read-only spectator ───
+    // The role is checked again in the database on every event.
+    async function adminOfSocket() {
+      const user = socket.data.user;
+      if (!user || typeof extras.isAdmin !== 'function') return null;
+      try {
+        return (await extras.isAdmin(user.id)) ? user : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function stopAdminObserving() {
+      const watched = socket.data.adminWatching;
+      if (!watched) return;
+      socket.leave(admRoom(watched));
+      // Still in the room's broadcasts only if also seated / spectating there
+      if (playerToRoom[playerId] !== watched && spectatorToRoom[playerId] !== watched) socket.leave(watched);
+      socket.data.adminWatching = null;
+    }
+
+    on('admin:observe', ({ roomId }, cb) => {
+      adminOfSocket().then((admin) => {
+        if (!admin) return cb({ success: false, error: ADMIN_NOT_FOUND });
+        const room = lobbyManager.getRoom(String(roomId || '').trim().toUpperCase());
+        if (!room) return cb({ success: false, error: 'No existe esa sala' });
+        const id = room.engine.roomId;
+        stopAdminObserving();
+        socket.join(id);
+        socket.join(admRoom(id));
+        socket.data.adminWatching = id;
+        cb({ success: true, roomId: id });
+        socket.emit('chatHistory', { roomId: id, messages: room.chat });
+        socket.emit('gameState', spectatorState(room));
+        if (typeof extras.onAdminAction === 'function') {
+          extras.onAdminAction(admin.id, 'room.observe', 'room', id, { phase: room.engine.phase });
+        }
+      }).catch(() => cb({ success: false, error: 'Error del servidor' }));
+    });
+
+    on('admin:unobserve', (_, cb) => {
+      adminOfSocket().then((admin) => {
+        if (!admin) return cb({ success: false, error: ADMIN_NOT_FOUND });
+        stopAdminObserving();
+        cb({ success: true });
+      }).catch(() => cb({ success: false, error: 'Error del servidor' }));
     });
 
     // ─── List Rooms ───
@@ -782,4 +901,172 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       console.log(`Player disconnected: ${playerId}`);
     });
   });
+
+  // ─── Live control for the admin panel (server/src/admin) ───
+  function serverStatus() {
+    const m = maintenance();
+    return { maintenance: { on: m.on, message: m.message } };
+  }
+
+  function seatInfo(room, pid) {
+    const p = room.engine.players[pid];
+    const over = room.engine.phase === 'gameOver';
+    // Public victory points only (hidden VP cards stay hidden until the end)
+    const pub = p.serialize(false, over);
+    return {
+      id: pid,
+      name: p.name,
+      avatarId: p.avatarId,
+      color: p.color,
+      connected: p.connected !== false,
+      left: !!p.left,
+      kicked: !!p.kicked,
+      isHost: room.host === pid,
+      vp: over ? pub.totalVP : pub.publicVP,
+      accountId: room.accounts[pid] || null,
+    };
+  }
+
+  function liveRooms() {
+    return Object.values(lobbyManager.rooms).map((room) => {
+      const e = room.engine;
+      return {
+        roomId: e.roomId,
+        boardType: e.boardType,
+        phase: e.phase,
+        round: e.turnNumber,
+        vpToWin: e.vpToWin,
+        turnTimeLimit: e.turnTimeLimit,
+        host: room.host,
+        createdAt: room.created,
+        startedAt: e.startedAt,
+        endedAt: e.endedAt,
+        winnerId: e.winner ? e.winner.id : null,
+        players: e.playerOrder.filter((pid) => e.players[pid]).map((pid) => seatInfo(room, pid)),
+        spectators: Object.values(room.spectators).map((sp) => ({ id: sp.id, name: sp.name, avatarId: sp.avatarId, connected: !!sp.connected })),
+        adminWatchers: adminWatchers(e.roomId),
+      };
+    });
+  }
+
+  function connections() {
+    const sockets = io.of('/').sockets;
+    const players = new Set();
+    const accountsOnline = new Set();
+    for (const s of sockets.values()) {
+      if (s.data.playerId) players.add(s.data.playerId);
+      if (s.data.user) accountsOnline.add(s.data.user.id);
+    }
+    return { sockets: sockets.size, players: players.size, accounts: accountsOnline.size };
+  }
+
+  function adminCloseRoom(roomId, reason = '') {
+    const room = lobbyManager.getRoom(roomId);
+    if (!room) return false;
+    const message = reason
+      ? `Un moderador de la aldea cerró la sala. Motivo: ${reason}`
+      : 'Un moderador de la aldea cerró la sala.';
+    closeRoom(roomId, message, { notifyAll: true, cause: 'admin' });
+    return true;
+  }
+
+  function adminKick(roomId, targetId, reason = '') {
+    const room = lobbyManager.getRoom(roomId);
+    if (!room) return { success: false, error: 'No existe esa sala' };
+    const spec = room.spectators[targetId];
+    const seat = room.engine.players[targetId];
+    if (!spec && !seat) return { success: false, error: 'Ese ninja ya no está en la sala' };
+    const message = reason ? `Un moderador te expulsó de la sala. Motivo: ${reason}` : 'Un moderador te expulsó de la sala';
+    const name = seat ? seat.name : spec.name;
+    room.banned.add(targetId);
+    io.to(targetId).emit('kicked', { roomId, message });
+    if (spec) {
+      removeSpectator(room, targetId);
+      detachSockets(targetId, roomId);
+      emitSpectators(roomId);
+    }
+    if (seat) {
+      if (seat.left) seat.kicked = true;
+      else removeSeatedPlayer(room, targetId, { kicked: true });
+    }
+    return { success: true, name, kind: seat ? 'player' : 'spectator' };
+  }
+
+  /** Rooms where an account holds a seat (user detail / bans) */
+  function roomsOfAccount(userId) {
+    const found = [];
+    for (const room of Object.values(lobbyManager.rooms)) {
+      for (const [pid, uid] of Object.entries(room.accounts)) {
+        const p = room.engine.players[pid];
+        if (uid === userId && p && !p.left) found.push({ roomId: room.engine.roomId, playerId: pid, phase: room.engine.phase });
+      }
+    }
+    return found;
+  }
+
+  /** Suspended / banned: out of every seat, and the sockets become guests */
+  function kickAccount(userId, message) {
+    const seats = roomsOfAccount(userId);
+    for (const { roomId, playerId: pid } of seats) {
+      const room = lobbyManager.getRoom(roomId);
+      if (!room || !room.engine.players[pid]) continue;
+      room.banned.add(pid);
+      io.to(pid).emit('kicked', { roomId, message });
+      removeSeatedPlayer(room, pid, { kicked: true });
+    }
+    let sockets = 0;
+    for (const s of io.of('/').sockets.values()) {
+      if (s.data.user && s.data.user.id === userId) {
+        s.data.user = null;
+        s.data.blocked = message;
+        s.emit('accountBlocked', { message });
+        sockets += 1;
+      }
+    }
+    return { seats: seats.length, sockets };
+  }
+
+  function broadcast({ message, severity = 'info', ttlMs = ANNOUNCEMENT_TTL_MS }) {
+    const at = Date.now();
+    announcement = { id: `${at}-${Math.random().toString(36).slice(2, 7)}`, message, severity, at, expiresAt: at + ttlMs };
+    io.emit('announcement', announcement);
+    return announcement;
+  }
+
+  function clearAnnouncement() {
+    announcement = null;
+    io.emit('announcement', { id: null, clear: true });
+  }
+
+  function emitServerStatus() {
+    io.emit('serverStatus', serverStatus());
+  }
+
+  /** Closes rooms nobody is connected to (no player online, no spectator) */
+  function cleanupEmptyRooms() {
+    const closed = [];
+    for (const room of Object.values(lobbyManager.rooms)) {
+      const e = room.engine;
+      const online = e.playerOrder.some((pid) => e.players[pid] && !e.players[pid].left && e.players[pid].connected !== false);
+      const watching = Object.values(room.spectators).some((sp) => sp.connected);
+      if (!online && !watching) closed.push(e.roomId);
+    }
+    for (const id of closed) closeRoom(id, 'La sala se cerró: estaba vacía', { cause: 'abandoned' });
+    return closed;
+  }
+
+  return {
+    liveRooms,
+    connections,
+    counters: () => ({ ...counters }),
+    adminCloseRoom,
+    adminKick,
+    roomsOfAccount,
+    kickAccount,
+    broadcast,
+    clearAnnouncement,
+    announcement: () => (announcement && announcement.expiresAt > Date.now() ? announcement : null),
+    emitServerStatus,
+    cleanupEmptyRooms,
+  };
 }

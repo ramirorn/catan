@@ -49,3 +49,6 @@ await import('./tests/rewards.test.js');
 
 // Shop: catalogue, buying / equipping rules, cosmetics in the game state
 await import('./tests/shop.test.js');
+
+// Admin panel: authorization, maintenance, coins, roles, blocked accounts
+await import('./tests/admin.test.js');

@@ -8,12 +8,12 @@ const PLAYER_ID_KEY = 'catan_player_id';
 
 // Persistent per-tab player id: survives reloads/reconnects (sessionStorage is per tab,
 // so two tabs in the same browser are still two different players).
-function getPlayerId() {
+function getPlayerId(key = PLAYER_ID_KEY) {
   try {
-    let id = sessionStorage.getItem(PLAYER_ID_KEY);
+    let id = sessionStorage.getItem(key);
     if (!id) {
       id = (globalThis.crypto?.randomUUID?.() || `p-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-      sessionStorage.setItem(PLAYER_ID_KEY, id);
+      sessionStorage.setItem(key, id);
     }
     return id;
   } catch {
@@ -29,10 +29,11 @@ export function resetPlayerId() {
   }
 }
 
-export function SocketProvider({ children }) {
+// `idKey`: the admin panel uses its own id so it never takes over a seat
+export function SocketProvider({ children, idKey = PLAYER_ID_KEY }) {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
-  const [playerId] = useState(getPlayerId);
+  const [playerId] = useState(() => getPlayerId(idKey));
   const { user, getSocketToken, currentUserId } = useAuth();
   const tokenRef = useRef(getSocketToken);
   const userIdOfRef = useRef(currentUserId);

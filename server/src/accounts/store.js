@@ -43,7 +43,7 @@ const PROFILE_COLUMNS = 'id, email, display_name, avatar_id, coins, games_played
  * Returns the game profile of a Neon Auth user, creating it the first time
  * (name from the account, avatar chosen on the device when given).
  */
-export async function ensureUser(pool, authUser, { avatarId } = {}) {
+export async function ensureUser(pool, authUser, { avatarId, adminEmails } = {}) {
   const avatar = Number.isInteger(avatarId) && avatarId >= 0 && avatarId < AVATAR_COUNT ? avatarId : 0;
   const { rows } = await pool.query(
     `WITH ins AS (
@@ -60,7 +60,34 @@ export async function ensureUser(pool, authUser, { avatarId } = {}) {
      LIMIT 1`,
     [authUser.id, String(authUser.email || '').toLowerCase(), defaultName(authUser), avatar],
   );
+  // ADMIN_EMAILS: these accounts become admins the moment they sign in
+  const email = String(authUser.email || '').trim().toLowerCase();
+  if (rows[0] && adminEmails && email && adminEmails.has(email)) {
+    await pool.query(`UPDATE users SET role = 'admin', updated_at = now() WHERE id = $1 AND role <> 'admin'`, [authUser.id]);
+  }
   return toProfile(rows[0]);
+}
+
+/**
+ * Role and moderation status of an account (null when it has no profile).
+ * Never sent to the client as-is: see admin/access.js.
+ */
+export async function getAccess(pool, userId) {
+  const { rows } = await pool.query(
+    'SELECT id, email, display_name, role, status, suspended_until, ban_reason FROM users WHERE id = $1',
+    [userId],
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    email: r.email,
+    displayName: r.display_name,
+    role: r.role,
+    status: r.status,
+    suspendedUntil: r.suspended_until,
+    banReason: r.ban_reason,
+  };
 }
 
 export async function getUser(pool, userId) {
@@ -158,8 +185,8 @@ export async function recordGame(pool, summary, awards) {
        SELECT * FROM unnest($1::uuid[], $2::boolean[], $3::int[], $4::int[]) AS t(user_id, won, vp, coins)
      ),
      ins AS (
-       INSERT INTO game_results (game_id, user_id, room_id, won, vp, coins_awarded, ended_by, players, duration_s)
-       SELECT $5, t.user_id, $6, t.won, t.vp, t.coins, $7, $8, $9
+       INSERT INTO game_results (game_id, user_id, room_id, won, vp, coins_awarded, ended_by, players, duration_s, board_type)
+       SELECT $5, t.user_id, $6, t.won, t.vp, t.coins, $7, $8, $9, $10::text
          FROM t JOIN users u ON u.id = t.user_id
        ON CONFLICT (game_id, user_id) DO NOTHING
        RETURNING user_id, won, coins_awarded
@@ -182,6 +209,7 @@ export async function recordGame(pool, summary, awards) {
       summary.endedBy,
       summary.players.length,
       summary.durationS,
+      summary.boardType === 'extended' ? 'extended' : summary.boardType === 'standard' ? 'standard' : null,
     ],
   );
   return rows.map((r) => ({ userId: r.id, coins: r.coins_awarded, total: r.coins }));

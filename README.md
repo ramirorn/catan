@@ -105,6 +105,7 @@ Los invitados juegan igual que siempre. Con cuenta, el perfil (nombre y avatar) 
 | `DATABASE_URL` | Cadena de conexión de Neon (Dashboard → Connect). Secreta. |
 | `NEON_AUTH_BASE_URL` | "Auth URL" de Neon Auth (Neon → Auth → Configuration), termina en `/neondb/auth`. |
 | `REWARD_MIN_VOTE_MINUTES` | Opcional, minutos mínimos para cobrar una partida terminada por votación (15). |
+| `ADMIN_EMAILS` | Opcional, correos separados por comas que reciben el rol de admin al iniciar sesión (ver «Panel de administración»). |
 
 En local van en `server/.env` (está en `.gitignore`). En Render: **Environment → Add Environment Variable** con las dos primeras. Si faltan, el servidor arranca igual con las cuentas desactivadas.
 
@@ -114,3 +115,14 @@ Google funciona sin crear nada en Google Cloud porque Neon presta sus credencial
 
 Nota: la sesión usa cookies seguras, así que el inicio de sesión funciona en `https://` y en `http://localhost`, pero no al abrir el juego por la IP de la red local (`http://192.168…`).
 
+
+## Panel de administración
+
+Panel oculto en **`/admin`**: no hay enlaces en el juego ni en la PWA y su código es un archivo aparte que los jugadores nunca descargan. Cualquiera que no sea admin (o no haya iniciado sesión) ve «Página no encontrada»; la API (`/api/admin/*`) responde 404 a todo el resto.
+
+- **Quién es admin:** las cuentas con `users.role = 'admin'`. Se puede dar o quitar desde la pestaña *Usuarios* (nadie puede quitarse el rol a sí mismo ni quitar al último admin). `ADMIN_EMAILS` (variable de entorno, separada por comas) da el rol automáticamente al iniciar sesión: en Render agrégala en **Environment** con tu correo para no quedarte nunca sin acceso. Una cuenta suspendida o bloqueada deja de ser admin mientras dure la sanción.
+- **Pestañas:** *Partidas* (salas en memoria, observar en secreto, expulsar, cerrar con motivo), *Usuarios* (buscar, ajustar Ryō, regalar objetos, renombrar, suspender / bloquear / levantar, rol), *Avisos y mantenimiento* (aviso global y modo mantenimiento), *Estadísticas*, *Sistema* (memoria, base de datos, últimos errores, limpiar salas vacías) y *Registro* (todas las acciones de los admins).
+- **Modo mantenimiento:** impide crear salas o sentarse en una nueva; las partidas en curso siguen. Se guarda en la tabla `app_settings` y sobrevive a reinicios. La pestaña muestra cuántas partidas quedan en curso para saber cuándo es seguro desplegar.
+- **Sanciones:** una cuenta suspendida (hasta una fecha) o bloqueada no puede jugar con su cuenta (sí como invitado); si está en una partida sale de ella al instante.
+- **Seguridad:** cada petición comprueba el rol en la base de datos, exige la cabecera `X-Catan-Admin` y el mismo origen, tiene límite de frecuencia y queda en `admin_actions`.
+- Código: servidor en `server/src/admin/` (una ruta por pestaña en `routes/`), cliente en `client/src/admin/` (una pestaña = una entrada en `TABS` de `AdminApp.jsx`).

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { GameProvider, useGame } from './context/GameContext';
@@ -27,7 +27,14 @@ import { EndGameModal } from './components/HUD/EndGameModal';
 import { RoomMenuModal } from './components/HUD/RoomMenuModal';
 import { ToastContainer } from './components/Shared/Toast';
 import { PwaLayer } from './components/Shared/Pwa';
+import { ServerNotices } from './components/Shared/ServerNotices';
 import { CloseIcon, ScrollIcon, EyeIcon } from './components/Shared/Icons';
+
+// Admin panel: only reachable by typing /admin. Its own lazy chunk, never
+// downloaded (nor precached) for players; the server answers 404 to anyone
+// who is not an admin.
+const AdminApp = lazy(() => import('./admin/AdminApp'));
+const IS_ADMIN_PATH = typeof window !== 'undefined' && /^\/admin(?:\/|$)/.test(window.location.pathname);
 
 /**
  * Keeps two CSS variables in sync with the part of the page that is really
@@ -215,12 +222,27 @@ function GameContent() {
 }
 
 export default function App() {
+  if (IS_ADMIN_PATH) {
+    return (
+      <AuthProvider>
+        <SocketProvider idKey="catan_admin_player_id">
+          <GameProvider>
+            <Suspense fallback={<div className="night-surface min-h-dvh w-full" aria-busy="true" />}>
+              <AdminApp />
+            </Suspense>
+            <ToastContainer />
+          </GameProvider>
+        </SocketProvider>
+      </AuthProvider>
+    );
+  }
   return (
     <AuthProvider>
       <SocketProvider>
         <GameProvider>
           <GameContent />
           <ToastContainer />
+          <ServerNotices />
           <PwaLayer />
         </GameProvider>
       </SocketProvider>

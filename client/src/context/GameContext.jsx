@@ -652,6 +652,7 @@ export function GameProvider({ children }) {
     joinRoom,
     spectateRoom,
     leaveRoom,
+    resetToMenu,
     kickPlayer,
     startGame,
     rollDice,
@@ -678,7 +679,7 @@ export function GameProvider({ children }) {
     sendChatMessage,
   }), [
     gameState, roomId, playerName, avatarId, setAvatarId, myPlayerId, myPlayer, isMyTurn,
-    isSpectator, spectators, hostId, isHost, spectateRoom, leaveRoom, kickPlayer,
+    isSpectator, spectators, hostId, isHost, spectateRoom, leaveRoom, resetToMenu, kickPlayer,
     canActOnBoard,
     buildMode, activeModal, toasts, addToast, chatMessages, robberVictims, isRolling,
     serverOffset, coinsAward, updateRoomSettings, setBoardTheme,

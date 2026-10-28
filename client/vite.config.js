@@ -50,13 +50,16 @@ export default defineConfig({
         // means a deploy mid-game never breaks its lazy import).
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
         // big install-only icons are fetched by the browser itself
-        globIgnores: ['**/pwa-512x512.png', '**/maskable-512x512.png', '**/app-icon.svg', '**/icons.svg'],
+        // (the admin panel chunk is never precached: players never download it)
+        globIgnores: ['**/pwa-512x512.png', '**/maskable-512x512.png', '**/app-icon.svg', '**/icons.svg', '**/AdminApp-*.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
         // Real-time server + health check are never served from the SW (no
         // route matches them either, so the SW does not even intercept them)
-        navigateFallbackDenylist: [/^\/socket\.io/, /^\/health/, /^\/api(?:\/|$)/],
+        // /admin always comes from the network (fresh index.html for the
+        // current admin chunk, never a stale cached shell)
+        navigateFallbackDenylist: [/^\/socket\.io/, /^\/health/, /^\/api(?:\/|$)/, /^\/admin(?:\/|$)/],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.origin === 'https://fonts.googleapis.com',
