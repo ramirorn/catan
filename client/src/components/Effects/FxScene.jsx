@@ -16,6 +16,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getBoardBridge } from './fxSignal';
 import { useShadersReady } from './useShadersReady';
+import { FaceMask3D } from '../RobberFace/FaceMask3D';
+import { useShownRobberFace } from '../RobberFace/robberFaceStore';
 
 const FOV = 30;
 const HEX = 60; // board units per hex radius
@@ -747,14 +749,26 @@ function CityFx({ item, assets, clock, onReveal, onDone }) {
 
 /* ─── 2. Robber leap ─── */
 
-function RogueFigure({ assets, mats }) {
+// With «Cara del ladrón» the same face as on the board (see Robber3D)
+function RogueFigure({ assets, mats, face = null }) {
   return (
     <group>
       <mesh geometry={assets.geo.cloak} material={mats.cloak} />
       <mesh geometry={assets.geo.cyl} material={mats.dark} position-y={0.395} scale={[0.08, 0.07, 0.08]} />
-      <mesh geometry={assets.geo.sphere} material={mats.dark} position-y={0.45} scale={0.062} />
-      <mesh geometry={assets.geo.box} material={mats.paper} position={[0.022, 0.452, 0.06]} scale={[0.03, 0.007, 0.006]} />
-      <mesh geometry={assets.geo.cone} material={mats.straw} position-y={0.52} scale={[0.19, 0.11, 0.19]} />
+      {face ? (
+        <>
+          <FaceMask3D face={face} width={0.17} position={[0, 0.47, 0.03]} rotation-x={-0.3} hoodMaterial={mats.dark} />
+        </>
+      ) : (
+        <>
+          <mesh geometry={assets.geo.sphere} material={mats.dark} position-y={0.45} scale={0.062} />
+          <mesh geometry={assets.geo.box} material={mats.paper} position={[0.022, 0.452, 0.06]} scale={[0.03, 0.007, 0.006]} />
+        </>
+      )}
+      {/* with a face the hat is pushed back, as on the board */}
+      <group position={face ? [0, 0.535, -0.035] : [0, 0.5, 0]} rotation-x={face ? -0.45 : 0}>
+        <mesh geometry={assets.geo.cone} material={mats.straw} position-y={0.02} scale={[0.19, 0.11, 0.19]} />
+      </group>
       {[
         [-0.09, 0.2, 0.12, 0.08],
         [0.08, 0.1, 0.15, 0.07],
@@ -768,6 +782,7 @@ function RogueFigure({ assets, mats }) {
 
 function RobberFx({ item, assets, clock, onReveal, onDone }) {
   const anchor = useAnchor();
+  const face = useShownRobberFace();
   const from = useRef({ x: 0, y: 0, R: 40 });
   const to = useRef({ x: 0, y: 0, R: 40 });
   const startPuff = useRef(null);
@@ -866,7 +881,7 @@ function RobberFx({ item, assets, clock, onReveal, onDone }) {
       ))}
       <group ref={rogue} visible={false}>
         <group position-y={-0.2}>
-          <RogueFigure assets={assets} mats={mats} />
+          <RogueFigure assets={assets} mats={mats} face={face} />
         </group>
       </group>
     </>

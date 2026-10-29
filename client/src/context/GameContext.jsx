@@ -5,6 +5,8 @@ import { useSocket } from './SocketContext';
 import { useAuth } from './AuthContext';
 import { PHASE, RESOURCE_NAMES } from '../utils/constants';
 import { loadAvatarId, saveAvatarId, isAvatarId } from '../utils/avatars';
+import { RobberFaceSync } from '../components/RobberFace/RobberFaceSync';
+import { faceKey, setRobberFace } from '../components/RobberFace/robberFaceStore';
 
 const GameContext = createContext(null);
 const NO_SPECTATORS = [];
@@ -446,6 +448,19 @@ export function GameProvider({ children }) {
     socket.emit('setBoardTheme', { themeId }, (res) => handleCallback(res));
   }, [socket, handleCallback]);
 
+  // Host: «Cara del ladrón» ({ image, points } from captureFace, or null to
+  // remove it). Resolves { success, error }.
+  const setRobberFaceOnServer = useCallback((face) => new Promise((resolve) => {
+    if (!socket) return resolve({ success: false, error: 'No hay conexión con el servidor' });
+    const event = face ? 'setRobberFace' : 'clearRobberFace';
+    socket.timeout(15000).emit(event, face || {}, (err, res) => {
+      if (err) return resolve({ success: false, error: 'El servidor no respondió. Inténtalo de nuevo.' });
+      // The host already has the photo: no need to download it back
+      if (face && res?.success) setRobberFace({ ...face, id: res.id, by: playerId, key: faceKey(roomId, res.id) });
+      resolve(res || { success: false, error: 'No se pudo cambiar la cara' });
+    });
+  }), [socket, playerId, roomId]);
+
   const startGame = useCallback(() => {
     if (!socket) return;
     socket.emit('startGame', {}, (res) => handleCallback(res, '¡Partida iniciada!'));
@@ -674,6 +689,7 @@ export function GameProvider({ children }) {
     createRoom,
     updateRoomSettings,
     setBoardTheme,
+    setRobberFace: setRobberFaceOnServer,
     joinRoom,
     spectateRoom,
     leaveRoom,
@@ -708,7 +724,7 @@ export function GameProvider({ children }) {
     isSpectator, spectators, hostId, isHost, spectateRoom, leaveRoom, resetToMenu, kickPlayer,
     canActOnBoard,
     buildMode, activeModal, toasts, addToast, chatMessages, robberVictims, isRolling,
-    serverOffset, coinsAward, updateRoomSettings, setBoardTheme,
+    serverOffset, coinsAward, updateRoomSettings, setBoardTheme, setRobberFaceOnServer,
     createRoom, joinRoom, startGame, rollDice, setupPlaceSettlement, setupPlaceRoad,
     buildRoad, buildSettlement, buildCity, buyDevCard, playDevCard, discardCards,
     moveRobber, stealCard, offerPeacePact, respondPeacePact, cancelPeacePact, bankTrade, proposeTrade, respondToTrade, acceptTrade,
@@ -718,6 +734,7 @@ export function GameProvider({ children }) {
   return (
     <GameContext.Provider value={value}>
       {children}
+      <RobberFaceSync />
     </GameContext.Provider>
   );
 }

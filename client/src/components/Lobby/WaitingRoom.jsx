@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { PlayerAvatar } from '../Shared/Avatar';
 import { AvatarPicker } from '../Shared/AvatarPicker';
 import { SPECTATOR_RING } from '../../utils/avatars';
+import { RobberFaceRule } from '../RobberFace/RobberFaceControls';
 
 export function WaitingRoom() {
   const {
@@ -74,10 +75,11 @@ export function WaitingRoom() {
             peacePacts={gameState.peacePacts !== false}
             onChange={updateRoomSettings}
           />
-          {/* Board theme (shop): chosen by the host among their boards */}
+          {/* Board theme (shop): chosen by the host among their boards, and
+              «Cara del ladrón» next to it */}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-start mb-4 tiny:mb-3 phland:mb-2">
           <BoardThemeRule
             idPrefix="room"
-            className="mb-4 tiny:mb-3 phland:mb-2"
             readOnly={!isHost}
             value={gameState.boardTheme}
             catalog={shop?.catalog || []}
@@ -85,6 +87,8 @@ export function WaitingRoom() {
             onChange={setBoardTheme}
             note={isHost && !user ? 'Inicia sesión y consigue tableros en la Tienda.' : null}
           />
+          <RobberFaceRule />
+          </div>
           </div>
 
           {/* Settlers List */}

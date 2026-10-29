@@ -7,6 +7,7 @@ import { PHASE } from '../../utils/constants';
 import { formatDuration, useGameElapsed } from '../../utils/gameClock';
 import { CrownIcon, EyeIcon, ExitIcon, FlagIcon } from '../Shared/Icons';
 import { ReportDialog } from './ReportDialog';
+import { RobberFaceMenuSection } from '../RobberFace/RobberFaceControls';
 
 /**
  * Room menu (header ☰): game info, who is playing / watching, the host's
@@ -18,7 +19,7 @@ export function RoomMenuModal({ isOpen, onClose }) {
     leaveRoom, kickPlayer, setActiveModal,
   } = useGame();
   const [confirm, setConfirm] = useState(null); // { kind: 'leave' } | { kind: 'kick', id, name }
-  const [reporting, setReporting] = useState(null); // { id, name }
+  const [reporting, setReporting] = useState(null); // { id, name, reason? }
   const elapsed = useGameElapsed(gameState?.startedAt, gameState?.endedAt, serverOffset);
 
   if (!isOpen || !gameState) return null;
@@ -140,6 +141,8 @@ export function RoomMenuModal({ isOpen, onClose }) {
           Votar para terminar la partida
         </button>
       )}
+
+      {!gameOver && <RobberFaceMenuSection onReport={setReporting} />}
 
       <div className="label-caps mb-1">Ninjas</div>
       <ul className="border-t border-ink/15 mb-4">

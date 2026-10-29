@@ -7,12 +7,13 @@ export const MUTE_MAX_MINUTES = 7 * 24 * 60;
 // "Until the game ends" also has a safety end (a room that never ends)
 export const MUTE_GAME_CAP_MS = 12 * 60 * 60 * 1000;
 
-export const REPORT_REASONS = ['insultos', 'trampa', 'spam', 'nombre', 'otro'];
+export const REPORT_REASONS = ['insultos', 'trampa', 'spam', 'nombre', 'imagen', 'otro'];
 export const REPORT_REASON_LABELS = {
   insultos: 'Insultos',
   trampa: 'Trampa',
   spam: 'Spam',
   nombre: 'Nombre ofensivo',
+  imagen: 'Cara del ladrón ofensiva',
   otro: 'Otro',
 };
 export const REPORT_TEXT_MAX = 300;

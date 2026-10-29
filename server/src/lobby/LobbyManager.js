@@ -22,6 +22,8 @@ export class LobbyManager {
       banned: new Set(),  // ids kicked by the host: cannot come back to this room
       abandonTimer: null, // closes a game nobody is connected to
       accounts: {},       // playerId → account id of a logged-in seat (Ryō at the end)
+      robberFace: null,   // «Cara del ladrón»: { id, by, image, points } (memory only)
+      robberFaceCounter: 0,
     };
 
     // Auto-join host

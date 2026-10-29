@@ -9,18 +9,20 @@ const REPORT_REASONS = [
   { value: 'trampa', label: 'Trampa' },
   { value: 'spam', label: 'Spam' },
   { value: 'nombre', label: 'Nombre ofensivo' },
+  { value: 'imagen', label: 'Cara del ladrón' },
   { value: 'otro', label: 'Otro' },
 ];
 
 /**
  * «Reportar» a ninja of this room to the moderators. `target` = { id, name,
- * messageId?, message? } (a chat message when reported from the chat).
+ * messageId?, message?, reason? } (a chat message when reported from the
+ * chat; `reason` preselects one, e.g. 'imagen' for the robber's face).
  * Mount it conditionally so every opening starts clean. Rendered in a
  * portal: the chat panel clips (overflow / containing block) fixed children.
  */
 export function ReportDialog({ target, onClose }) {
   const { reportPlayer, addToast } = useGame();
-  const [reason, setReason] = useState(target.messageId != null ? 'insultos' : '');
+  const [reason, setReason] = useState(target.reason || (target.messageId != null ? 'insultos' : ''));
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

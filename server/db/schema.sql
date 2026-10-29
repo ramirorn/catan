@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS reports (
   target_player_id   text NOT NULL CHECK (char_length(target_player_id) BETWEEN 1 AND 64),
   target_name        text NOT NULL CHECK (char_length(target_name) <= 40),
   room_id            text NOT NULL CHECK (char_length(room_id) <= 16),
-  reason             text NOT NULL CHECK (reason IN ('insultos', 'trampa', 'spam', 'nombre', 'otro')),
+  reason             text NOT NULL CHECK (reason IN ('insultos', 'trampa', 'spam', 'nombre', 'imagen', 'otro')),
   details            text CHECK (details IS NULL OR char_length(details) <= 300),
   chat_excerpt       jsonb NOT NULL DEFAULT '[]'::jsonb,
   status             text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
@@ -148,6 +148,10 @@ CREATE TABLE IF NOT EXISTS reports (
 );
 CREATE INDEX IF NOT EXISTS reports_status_idx ON reports (status, id DESC);
 CREATE INDEX IF NOT EXISTS reports_target_idx ON reports (target_user_id, id DESC);
+-- «Cara del ladrón ofensiva» (imagen) added after the table existed
+ALTER TABLE reports DROP CONSTRAINT IF EXISTS reports_reason_check;
+ALTER TABLE reports ADD CONSTRAINT reports_reason_check
+  CHECK (reason IN ('insultos', 'trampa', 'spam', 'nombre', 'imagen', 'otro'));
 
 -- Shop changes made from the panel, on top of the catalogue in code
 -- (server/src/shop/catalog.js). No row = the item as defined in code.

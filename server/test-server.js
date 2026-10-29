@@ -56,3 +56,6 @@ await import('./tests/admin.test.js');
 // Admin panel phase B: moderation, banned words, reports, shop overrides,
 // reward rules, ranking exclusions
 await import('./tests/adminB.test.js');
+
+// «Cara del ladrón»: payload checks, host only, fetched by the room
+await import('./tests/robberFace.test.js');

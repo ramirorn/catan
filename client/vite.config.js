@@ -50,8 +50,9 @@ export default defineConfig({
         // means a deploy mid-game never breaks its lazy import).
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
         // big install-only icons are fetched by the browser itself
-        // (the admin panel chunk is never precached: players never download it)
-        globIgnores: ['**/pwa-512x512.png', '**/maskable-512x512.png', '**/app-icon.svg', '**/icons.svg', '**/AdminApp-*.js'],
+        // (the admin panel chunk is never precached: players never download it,
+        // nor the face detector of «Cara del ladrón», only used by some hosts)
+        globIgnores: ['**/pwa-512x512.png', '**/maskable-512x512.png', '**/app-icon.svg', '**/icons.svg', '**/AdminApp-*.js', '**/vision_bundle-*.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',

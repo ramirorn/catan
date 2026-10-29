@@ -6,6 +6,7 @@ import {
   REPORT_EXCERPT, REPORT_REASONS, REPORT_TEXT_MAX, createReportLimiter, muteMessage,
 } from '../admin/moderation.js';
 import { cleanMessage } from '../admin/settings.js';
+import { parseRobberFace } from './robberFace.js';
 
 const CHAT_HISTORY_LIMIT = 200;
 const CHAT_MAX_LENGTH = 150;
@@ -21,6 +22,8 @@ export const MAX_SPECTATORS = 20;
 const AVATAR_MIN_INTERVAL_MS = 300;
 // Board theme changes by the host: at most one every 400 ms
 const THEME_MIN_INTERVAL_MS = 400;
+// «Cara del ladrón» uploads by the host: at most one every 5 s
+const FACE_MIN_INTERVAL_MS = 5000;
 // A spectator who closes the page keeps their place this long (page reloads)
 const SPECTATOR_GRACE_MS = 2 * 60 * 1000;
 // A game in progress with nobody connected is closed after this long
@@ -199,9 +202,16 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       .map((s) => ({ id: s.id, name: s.name, avatarId: s.avatarId }));
   }
 
-  // Room-level data added to every state (not part of the game engine)
+  // Room-level data added to every state (not part of the game engine). The
+  // robber's face only travels as an id: clients fetch the photo once
+  // (getRobberFace) instead of receiving it with every state
   function roomExtras(room) {
-    return { hostId: room.host, spectators: spectatorList(room) };
+    const face = room.robberFace;
+    return {
+      hostId: room.host,
+      spectators: spectatorList(room),
+      robberFace: face ? { id: face.id, by: face.by } : null,
+    };
   }
 
   function spectatorState(room) {
@@ -696,6 +706,54 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
       accounts.ownsItem(userId, item.id)
         .then((owned) => (owned ? apply() : cb({ success: false, error: 'Ese tablero no es tuyo: cómpralo en la tienda' })))
         .catch(() => cb({ success: false, error: 'No se pudo comprobar tu tablero. Inténtalo de nuevo.' }));
+    });
+
+    // ─── «Cara del ladrón»: the host puts a face on the robber ───
+    // The photo is processed in the host's browser; only a small JPEG and the
+    // face landmarks arrive here, and they live in the room's memory only.
+    let lastFaceAt = 0;
+    function hostRoomForFace() {
+      const roomId = playerToRoom[playerId];
+      const room = lobbyManager.getRoom(roomId);
+      const me = room && room.engine.players[playerId];
+      if (!me || me.left) return { error: 'No estás en una sala' };
+      if (!isHost(room, playerId)) return { error: 'Solo el anfitrión puede cambiar la cara del ladrón' };
+      if (room.engine.phase === 'gameOver') return { error: 'La partida ya terminó' };
+      return { room, roomId, me };
+    }
+
+    on('setRobberFace', (payload, cb) => {
+      const { room, roomId, me, error } = hostRoomForFace();
+      if (error) return cb({ success: false, error });
+      const now = Date.now();
+      if (now - lastFaceAt < FACE_MIN_INTERVAL_MS) return cb({ success: false, error: 'Espera unos segundos' });
+      const parsed = parseRobberFace(payload);
+      if (parsed.error) return cb({ success: false, error: parsed.error });
+      lastFaceAt = now;
+      room.robberFaceCounter += 1;
+      room.robberFace = { id: room.robberFaceCounter, by: playerId, ...parsed.face };
+      if (room.engine.phase !== 'lobby') room.engine.log(`${me.name} le puso cara al ladrón`);
+      cb({ success: true, id: room.robberFace.id });
+      emitGameState(roomId);
+    });
+
+    on('clearRobberFace', (_, cb) => {
+      const { room, roomId, error } = hostRoomForFace();
+      if (error) return cb({ success: false, error });
+      if (!room.robberFace) return cb({ success: true });
+      room.robberFace = null;
+      cb({ success: true });
+      emitGameState(roomId);
+    });
+
+    // Anyone in the room (seat, spectator or an admin observing) fetches the
+    // photo once per face id
+    on('getRobberFace', ({ id }, cb) => {
+      const roomId = playerToRoom[playerId] || spectatorToRoom[playerId] || socket.data.adminWatching;
+      const room = lobbyManager.getRoom(roomId);
+      const face = room && room.robberFace;
+      if (!face || face.id !== id) return cb({ success: false, error: 'Esa cara ya no está' });
+      cb({ success: true, face: { id: face.id, by: face.by, image: face.image, points: face.points } });
     });
 
     // ─── Lobby: Start Game ───

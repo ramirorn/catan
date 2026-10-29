@@ -24,6 +24,8 @@ import { ThemeAccents3D } from './ThemeAccents3D';
 import { SceneContext } from './sceneContext';
 import { tipHandlers3D } from '../Board/boardTip';
 import { useFxHidden } from '../Effects/fxSignal';
+import { FaceMask3D } from '../RobberFace/FaceMask3D';
+import { useShownRobberFace } from '../RobberFace/robberFaceStore';
 const useScene = () => useContext(SceneContext);
 
 // drei <Outlines> thickness is in device pixels (constant on screen)
@@ -225,10 +227,20 @@ const CLOAK_PROFILE = [
   [0.0, 0.37],
 ].map(([x, y]) => new THREE.Vector2(x, y));
 
-export function Robber3D({ x, z }) {
+// «Cara del ladrón»: with a face the rogue is a bit bigger and pushes his hat
+// back (seen from above, the brim would hide the face)
+const FACE_SCALE = 1.45;
+// The hat tilts back around the crown of the head (HAT_PIVOT), not the feet
+const HAT_PIVOT = 0.5;
+const FACE_HAT = { position: [0, HAT_PIVOT + 0.035, -0.035], rotation: [-0.45, 0, 0] };
+const NO_HAT_TILT = { position: [0, HAT_PIVOT, 0], rotation: [0, 0, 0] };
+
+export function Robber3D({ x, z, withFace = false }) {
   const { res } = useScene();
   const dpr = useOutlinePx();
   const invalidate = useThree((s) => s.invalidate);
+  const shownFace = useShownRobberFace();
+  const face = withFace ? shownFace : null;
   const ref = useRef(null);
   const anim = useRef(null);
   const last = useRef(null);
@@ -275,7 +287,7 @@ export function Robber3D({ x, z }) {
 
   return (
     <group ref={ref} visible={!hidden}>
-      <group scale={1.2}>
+      <group scale={face ? FACE_SCALE : 1.2}>
         <mesh material={res.mat.cloak} castShadow>
           <latheGeometry args={[CLOAK_PROFILE, 28]} />
           <Outlines thickness={OUTLINE_PX * dpr} color={INK} />
@@ -284,29 +296,43 @@ export function Robber3D({ x, z }) {
         <mesh material={res.mat.robberDark} position-y={0.395} castShadow>
           <cylinderGeometry args={[0.072, 0.085, 0.07, 14]} />
         </mesh>
-        {/* shadowed face with a pale eye glint */}
-        <mesh material={res.mat.robberDark} position-y={0.45}>
-          <sphereGeometry args={[0.062, 16, 12]} />
-        </mesh>
-        <mesh material={res.mat.paper} position={[0.022, 0.452, 0.058]}>
-          <boxGeometry args={[0.03, 0.007, 0.006]} />
-        </mesh>
-        {/* conical straw hat */}
-        <mesh material={res.mat.straw} position-y={0.52} castShadow>
-          <coneGeometry args={[0.19, 0.11, 24, 1]} />
-          <Outlines thickness={OUTLINE_PX * dpr} color={INK} />
-        </mesh>
-        {/* hat underside: the circle faces +z by default, so turn it a quarter
-            turn to lie flat facing down (a half turn left it standing upright) */}
-        <mesh material={res.mat.strawDark} position-y={0.4655} rotation-x={Math.PI / 2}>
-          <circleGeometry args={[0.19, 24]} />
-        </mesh>
-        {/* hanging paper strips */}
-        {[0.6, 1.4, 3.6, 4.6].map((a) => (
-          <mesh key={a} material={res.mat.paper} position={[Math.sin(a) * 0.17, 0.43, Math.cos(a) * 0.17]} rotation-y={a}>
-            <boxGeometry args={[0.018, 0.07, 0.004]} />
+        {face ? (
+          <>
+            {/* the face, tilted up towards the camera, with a dark hood the
+                size of the face closing the head behind it */}
+            <FaceMask3D face={face} width={0.17} position={[0, 0.47, 0.03]} rotation-x={-0.3} hoodMaterial={res.mat.robberDark} />
+          </>
+        ) : (
+          <>
+            {/* shadowed face with a pale eye glint */}
+            <mesh material={res.mat.robberDark} position-y={0.45}>
+              <sphereGeometry args={[0.062, 16, 12]} />
+            </mesh>
+            <mesh material={res.mat.paper} position={[0.022, 0.452, 0.058]}>
+              <boxGeometry args={[0.03, 0.007, 0.006]} />
+            </mesh>
+          </>
+        )}
+        <group {...(face ? FACE_HAT : NO_HAT_TILT)}>
+        <group position-y={-HAT_PIVOT}>
+          {/* conical straw hat */}
+          <mesh material={res.mat.straw} position-y={0.52} castShadow>
+            <coneGeometry args={[0.19, 0.11, 24, 1]} />
+            <Outlines thickness={OUTLINE_PX * dpr} color={INK} />
           </mesh>
-        ))}
+          {/* hat underside: the circle faces +z by default, so turn it a quarter
+              turn to lie flat facing down (a half turn left it standing upright) */}
+          <mesh material={res.mat.strawDark} position-y={0.4655} rotation-x={Math.PI / 2}>
+            <circleGeometry args={[0.19, 24]} />
+          </mesh>
+          {/* hanging paper strips (only at the back and sides with a face) */}
+          {(face ? [1.4, 3.6, 4.6] : [0.6, 1.4, 3.6, 4.6]).map((a) => (
+            <mesh key={a} material={res.mat.paper} position={[Math.sin(a) * 0.17, 0.43, Math.cos(a) * 0.17]} rotation-y={a}>
+              <boxGeometry args={[0.018, 0.07, 0.004]} />
+            </mesh>
+          ))}
+        </group>
+        </group>
       </group>
     </group>
   );
@@ -654,7 +680,7 @@ export function Board3D({ board, hexGeom, bounds, center, radius, shadows, lowPo
           center={centerPx}
         />
       ))}
-      {robberHex && <Robber3D x={robberHex.x * PX} z={robberHex.y * PX} />}
+      {robberHex && <Robber3D x={robberHex.x * PX} z={robberHex.y * PX} withFace />}
       {edges}
       {vertices}
       {anyMarker && <PulseDriver lowPower={lowPower} />}

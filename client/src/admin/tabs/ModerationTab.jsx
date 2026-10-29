@@ -5,7 +5,7 @@ import { PHASE_LABELS, fmtDate, fmtTime } from '../format';
 import { useGame } from '../../context/GameContext';
 import { Dropdown } from '../../components/Shared/Choice';
 
-const REASON_LABELS = { insultos: 'Insultos', trampa: 'Trampa', spam: 'Spam', nombre: 'Nombre ofensivo', otro: 'Otro' };
+const REASON_LABELS = { insultos: 'Insultos', trampa: 'Trampa', spam: 'Spam', nombre: 'Nombre ofensivo', imagen: 'Cara del ladrón', otro: 'Otro' };
 const REPORT_STATUS = { open: 'Abierto', resolved: 'Resuelto', dismissed: 'Descartado' };
 const MUTE_OPTIONS = [
   { value: '5', label: '5 minutos' },
