@@ -260,12 +260,14 @@ export function ShopScreen({ onBack, onLogin, onProfile }) {
                   <p className="text-[12.5px] leading-snug text-ink-soft mt-0.5">{selected.description}</p>
                 </div>
                 <div className="shrink-0 text-right">
-                  {selected.isDefault ? (
+                  {selected.adminOnly ? (
+                    <span className="shop-badge !bg-chakra/15 !text-chakra-dark !border-chakra/50">Exclusivo del Consejo</span>
+                  ) : selected.isDefault ? (
                     <span className="text-[12px] font-bold text-ink-faint">Gratis</span>
                   ) : (
                     <PriceTag item={selected} coinName={coinName} large />
                   )}
-                  {!selected.isDefault && selected.salePercent && selected.saleEndsAt && (
+                  {!selected.isDefault && !selected.adminOnly && selected.salePercent && selected.saleEndsAt && (
                     <p className="text-[11px] text-shu font-semibold mt-0.5">Oferta {saleUntil(selected.saleEndsAt)}</p>
                   )}
                   <div className="mt-1">
@@ -322,7 +324,7 @@ export function ShopScreen({ onBack, onLogin, onProfile }) {
                     </span>
                     <span className="block font-bold text-[12.5px] leading-tight text-ink mt-1 truncate">{item.name}</span>
                     <span className="block text-[11.5px] tabular-nums text-chakra-dark font-bold">
-                      {item.isDefault ? 'Gratis' : <PriceTag item={item} coinName={coinName} />}
+                      {item.adminOnly ? 'Exclusivo del Consejo' : item.isDefault ? 'Gratis' : <PriceTag item={item} coinName={coinName} />}
                     </span>
                   </button>
                 </li>

@@ -7,7 +7,7 @@ import { Robber } from './Robber.js';
 import { Scoring } from './Scoring.js';
 import { sanitizeBoardTheme, sanitizePieceSet } from '../shop/catalog.js';
 import {
-  PHASE, BUILD_COSTS, PLAYER_COLORS, RESOURCE,
+  PHASE, BUILD_COSTS, PLAYER_COLORS, GOLD_COLOR, RESOURCE,
   DEV_CARD, BANK_RESOURCE_COUNT, BANK_RESOURCE_COUNT_EXTENDED, MAX_ROADS,
   VP_TO_WIN, VP_TO_WIN_OPTIONS, TURN_TIME_OPTIONS, sanitizeAvatarId,
   PEACE_PACT_MS, PEACE_PACT_MAX_CARDS,
@@ -209,7 +209,7 @@ export class GameEngine {
       // Reindex remaining players
       this.playerOrder.forEach((pid, i) => {
         this.players[pid].index = i;
-        this.players[pid].color = PLAYER_COLORS[i];
+        this.players[pid].color = this.players[pid].gold ? GOLD_COLOR : PLAYER_COLORS[i];
       });
       return true;
     }
@@ -260,6 +260,15 @@ export class GameEngine {
   }
 
   // ─── Cosmetics (shop items: only short catalogue ids travel) ───
+  /** Gold seat colour of an admin account (true) or the seat's usual one */
+  setGold(id, on) {
+    const player = this.players[id];
+    if (!player || player.gold === !!on) return false;
+    player.gold = !!on;
+    player.color = player.gold ? GOLD_COLOR : PLAYER_COLORS[player.index];
+    return true;
+  }
+
   setPieceSet(id, pieceSet) {
     const player = this.players[id];
     if (!player) return false;

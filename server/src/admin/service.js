@@ -70,6 +70,7 @@ export function createAdminService(store) {
     const item = getItem(itemId);
     if (!item) throw new AdminError(400, 'Ese objeto no existe en el catálogo');
     if (item.isDefault) throw new AdminError(400, 'Ese objeto es gratuito: todos lo tienen');
+    if (item.adminOnly) throw new AdminError(400, 'Ese objeto es exclusivo de los admins: no se puede regalar');
     const why = requireReason(reason, { required: false });
     const r = await store.giftItem(userId, item.id, {
       adminId,

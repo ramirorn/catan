@@ -141,6 +141,8 @@ export const PLAYER_COLORS = [
   '#9b59b6', // purple
   '#1abc9c', // teal
 ];
+// Seats of admin accounts are gold (never one of the colours above)
+export const GOLD_COLOR = '#d4af37';
 
 // ─── Profile avatars ───
 // The client draws them (inline SVG); the server only stores the index.

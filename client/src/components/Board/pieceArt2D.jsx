@@ -36,6 +36,9 @@ const BLACK = '#18181d';
 const CLOUD_RED = '#c0271b';
 const CREAM = '#f1e6c6';
 const STRAW = '#cfae6c';
+const GOLD = '#e0b94a';
+const GOLD_DARK = '#9c7420';
+const GOLD_LIGHT = '#fbe7a6';
 
 /** Colour tokens: p = player, pd = roof shade, ps = side shade, pl = highlight */
 function tone(token, color) {
@@ -250,6 +253,48 @@ const SETS = {
         ['M -6 -13 L 0 -29 L 6 -13 Z', 'p', { stroke: 'ink', sw: 1.1 }],
         ['M -3.6 -14.2 L -0.4 -26', 'none', { stroke: 'pl', sw: 1.3, cap: true }],
         ['M -13 -15 H 13', 'none', { stroke: 'p', sw: 1.6 }],
+      ],
+    },
+  },
+
+  // Admins only: lacquered pagodas in the player colour with gold roofs
+  'pieces:council': {
+    settlement: {
+      scale: 1.2,
+      sil: 'M -7.5 9 V 0 H -12 Q -6 -1 -2.4 -9.5 H -1 V -15.6 H 1 V -9.5 H 2.4 Q 6 -1 12 0 H 7.5 V 9 Z',
+      layers: [
+        [rect(-7.5, 0, 15, 9), 'p'],
+        [rect(3.4, 0, 4.1, 9), 'ps'],
+        [rect(-7.5, 7.2, 15, 1.8), BLACK],
+        [rect(-2, 3, 4, 6), PIECE_INK],
+        ['M -2.8 2.2 H 2.8', 'none', { stroke: GOLD, sw: 1.1, cap: true }],
+        ['M -12 0 Q -6 -1 -2.4 -9.5 H 2.4 Q 6 -1 12 0 Z', GOLD, { stroke: 'ink', sw: 1.1 }],
+        ['M -9.4 -0.9 Q -5.4 -2.3 -2.7 -8', 'none', { stroke: GOLD_LIGHT, sw: 1.3, cap: true }],
+        ['M 0 -9.5 V -13', 'none', { stroke: GOLD_DARK, sw: 1.5, cap: true }],
+        [circ(0, -14, 1.6), GOLD, { stroke: 'ink', sw: 0.7 }],
+      ],
+    },
+    city: {
+      scale: 1.1,
+      sil: 'M -9 10 V 0 H -15.5 Q -11 -0.8 -8 -5 H -6.5 V -11 H -12.5 Q -8.5 -11.8 -5.2 -15.5 H -4.6 V -20 H -10 Q -4 -21 0 -27 Q 4 -21 10 -20 H 4.6 V -15.5 H 5.2 Q 8.5 -11.8 12.5 -11 H 6.5 V -5 H 8 Q 11 -0.8 15.5 0 H 9 V 10 Z',
+      layers: [
+        [rect(-9, 0, 18, 10), 'p'],
+        [rect(4.5, 0, 4.5, 10), 'ps'],
+        [rect(-9, 8.2, 18, 1.8), BLACK],
+        [rect(-2.3, 3.6, 4.6, 6.4), PIECE_INK],
+        ['M -15.5 0 Q -11 -0.8 -8 -5 H 8 Q 11 -0.8 15.5 0 Z', GOLD, { stroke: 'ink', sw: 1.1 }],
+        ['M -12.4 -0.9 Q -9.6 -2 -7.6 -4.2', 'none', { stroke: GOLD_LIGHT, sw: 1.3, cap: true }],
+        [rect(-6.5, -11, 13, 6), 'p'],
+        [rect(3, -11, 3.5, 6), 'ps'],
+        [rect(-2, -9.6, 4, 3), PIECE_INK],
+        ['M -12.5 -11 Q -8.5 -11.8 -5.2 -15.5 H 5.2 Q 8.5 -11.8 12.5 -11 Z', GOLD, { stroke: 'ink', sw: 1.1 }],
+        ['M -9.8 -11.8 Q -7.4 -12.8 -5.6 -14.6', 'none', { stroke: GOLD_LIGHT, sw: 1.2, cap: true }],
+        [rect(-4.6, -20, 9.2, 4.5), 'p'],
+        [rect(2, -20, 2.6, 4.5), 'ps'],
+        ['M -10 -20 Q -4 -21 0 -27 Q 4 -21 10 -20 Z', GOLD, { stroke: 'ink', sw: 1.1 }],
+        ['M -6.6 -20.8 Q -3 -22.2 -0.8 -25.4', 'none', { stroke: GOLD_LIGHT, sw: 1.2, cap: true }],
+        ['M 0 -27 V -31.5', 'none', { stroke: GOLD_DARK, sw: 1.6, cap: true }],
+        [circ(0, -33, 1.7), GOLD, { stroke: 'ink', sw: 0.8 }],
       ],
     },
   },
@@ -504,6 +549,19 @@ function RoadShape({ set, L, color }) {
           <line x1={-half} y1={-3.6} x2={half} y2={-3.6} stroke={color} strokeWidth="2.2" strokeLinecap="round" />
           <line x1={-half} y1={3.6} x2={half} y2={3.6} stroke={color} strokeWidth="2.2" strokeLinecap="round" />
           <path d={CLOUD} transform="translate(0 0.6) scale(0.9)" fill={CLOUD_RED} stroke="#f3ede1" strokeWidth="0.5" />
+        </>
+      );
+    case 'pieces:council':
+      return (
+        <>
+          <StripBase L={L} h={13} color={color} />
+          <line x1={-half} y1={0} x2={half} y2={0} stroke={BLACK} strokeWidth="9.6" strokeLinecap="round" />
+          <line x1={-half + 2} y1={0} x2={half - 2} y2={0} stroke={color} strokeWidth="5.6" />
+          <line x1={-half} y1={-3.9} x2={half} y2={-3.9} stroke={GOLD} strokeWidth="1.6" strokeLinecap="round" />
+          <line x1={-half} y1={3.9} x2={half} y2={3.9} stroke={GOLD} strokeWidth="1.6" strokeLinecap="round" />
+          {[-1, 1].map((k) => (
+            <circle key={k} cx={k * (half - 2.5)} cy="0" r="2.2" fill={GOLD} stroke={PIECE_INK} strokeWidth="0.8" />
+          ))}
         </>
       );
     case 'pieces:toad': {

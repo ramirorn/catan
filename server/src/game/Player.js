@@ -7,6 +7,7 @@ export class Player {
     this.name = name;
     this.avatarId = sanitizeAvatarId(avatarId); // profile picture (index, drawn by the client)
     this.color = color;
+    this.gold = false; // admin account: gold colour instead of the seat's
     this.index = index;
     this.pieceSet = sanitizePieceSet(null); // shop piece set (seen by everyone)
     this.connected = true;

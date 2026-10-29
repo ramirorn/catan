@@ -8,7 +8,7 @@ import { createNeonAuth } from './neonAuth.js';
 import { createRateLimiter } from './rateLimit.js';
 import { COIN_NAME, computeRewards } from './rewards.js';
 import { cleanDisplayName, ensureUser, getAccess, getLeaderboard, getStats, getUser, recordGame, updateProfile } from './store.js';
-import { blockedMessage, parseAdminEmails } from '../admin/access.js';
+import { blockedMessage, isAdminAccess, parseAdminEmails } from '../admin/access.js';
 import { createShopService, ShopError } from '../shop/service.js';
 import { createPgShopStore } from '../shop/store.js';
 import { DEFAULT_ITEMS } from '../shop/catalog.js';
@@ -63,7 +63,11 @@ export function createAccounts(env = process.env, { runtime: givenRuntime = null
   const limit = createRateLimiter();
   const router = express.Router();
   const runtime = givenRuntime || createRuntime({ pool });
-  const shop = createShopService(enabled ? createPgShopStore(pool) : null, { pricing: runtime });
+  // Admins own the admin-only items (role checked through the access cache)
+  const shop = createShopService(enabled ? createPgShopStore(pool) : null, {
+    pricing: runtime,
+    isAdmin: async (userId) => isAdminAccess(await loadAccess(userId)),
+  });
   // Display names go through the banned-words filter too
   const cleanName = (value) => {
     const name = cleanDisplayName(value);

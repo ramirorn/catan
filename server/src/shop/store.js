@@ -4,6 +4,7 @@
 //   buy(userId, itemId, price, { listPrice, salePercent }) → { status: 'bought' | 'owned' | 'insufficient' | 'nouser', coins }
 //     (a purchase also writes its shop_purchases row in the same transaction)
 //   equip(userId, slot, itemId | null) → boolean (false = item not owned)
+//   grant(userId, itemId) → adds an item without charging (admin-only items)
 
 export function createPgShopStore(pool) {
   async function inventory(userId) {
@@ -85,5 +86,12 @@ export function createPgShopStore(pool) {
     return rowCount > 0;
   }
 
-  return { inventory, buy, equip };
+  async function grant(userId, itemId) {
+    await pool.query(
+      'INSERT INTO user_items (user_id, item_id) VALUES ($1, $2) ON CONFLICT (user_id, item_id) DO NOTHING',
+      [userId, itemId],
+    );
+  }
+
+  return { inventory, buy, equip, grant };
 }

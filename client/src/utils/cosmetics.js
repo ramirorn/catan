@@ -15,6 +15,7 @@ export const PIECE_SET_IDS = [
   'pieces:lantern',
   'pieces:crimson',
   'pieces:toad',
+  'pieces:council', // admins only
 ];
 
 export function pieceSetOf(id) {

@@ -8,7 +8,13 @@ const PIECE_TONES = {
   '#2ecc71': '#2fa84a', // verde -> leaf
   '#9b59b6': '#8e4bbd', // morado -> plum
   '#1abc9c': '#14a796', // turquesa -> verdigris
+  '#d4af37': '#d8a72a', // dorado (admins) -> gold leaf
 };
+
+/** Gold seat of an admin account (server GOLD_COLOR) and its piece tone */
+export const GOLD_SEAT = '#d4af37';
+export const GOLD_PIECE = PIECE_TONES[GOLD_SEAT];
+export const isGoldColor = (color) => !!color && (color.toLowerCase() === GOLD_SEAT || color.toLowerCase() === GOLD_PIECE);
 
 export function pieceColor(color) {
   if (!color) return '#8a7860';

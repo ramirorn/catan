@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { createShopService, ShopError } from '../src/shop/service.js';
 import { DEFAULT_ITEMS, getItem, publicCatalog, sanitizeBoardTheme, sanitizePieceSet } from '../src/shop/catalog.js';
 import { GameEngine } from '../src/game/GameEngine.js';
+import { GOLD_COLOR } from '../src/game/constants.js';
 import { createAccounts } from '../src/accounts/index.js';
 
 const results = [];
@@ -48,6 +49,9 @@ function memoryStore(users) {
       }
       equipped.set(userId, e);
       return true;
+    },
+    async grant(userId, itemId) {
+      owned(userId).add(itemId);
     },
   };
 }
@@ -169,6 +173,38 @@ await test('without DATABASE_URL the shop gives defaults and owns nothing', asyn
   assert.deepEqual(await a.getLoadout('u1'), DEFAULT_ITEMS);
   assert.equal(await a.ownsItem('u1', 'board:night'), false);
   assert.equal(await a.ownsItem('u1', DEFAULT_ITEMS.board), true);
+});
+
+await test('admin-only pieces: hidden and owned only for admins, never bought; admin seats are gold', async () => {
+  const store = memoryStore(new Map([['adm', { coins: 0 }], ['pl', { coins: 9999 }]]));
+  const shop = createShopService(store, { isAdmin: async (id) => id === 'adm' });
+  assert.equal(publicCatalog().some((i) => i.id === 'pieces:council'), false);
+  const pv = await shop.view('pl');
+  assert.equal(pv.catalog.some((i) => i.id === 'pieces:council'), false);
+  assert.equal(pv.owned.includes('pieces:council'), false);
+  await rejects(shop.buy('pl', 'pieces:council'), 403);
+  await rejects(shop.equip('pl', 'pieces', 'pieces:council'), 403);
+  const av = await shop.view('adm');
+  assert.ok(av.catalog.some((i) => i.id === 'pieces:council' && i.adminOnly));
+  assert.ok(av.owned.includes('pieces:council'));
+  await rejects(shop.buy('adm', 'pieces:council'), 403);
+  await shop.equip('adm', 'pieces', 'pieces:council');
+  assert.equal((await shop.loadout('adm')).pieces, 'pieces:council');
+  // Losing the role: the set falls back to the default
+  const exAdmin = createShopService(store, { isAdmin: async () => false });
+  assert.equal((await exAdmin.loadout('adm')).pieces, DEFAULT_ITEMS.pieces);
+
+  const e = new GameEngine('G1', 'standard');
+  e.addPlayer('a', 'Ana');
+  e.addPlayer('b', 'Beto');
+  const blue = e.players.b.color;
+  assert.ok(e.setGold('b', true));
+  assert.equal(e.players.b.color, GOLD_COLOR);
+  e.removePlayer('a');
+  assert.equal(e.players.b.color, GOLD_COLOR, 'gold survives the reindex');
+  e.setGold('b', false);
+  assert.notEqual(e.players.b.color, GOLD_COLOR);
+  assert.notEqual(blue, GOLD_COLOR);
 });
 
 // ─── Report ───

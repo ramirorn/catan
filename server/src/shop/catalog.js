@@ -19,6 +19,8 @@ const ITEMS = [
   { id: 'pieces:lantern', slot: 'pieces', price: 350, name: 'Linterna de Papel', description: 'Faroles de papel que brillan en tu color y linternas de piedra.' },
   { id: 'pieces:crimson', slot: 'pieces', price: 450, name: 'Nubes Carmesí', description: 'Fortalezas negras marcadas con nubes rojas. Para ninjas renegados.' },
   { id: 'pieces:toad', slot: 'pieces', price: 600, name: 'Sapo Ermitaño', description: 'Sapos sabios de tu color, un sapo gigante y piedras para saltar.' },
+  // Admins only: never sold or gifted; every admin account owns it
+  { id: 'pieces:council', slot: 'pieces', price: 0, adminOnly: true, name: 'Consejo Dorado', description: 'Pagodas lacadas con tejados y remates de oro. Exclusivo del Consejo de la aldea.' },
 
   // ─── Board themes: the host's choice is used for the whole room ───
   { id: 'board:classic', slot: 'board', price: 0, name: 'Clásico', description: 'Mar de olas seigaiha y pergamino de washi.' },
@@ -34,6 +36,7 @@ for (const item of ITEMS) {
   if (!Number.isInteger(item.price) || item.price < 0 || item.price > 100000) throw new Error(`Bad price for ${item.id}`);
   if (!item.id.startsWith(`${item.slot === 'pieces' ? 'pieces' : 'board'}:`)) throw new Error(`Item ${item.id} is in the wrong slot`);
   item.isDefault = DEFAULT_ITEMS[item.slot] === item.id;
+  item.adminOnly = item.adminOnly === true;
   Object.freeze(item);
 }
 if (new Set(ITEMS.map((i) => i.id)).size !== ITEMS.length) throw new Error('Duplicate catalogue ids');
@@ -44,10 +47,14 @@ export function getItem(id) {
   return typeof id === 'string' ? BY_ID.get(id) || null : null;
 }
 
-/** Catalogue as sent to the client */
-export function publicCatalog() {
-  return ITEMS.map(({ id, slot, price, name, description, isDefault }) => ({ id, slot, price, name, description, isDefault }));
+/** Catalogue as sent to the client (admin-only items only with `admins`) */
+export function publicCatalog({ admins = false } = {}) {
+  return ITEMS.filter((i) => admins || !i.adminOnly)
+    .map(({ id, slot, price, name, description, isDefault, adminOnly }) => ({ id, slot, price, name, description, isDefault, adminOnly }));
 }
+
+/** Items every admin owns without buying them */
+export const ADMIN_ITEM_IDS = ITEMS.filter((i) => i.adminOnly).map((i) => i.id);
 
 /** A known item id of that slot, or the slot's default */
 export function sanitizeSlotItem(slot, id) {

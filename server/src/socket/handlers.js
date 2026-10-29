@@ -7,6 +7,7 @@ import {
 } from '../admin/moderation.js';
 import { cleanMessage } from '../admin/settings.js';
 import { parseRobberFace } from './robberFace.js';
+import { isAdminAccess } from '../admin/access.js';
 
 const CHAT_HISTORY_LIMIT = 200;
 const CHAT_MAX_LENGTH = 150;
@@ -151,14 +152,25 @@ export function registerSocketHandlers(io, lobbyManager, timerOptions = {}, acco
     }
   }
 
+  // Admin accounts also sit in gold
+  async function seatIsAdmin(userId) {
+    if (typeof accounts.getAccess !== 'function') return false;
+    try {
+      return isAdminAccess(await accounts.getAccess(userId));
+    } catch {
+      return false;
+    }
+  }
+
   function applyLoadout(roomId, id, userId, asHost) {
     if (!accounts || !accounts.enabled || typeof accounts.getLoadout !== 'function') return;
-    accounts.getLoadout(userId)
-      .then((loadout) => {
+    Promise.all([accounts.getLoadout(userId), seatIsAdmin(userId)])
+      .then(([loadout, admin]) => {
         const room = lobbyManager.getRoom(roomId);
         // The seat may be gone or taken by someone else meanwhile
         if (!room || room.accounts[id] !== userId || !room.engine.players[id]) return;
         let changed = room.engine.setPieceSet(id, loadout.pieces);
+        changed = room.engine.setGold(id, admin) || changed;
         if (asHost && room.host === id && !room.boardThemeChosen && room.engine.phase === 'lobby' &&
             room.engine.boardTheme !== loadout.board) {
           changed = room.engine.setBoardTheme(loadout.board).success || changed;

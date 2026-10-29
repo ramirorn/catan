@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { pieceSetOf } from '../../utils/cosmetics';
+import { isGoldColor } from '../../utils/theme';
 
 /** Flat-shaded part with a constant vertex tone, tagged with its material slot */
 export function part(geom, tone, at, mat = 0) {
@@ -434,6 +435,59 @@ function toadRoad() {
   return parts;
 }
 
+/* ─── Consejo Dorado (admins only): lacquered pagodas with gold roofs ─── */
+
+function councilSettlement() {
+  return [
+    B(cyl(0.19, 0.205, 0.035, 8), 1, [0, 0.0175, 0]),
+    A(flatRing(0.185, 0.01), 1, [0, 0.038, 0]),
+    part(box(0.22, 0.16, 0.22), 1, [0, 0.115, 0]),
+    B(box(0.065, 0.1, 0.012), 1, [0, 0.085, 0.112]),
+    A(box(0.08, 0.012, 0.014), 1, [0, 0.142, 0.113]),
+    B(box(0.3, 0.014, 0.3), 1, [0, 0.2, 0]),
+    A(curvedRoof([[0.17, 0.2], [0.135, 0.222], [0.09, 0.262], [0.045, 0.315], [0.012, 0.35], [0, 0.356]]), 0.82),
+    A(cyl(0.01, 0.012, 0.06, 6), 1, [0, 0.38, 0]),
+    A(sphere(0.022, 10, 8), 1, [0, 0.418, 0]),
+  ];
+}
+
+function councilCity() {
+  const tier = (half, y0, h, roofHalf, roofTop, tone = 1) => [
+    part(box(half * 2, h, half * 2), tone, [0, y0 + h / 2, 0]),
+    B(box(half * 0.9, h * 0.38, 0.012), 1, [0, y0 + h * 0.55, half + 0.004]),
+    B(box(roofHalf * 2 + 0.04, 0.012, roofHalf * 2 + 0.04), 1, [0, y0 + h + 0.004, 0]),
+    A(curvedRoof([[roofHalf, y0 + h], [roofHalf * 0.8, y0 + h + 0.022], [roofHalf * 0.6, y0 + h + 0.05], [half * 0.7, roofTop]]), 0.82),
+  ];
+  return [
+    B(cyl(0.31, 0.33, 0.035, 10), 1, [0, 0.0175, 0]),
+    A(flatRing(0.3, 0.014), 1, [0, 0.038, 0]),
+    B(cyl(0.24, 0.26, 0.03, 10), 0.9, [0, 0.05, 0]),
+    ...tier(0.15, 0.065, 0.17, 0.235, 0.29),
+    ...tier(0.11, 0.285, 0.12, 0.185, 0.45, 0.94),
+    ...tier(0.075, 0.445, 0.1, 0.14, 0.6, 0.9),
+    A(curvedRoof([[0.1, 0.6], [0.06, 0.64], [0.025, 0.68], [0, 0.69]]), 0.82),
+    A(cyl(0.01, 0.012, 0.16, 6), 1, [0, 0.76, 0]),
+    A(torus(0.028, 0.007, 4, 12).rotateX(Math.PI / 2), 1, [0, 0.73, 0]),
+    A(torus(0.022, 0.007, 4, 12).rotateX(Math.PI / 2), 1, [0, 0.765, 0]),
+    A(sphere(0.026, 10, 8), 1, [0, 0.85, 0]),
+  ];
+}
+
+function councilRoad() {
+  const parts = [
+    B(box(ROAD_LEN, 0.03, 0.17), 1, [0, 0.015, 0]),
+    part(box(ROAD_LEN - 0.04, 0.03, 0.12), 1, [0, 0.04, 0]),
+  ];
+  for (const z of [-0.075, 0.075]) parts.push(A(box(ROAD_LEN, 0.02, 0.018), 1, [0, 0.065, z]));
+  for (const x of [-0.24, 0.24]) {
+    for (const z of [-0.075, 0.075]) {
+      parts.push(B(box(0.03, 0.07, 0.03), 1, [x, 0.06, z]));
+      parts.push(A(sphere(0.016, 8, 6), 1, [x, 0.105, z]));
+    }
+  }
+  return parts;
+}
+
 /* ─── Sets ─── */
 
 /**
@@ -494,6 +548,14 @@ export const PIECE_SETS_3D = {
       { color: '#c0271b', roughness: 0.5, emissive: 0.15 },
     ],
   },
+  'pieces:council': {
+    build: { settlement: councilSettlement, city: councilCity, road: councilRoad },
+    player: { roughness: 0.38, metalness: 0.08, glow: 0.2 },
+    accents: [
+      { color: '#d9ad3c', roughness: 0.42, metalness: 0.5, emissive: 0.06 },
+      { color: '#17151a', roughness: 0.32, metalness: 0.2 },
+    ],
+  },
   'pieces:toad': {
     build: { settlement: toadSettlement, city: toadCity, road: toadRoad },
     player: { roughness: 0.42, metalness: 0.05, glow: 0.2 },
@@ -516,13 +578,16 @@ export function buildPieceGeometry(id, kind) {
 /** Player-colour lacquer of a set */
 export function createPlayerMaterial(id, color) {
   const p = pieceSet3D(id).player;
+  // Admins' gold: polished metal instead of lacquer (some glow keeps it
+  // bright without an environment map)
+  const gold = isGoldColor(color);
   return new THREE.MeshStandardMaterial({
     color,
     vertexColors: true,
-    roughness: p.roughness,
-    metalness: p.metalness,
+    roughness: gold ? 0.32 : p.roughness,
+    metalness: gold ? 0.55 : p.metalness,
     // keeps the lacquer colour saturated on the shaded sides (and lanterns lit)
-    emissive: new THREE.Color(color).multiplyScalar(p.glow),
+    emissive: new THREE.Color(color).multiplyScalar(gold ? Math.max(p.glow, 0.3) : p.glow),
   });
 }
 
