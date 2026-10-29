@@ -5,6 +5,7 @@ import { ACTION_LABELS, BOARD_LABELS, ROLE_LABELS, fmtDate, fmtDuration, fmtNum,
 import { useGame } from '../../context/GameContext';
 import { Avatar } from '../../components/Shared/Avatar';
 import { Dropdown, SegmentedControl } from '../../components/Shared/Choice';
+import { DateTimePicker } from '../../components/Shared/DateTimePicker';
 
 const DAY = 24 * 60 * 60 * 1000;
 const SUSPEND_PRESETS = [
@@ -14,7 +15,7 @@ const SUSPEND_PRESETS = [
   { value: '30', label: '30 días' },
 ];
 
-// <input type="datetime-local"> value in local time
+// Local "YYYY-MM-DDTHH:MM" value of DateTimePicker
 function localInputValue(ms) {
   const d = new Date(ms);
   const pad = (n) => String(n).padStart(2, '0');
@@ -170,7 +171,7 @@ export function UserDetail({ userId, admin, onChanged, onClose }) {
       <h3 className="mt-4 font-display text-[16px]">Partidas recientes</h3>
       {user.results.length ? (
         <div className="overflow-x-auto">
-          <table className="w-full text-[12px] min-w-[420px]">
+          <table className="admin-table w-full text-[12px] min-w-[420px]">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wider text-ink-faint">
                 <th className="py-1 pr-2">Fecha</th><th className="pr-2">Sala</th><th className="pr-2">Resultado</th><th className="pr-2 text-right">PV</th><th className="pr-2 text-right">Ryō</th><th>Duración</th>
@@ -235,7 +236,7 @@ export function UserDetail({ userId, admin, onChanged, onClose }) {
                 ariaLabel="Duración"
               />
               <Field label="Hasta">
-                <input type="datetime-local" className="field !py-1.5 text-[14px]" value={form.until} onChange={(e) => set({ until: e.target.value, preset: '' })} />
+                <DateTimePicker value={form.until} onChange={(v) => set({ until: v, preset: '' })} ariaLabel="Suspendida hasta" />
               </Field>
             </>
           )}

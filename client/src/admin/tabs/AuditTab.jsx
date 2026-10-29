@@ -34,7 +34,7 @@ export function AuditTab({ onOpenUser }) {
         <Empty>No hay acciones registradas con esos filtros.</Empty>
       ) : (
         <div className="overflow-x-auto -mx-3 sm:mx-0">
-          <table className="w-full text-[13px] min-w-[640px]">
+          <table className="admin-table w-full text-[13px] min-w-[640px]">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wider text-ink-faint">
                 <th className="py-1 px-2">Fecha</th>

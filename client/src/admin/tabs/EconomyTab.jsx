@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Toggle } from '../../components/Shared/Toggle';
+import { DateTimePicker } from '../../components/Shared/DateTimePicker';
 import { adminPost, usePolling } from '../api';
 import { ActionDialog, Badge, Bars, Btn, Card, Empty, ErrorNote, Field, Stat } from '../ui';
 import { fmtDate, fmtNum } from '../format';
@@ -12,7 +14,7 @@ const RULE_LABELS = {
   minVoteMinutes: 'Minutos mínimos (partidas terminadas por votación)',
 };
 
-// <input type="datetime-local"> value in local time
+// Local "YYYY-MM-DDTHH:MM" value of DateTimePicker
 function localValue(ts) {
   const d = new Date(ts);
   const pad = (n) => String(n).padStart(2, '0');
@@ -54,24 +56,25 @@ function ItemDialog({ item, onClose, onDone }) {
       <Field label={`Precio (catálogo: ${item.price} Ryō)`} hint="Vacío = el precio del catálogo">
         <input className="field !py-1.5 text-[14px]" inputMode="numeric" value={form.price} onChange={(e) => set({ price: e.target.value.replace(/\D/g, '') })} placeholder={String(item.price)} />
       </Field>
-      <label className="flex items-center gap-2 mb-3 text-[14px]">
-        <input type="checkbox" checked={form.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
-        A la venta <span className="text-[12px] text-ink-faint">(si lo quitas, quien ya lo tiene lo conserva)</span>
-      </label>
-      <label className="flex items-center gap-2 mb-2 text-[14px]">
-        <input type="checkbox" checked={form.sale} onChange={(e) => set({ sale: e.target.checked })} />
-        Oferta temporal
-      </label>
+      <Toggle
+        className="mb-2 !flex"
+        checked={form.enabled}
+        onChange={(v) => set({ enabled: v })}
+        label="A la venta"
+        hint="Si lo quitas, quien ya lo tiene lo conserva"
+      />
+      <Toggle className="mb-2 !flex" checked={form.sale} onChange={(v) => set({ sale: v })} label="Oferta temporal" />
       {form.sale && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-2">
           <Field label="% desc.">
             <input className="field !py-1.5 text-[14px]" inputMode="numeric" value={form.percent} onChange={(e) => set({ percent: e.target.value.replace(/\D/g, '').slice(0, 2) })} />
           </Field>
           <Field label="Desde">
-            <input type="datetime-local" className="field !py-1.5 text-[13px]" value={form.startsAt} onChange={(e) => set({ startsAt: e.target.value })} />
+            <DateTimePicker value={form.startsAt} onChange={(v) => set({ startsAt: v })} ariaLabel="Inicio de la oferta" />
           </Field>
+          <span />
           <Field label="Hasta">
-            <input type="datetime-local" className="field !py-1.5 text-[13px]" value={form.endsAt} onChange={(e) => set({ endsAt: e.target.value })} />
+            <DateTimePicker value={form.endsAt} onChange={(v) => set({ endsAt: v })} ariaLabel="Fin de la oferta" />
           </Field>
         </div>
       )}
@@ -134,7 +137,7 @@ export function EconomyTab({ onOpenUser }) {
   const stats = data && data.stats;
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-6">
       <ErrorNote>{error}</ErrorNote>
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -146,11 +149,11 @@ export function EconomyTab({ onOpenUser }) {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] items-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] items-start">
         <Card title="Catálogo de la tienda">
           <p className="text-[13px] text-ink-soft mb-2">Los objetos se definen en el código; aquí se cambia precio, venta y ofertas sin desplegar.</p>
           <div className="overflow-x-auto -mx-3 sm:mx-0">
-            <table className="w-full text-[13px] min-w-[560px]">
+            <table className="admin-table w-full text-[13px] min-w-[560px]">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-ink-faint">
                   <th className="py-1 px-2">Objeto</th>
@@ -168,7 +171,7 @@ export function EconomyTab({ onOpenUser }) {
                   return (
                     <tr key={i.id} className="border-t border-ink/10">
                       <td className="py-1.5 px-2">
-                        <strong>{i.name}</strong>
+                        <strong className="whitespace-nowrap">{i.name}</strong>
                         <span className="block text-[11px] text-ink-faint">{i.slot === 'pieces' ? 'Fichas' : 'Tablero'} · {i.id}</span>
                       </td>
                       <td className="py-1.5 px-2 text-right tabular-nums whitespace-nowrap">
@@ -202,7 +205,7 @@ export function EconomyTab({ onOpenUser }) {
       </div>
 
       {stats && (
-        <div className="grid gap-4 lg:grid-cols-3 items-start">
+        <div className="grid gap-6 lg:grid-cols-3 items-start">
           <Card title="Mayores saldos">
             {stats.top.length === 0 ? <Empty>Sin cuentas todavía.</Empty> : (
               <ol className="space-y-1">

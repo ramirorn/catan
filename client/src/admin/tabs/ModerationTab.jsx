@@ -337,8 +337,8 @@ export function ModerationTab({ onOpenUser }) {
   };
 
   return (
-    <div className="grid gap-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start">
+    <div className="grid gap-6">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start">
         {room ? (
           <RoomChat key={room} roomId={room} onBack={() => setRoom(null)} />
         ) : (
@@ -376,7 +376,7 @@ export function ModerationTab({ onOpenUser }) {
           </ul>
         </Card>
       </div>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start">
         <ReportsCard onOpenUser={onOpenUser} />
         {data && <WordsCard words={data.words} wordsMax={data.wordsMax} reload={reload} />}
       </div>

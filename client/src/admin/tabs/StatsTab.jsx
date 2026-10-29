@@ -13,7 +13,7 @@ export function StatsTab() {
   const finishedLive = c ? c.victory + c.vote + c.abandoned + c.closedByAdmin : 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-7">
       <ErrorNote>{error}</ErrorNote>
       <Card title="Ahora mismo" actions={<Btn onClick={reload}>Actualizar</Btn>}>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -60,7 +60,7 @@ export function StatsTab() {
           La base de datos solo guarda partidas terminadas con al menos una cuenta que cobró Ryō (2+ ninjas hasta el final). Las abandonadas no se guardan.
         </p>
 
-        <div className="grid gap-4 md:grid-cols-2 mt-4">
+        <div className="grid gap-6 md:grid-cols-2 mt-4">
           <div>
             <h3 className="font-display text-[16px] mb-1">Partidas por día (14 días)</h3>
             {db ? <DayColumns rows={db.gamesPerDay.map((r) => ({ day: r.day, value: r.games }))} label="Partidas por día" /> : null}

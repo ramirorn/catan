@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useGame } from '../context/GameContext';
 import { adminApi } from './api';
@@ -12,7 +12,8 @@ import { ModerationTab } from './tabs/ModerationTab';
 import { EconomyTab } from './tabs/EconomyTab';
 import { RankingTab } from './tabs/RankingTab';
 import { ObserveView } from './ObserveView';
-import { ShurikenIcon } from '../components/Shared/Icons';
+import { CrownIcon, ExitIcon } from '../components/Shared/Icons';
+import { BrandPlate } from '../components/Shared/Brand';
 
 // Admin panel shell (/admin). Tabs are a plain list: a new tool is a new
 // entry here plus its component in ./tabs and its routes on the server
@@ -57,6 +58,7 @@ export default function AdminApp() {
   const [tab, setTab] = useState(tabFromHash);
   const [focusUserId, setFocusUserId] = useState(null);
   const [observing, setObserving] = useState(null);
+  const navRef = useRef(null);
 
   // Ask the server who we are once the session is known (404 = not an admin)
   useEffect(() => {
@@ -90,6 +92,11 @@ export default function AdminApp() {
     }
   }, []);
 
+  // On narrow screens the tab strip scrolls: keep the open tab in view
+  useEffect(() => {
+    navRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [tab, access.state]);
+
   const closeObserve = useCallback(() => setObserving(null), []);
 
   const openUser = useCallback((userId) => {
@@ -105,28 +112,33 @@ export default function AdminApp() {
   const Active = (TABS.find((t) => t.id === tab) || TABS[0]).Component;
 
   return (
-    <div className="night-surface min-h-dvh w-full text-ink font-sans">
-      <header className="night-rail sticky top-0 z-30 border-b-2 border-black/70 shadow-[0_6px_16px_-6px_rgba(0,0,0,0.8)]">
-        <div className="max-w-7xl mx-auto px-3 sm:px-5 pt-[max(0.5rem,env(safe-area-inset-top))] pb-1 flex items-center gap-3">
-          <ShurikenIcon className="w-5 h-5 text-shu shrink-0" hole="#10141d" />
-          <h1 className="font-display text-paper-light text-[19px] sm:text-[22px] leading-tight truncate">Consejo de la aldea</h1>
-          <span className="ml-auto text-[12px] text-paper/70 truncate hidden sm:inline">
-            Admin: <strong className="text-paper-light">{access.admin.displayName}</strong>
+    <div className="admin-shell night-surface w-full text-ink font-sans">
+      <header className="night-rail sticky top-0 z-30 border-b-2 border-black/70 shadow-[0_8px_18px_-8px_rgba(0,0,0,0.85)]">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-[max(0.65rem,env(safe-area-inset-top))] pb-2 flex items-center gap-3">
+          <BrandPlate className="w-10 h-[27px] shrink-0" />
+          <div className="min-w-0">
+            <p className="font-display text-[20px] sm:text-[24px] leading-none text-paper-light truncate">
+              Catán <span className="text-chakra">Shinobi</span>
+            </p>
+            <p className="label-caps !text-[10px] !text-paper/60 mt-1 truncate">Consejo de la aldea · panel de administración</p>
+          </div>
+          <span className="ml-auto hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-[3px] border border-paper/20 bg-white/5 text-[12px] text-paper/75 min-w-0">
+            <CrownIcon className="w-4 h-4 text-chakra shrink-0" />
+            <strong className="text-paper-light truncate">{access.admin.displayName}</strong>
           </span>
-          <a href="/" className="btn btn-ghost !text-paper-light !border-paper/40 hover:!bg-white/10 min-h-[32px] px-2.5 py-0.5 text-[12px] shrink-0">
-            Ir al juego
+          <a href="/" className="btn btn-ghost !text-paper-light !border-paper/40 hover:!bg-white/10 min-h-[36px] px-3 py-1 text-[13px] shrink-0">
+            <ExitIcon className="w-4 h-4" />
+            <span className="max-[380px]:hidden">Ir al juego</span>
           </a>
         </div>
-        <nav className="max-w-7xl mx-auto px-2 sm:px-4 flex gap-1 overflow-x-auto" aria-label="Secciones">
+        <nav ref={navRef} className="max-w-7xl mx-auto px-2 sm:px-5 flex gap-0.5 overflow-x-auto [scrollbar-width:none]" aria-label="Secciones">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => go(t.id)}
               aria-current={tab === t.id ? 'page' : undefined}
-              className={`shrink-0 px-3 py-2 text-[13px] font-bold border-b-[3px] transition-colors ${
-                tab === t.id ? 'text-paper-light border-shu' : 'text-paper/60 border-transparent hover:text-paper-light'
-              }`}
+              className="admin-tab"
             >
               {t.label}
             </button>
@@ -134,7 +146,7 @@ export default function AdminApp() {
         </nav>
       </header>
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-5 py-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 pt-6 pb-[max(2.5rem,env(safe-area-inset-bottom))]">
         <Active
           admin={access.admin}
           onObserve={setObserving}

@@ -948,3 +948,43 @@ export function MenuIcon(props) {
     </Svg>
   );
 }
+
+/** Hanging calendar scroll: rod, sheet and a few brushed day marks */
+const CALENDAR = {
+  rod: line(3.4, 5.6, 20.6, 5.4, 2.2, { bend: -0.2, start: 0.6, peak: 0.3, end: 0.6 }),
+  sheet: line(5.2, 6.4, 5.4, 20, 1.7, { bend: 0.2, start: 0.7, peak: 0.3, end: 0.5 }) +
+    line(5.4, 20, 18.8, 19.8, 1.7, { bend: -0.2, start: 0.6, peak: 0.4, end: 0.6 }) +
+    line(18.8, 19.8, 18.6, 6.4, 1.7, { bend: 0.2, start: 0.6, peak: 0.4, end: 0.7 }),
+  rings: line(8.4, 3, 8.4, 7.4, 1.8, { start: 0.8, peak: 0.4, end: 0.8 }) +
+    line(15.6, 3, 15.6, 7.4, 1.8, { start: 0.8, peak: 0.4, end: 0.8 }),
+  days: line(8.3, 11, 10.1, 11, 1.9, { start: 0.9, peak: 0.5, end: 0.9 }) +
+    line(13.9, 11, 15.7, 11, 1.9, { start: 0.9, peak: 0.5, end: 0.9 }) +
+    line(8.3, 15.3, 10.1, 15.3, 1.9, { start: 0.9, peak: 0.5, end: 0.9 }),
+};
+
+export function CalendarIcon(props) {
+  return (
+    <Svg {...props}>
+      <Ink d={CALENDAR.rod} />
+      <Ink d={CALENDAR.sheet} />
+      <Ink d={CALENDAR.rings} />
+      <Ink d={CALENDAR.days} o="0.85" />
+      <Ink d={line(13.9, 15.3, 15.7, 15.3, 1.9, { start: 0.9, peak: 0.5, end: 0.9 })} o="0.85" fill="#c0271b" />
+    </Svg>
+  );
+}
+
+/** Brushed magnifying glass (search fields) */
+const SEARCH = {
+  lens: ring(10.2, 10.2, 6, 6, 2.1),
+  handle: line(14.6, 14.6, 20.4, 20.4, 2.8, { start: 0.7, peak: 0.35, end: 0.55 }),
+};
+
+export function SearchIcon(props) {
+  return (
+    <Svg {...props}>
+      <Ink d={SEARCH.lens} />
+      <Ink d={SEARCH.handle} />
+    </Svg>
+  );
+}

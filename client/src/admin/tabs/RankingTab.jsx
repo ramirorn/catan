@@ -74,8 +74,8 @@ export function RankingTab({ onOpenUser }) {
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start">
-      <div className="grid gap-4">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start">
+      <div className="grid gap-6">
         <Card title="Ranking" actions={<SegmentedControl options={PERIODS} value={period} onChange={(v) => { setPeriod(v); setPlayer(null); }} ariaLabel="Periodo" />}>
           <p className="text-[13px] text-ink-soft mb-2">Igual que el que ven los jugadores: más victorias; empate, menos partidas. No cuenta lo excluido.</p>
           <ErrorNote>{error}</ErrorNote>
@@ -108,7 +108,7 @@ export function RankingTab({ onOpenUser }) {
           </div>
         </Card>
       </div>
-      <div className="grid gap-4">
+      <div className="grid gap-6">
         {player ? (
           <UserResults key={`${player.userId}-${version}`} player={player} onAction={open} onOpenUser={onOpenUser} />
         ) : (

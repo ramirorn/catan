@@ -51,7 +51,7 @@ export function NoticesTab() {
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2 items-start">
+    <div className="grid gap-6 lg:grid-cols-2 items-start">
       <Card title="Aviso global">
         <p className="text-[13px] text-ink-soft mb-3">Aparece arriba de la pantalla a todos los conectados, en el menú y en partida.</p>
         <Field label="Mensaje" hint={`${message.trim().length}/300`}>

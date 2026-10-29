@@ -22,7 +22,7 @@ export function SystemTab() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-7">
       <ErrorNote>{error}</ErrorNote>
       <Card title="Servidor" actions={<Btn onClick={reload}>Actualizar</Btn>}>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">

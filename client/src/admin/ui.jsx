@@ -1,30 +1,42 @@
 import { useState } from 'react';
 import { ConfirmDialog } from '../components/Shared/ConfirmDialog';
+import { ScrollPanel } from '../components/Shared/ScrollPanel';
+import { SearchIcon } from '../components/Shared/Icons';
 import { STATUS_LABELS, liveStatus } from './format';
 
-// Dense building blocks of the admin panel: same paper / ink look as the
-// game, tighter spacing.
+// Building blocks of the admin panel: the game's hanging scrolls, washi and
+// ink, with tighter spacing for dense data.
 
-export function Card({ title, actions, children, className = '' }) {
+/** A panel: hanging scroll with a brushed title rule (like the game's menus) */
+export function Card({ title, kicker, actions, children, className = '' }) {
   return (
-    <section className={`paper rounded-[2px] border border-paper-edge shadow-[0_8px_20px_-10px_rgba(0,0,0,0.7)] ${className}`}>
+    <ScrollPanel className={`min-w-0 ${className}`} bodyClassName="min-w-0">
       {(title || actions) && (
-        <header className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 pt-2.5 pb-2 border-b border-dashed border-ink/25">
-          {title && <h2 className="font-display text-[18px] leading-tight text-ink">{title}</h2>}
-          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        <header className="px-4 sm:px-5 pt-3.5">
+          <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+            <div className="min-w-0">
+              {kicker && <p className="label-caps">{kicker}</p>}
+              {title && <h2 className="font-display text-[21px] sm:text-[23px] leading-tight text-ink">{title}</h2>}
+            </div>
+            {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+          </div>
+          <hr className="brush-rule mt-2" />
         </header>
       )}
-      <div className="px-3 sm:px-4 py-3">{children}</div>
-    </section>
+      <div className="px-4 sm:px-5 pt-3 pb-4">{children}</div>
+    </ScrollPanel>
   );
 }
 
+/** A figure on a slip of paper with a vermilion seal stripe */
 export function Stat({ label, value, hint, tone = 'ink' }) {
   const color = tone === 'shu' ? 'text-shu' : tone === 'leaf' ? 'text-leaf' : tone === 'chakra' ? 'text-chakra-dark' : 'text-ink';
   return (
-    <div className="paper rounded-[2px] border border-paper-edge shadow-[0_4px_10px_-6px_rgba(0,0,0,0.6)] px-3 py-2 min-w-0">
-      <p className="text-[11px] uppercase tracking-wider text-ink-faint font-bold truncate">{label}</p>
-      <p className={`font-display text-[22px] leading-tight tabular-nums ${color}`}>{value}</p>
+    <div className="paper relative rounded-[2px] border border-paper-edge shadow-[0_8px_18px_-10px_rgba(0,0,0,0.8)] pl-4 pr-3 py-2.5 min-w-0 overflow-hidden">
+      <span className="absolute left-0 top-0 bottom-0 w-[4px] bg-shu/80" aria-hidden="true" />
+      <p className="label-caps truncate">{label}</p>
+      {/* long values (dates, words) get a smaller size so they stay on one or two lines */}
+      <p className={`font-serif font-extrabold leading-tight tabular-nums ${String(value).length > 9 ? 'text-[17px] mt-1' : 'text-[26px]'} ${color}`}>{value}</p>
       {hint && <p className="text-[12px] text-ink-faint leading-snug">{hint}</p>}
     </div>
   );
@@ -54,7 +66,7 @@ export function Btn({ variant = 'ghost', className = '', ...props }) {
 export function Field({ label, hint, children }) {
   return (
     <label className="block mb-3">
-      <span className="block text-[12px] font-bold uppercase tracking-wider text-ink-faint mb-1">{label}</span>
+      <span className="label-caps block mb-1">{label}</span>
       {children}
       {hint && <span className="block text-[12px] text-ink-faint mt-1">{hint}</span>}
     </label>
@@ -67,13 +79,31 @@ export function ErrorNote({ children }) {
 }
 
 export function Empty({ children }) {
-  return <p className="text-[13px] text-ink-faint italic py-3 text-center">{children}</p>;
+  return <p className="text-[14px] text-ink-faint italic py-6 text-center">{children}</p>;
+}
+
+/** Search field with a brushed magnifier */
+export function SearchField({ value, onChange, placeholder, ariaLabel, className = '' }) {
+  return (
+    <div className={`admin-search ${className}`}>
+      <SearchIcon />
+      <input
+        type="text"
+        inputMode="search"
+        className="field !py-2 text-[14px]"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={ariaLabel}
+      />
+    </div>
+  );
 }
 
 export function Pager({ page, pageSize, total, onPage }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
-    <div className="flex items-center justify-between gap-2 pt-3 text-[13px] text-ink-soft">
+    <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-dashed border-ink/25 text-[13px] text-ink-soft">
       <span>{total} resultado{total === 1 ? '' : 's'}</span>
       <div className="flex items-center gap-2">
         <Btn disabled={page <= 1} onClick={() => onPage(page - 1)}>Anterior</Btn>

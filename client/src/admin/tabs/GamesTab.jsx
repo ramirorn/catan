@@ -104,7 +104,7 @@ export function GamesTab({ onObserve, onOpenUser }) {
   const now = data ? data.now : 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-7">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         <Stat label="Conectados" value={data ? data.connections.players : '…'} hint={data ? `${data.connections.accounts} con cuenta` : null} />
         <Stat label="Salas" value={data ? data.counts.total : '…'} />

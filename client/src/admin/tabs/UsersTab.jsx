@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { usePolling } from '../api';
-import { Badge, Card, Empty, ErrorNote, Pager, StatusBadge } from '../ui';
+import { Badge, Card, Empty, ErrorNote, Pager, SearchField, StatusBadge } from '../ui';
 import { ROLE_LABELS, fmtDate, fmtNum } from '../format';
 import { Dropdown } from '../../components/Shared/Choice';
 import { Avatar } from '../../components/Shared/Avatar';
@@ -38,17 +38,10 @@ export function UsersTab({ admin, focusUserId, onFocusUser }) {
   const { data, error, loading, reload } = usePolling(`/users?${params}`, 0);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] items-start">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] items-start">
       <Card title="Cuentas">
         <div className="flex flex-col sm:flex-row gap-2 mb-3">
-          <input
-            type="search"
-            className="field !py-1.5 text-[14px] flex-1"
-            placeholder="Buscar por nombre, correo o id"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            aria-label="Buscar cuentas"
-          />
+          <SearchField value={text} onChange={setText} placeholder="Buscar por nombre, correo o id" ariaLabel="Buscar cuentas" />
           <Dropdown options={ROLE_OPTIONS} value={role} onChange={(v) => { setRole(v); setPage(1); }} ariaLabel="Filtrar por rol" className="sm:w-40" />
           <Dropdown options={STATUS_OPTIONS} value={status} onChange={(v) => { setStatus(v); setPage(1); }} ariaLabel="Filtrar por estado" className="sm:w-44" />
         </div>
@@ -57,7 +50,7 @@ export function UsersTab({ admin, focusUserId, onFocusUser }) {
           <Empty>Ninguna cuenta coincide.</Empty>
         ) : (
           <div className="overflow-x-auto -mx-3 sm:mx-0">
-            <table className="w-full text-[13px] min-w-[520px]">
+            <table className="admin-table w-full text-[13px] min-w-[520px]">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-ink-faint">
                   <th className="py-1 px-2">Ninja</th>
@@ -72,11 +65,11 @@ export function UsersTab({ admin, focusUserId, onFocusUser }) {
                   <tr
                     key={u.id}
                     onClick={() => onFocusUser(u.id)}
-                    className={`cursor-pointer border-t border-ink/10 hover:bg-chakra/10 ${focusUserId === u.id ? 'bg-chakra/15' : ''}`}
+                    className={`cursor-pointer ${focusUserId === u.id ? 'is-selected' : ''}`}
                   >
                     <td className="py-1.5 px-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <Avatar id={u.avatarId} size={26} />
+                        <Avatar id={u.avatarId} size={32} />
                         <div className="min-w-0">
                           <p className="font-bold truncate">
                             {u.displayName} {u.role === 'admin' && <Badge tone="chakra">{ROLE_LABELS.admin}</Badge>}

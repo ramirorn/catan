@@ -1412,3 +1412,142 @@ a { touch-action: manipulation; }
   background: var(--color-shu);
   border-color: #5a140a;
 }
+
+/* ─── Toggle (replaces native checkboxes) ─── */
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 36px;
+  padding: 2px 0;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+.toggle:disabled { cursor: not-allowed; opacity: 0.55; }
+.toggle-track {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #2a2420, #3d342c);
+  border: 1px solid #1f1b17;
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.45);
+  transition: background 0.18s ease;
+}
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--color-paper-light, #f6efe0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(31, 27, 23, 0.25);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+.toggle.is-on .toggle-track { background: linear-gradient(180deg, var(--color-shu-dark), var(--color-shu)); }
+.toggle.is-on .toggle-knob { transform: translateX(18px); }
+.toggle:focus-visible { outline: none; }
+.toggle:focus-visible .toggle-track { box-shadow: 0 0 0 2px var(--color-chakra), inset 0 2px 3px rgba(0, 0, 0, 0.45); }
+
+/* ─── Date + time picker popup (same paper slip as .dd-list) ─── */
+.dtp-pop {
+  z-index: 79;
+  padding: 10px 10px 12px;
+  border: 1px solid var(--color-ink);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255, 252, 244, 0.6), 0 12px 26px -6px rgba(0, 0, 0, 0.6), 0 2px 0 #1f1b17;
+}
+.dtp-nav {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.dtp-nav:hover { background: rgba(226, 113, 29, 0.15); }
+.dtp-day {
+  height: 32px;
+  border-radius: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.dtp-day:hover { background: rgba(226, 113, 29, 0.15); }
+.dtp-day.is-today { box-shadow: inset 0 0 0 1px rgba(226, 113, 29, 0.7); }
+.dtp-day.is-on { background: var(--color-shu); color: #fff6ea; font-weight: 800; box-shadow: 0 1px 0 var(--color-shu-dark); }
+.dtp-day:focus-visible, .dtp-nav:focus-visible { outline: 2px solid var(--color-chakra); outline-offset: 1px; }
+
+/* ─── Admin panel (/admin): own scroll, paper tabs and ink tables ─── */
+.admin-shell {
+  height: 100dvh;
+  overflow-x: clip;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.admin-tab {
+  position: relative;
+  flex-shrink: 0;
+  padding: 0.55rem 0.95rem 0.6rem;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(239, 231, 214, 0.65);
+  border-radius: 3px 3px 0 0;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  cursor: pointer;
+}
+.admin-tab:hover { color: #fff6ea; background: rgba(255, 255, 255, 0.05); }
+.admin-tab[aria-current='page'] {
+  color: var(--color-ink);
+  background: var(--color-paper);
+  box-shadow: inset 0 3px 0 var(--color-shu), 0 -2px 8px rgba(0, 0, 0, 0.35);
+}
+.admin-tab:focus-visible { outline: 2px solid var(--color-chakra); outline-offset: -2px; }
+
+.admin-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.admin-table thead th {
+  padding: 0.45rem 0.5rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+  border-bottom: 2px solid rgba(31, 27, 23, 0.35);
+  white-space: nowrap;
+}
+.admin-table tbody td {
+  padding: 0.55rem 0.5rem;
+  border-top: 1px solid rgba(31, 27, 23, 0.12);
+  vertical-align: middle;
+}
+.admin-table tbody tr:first-child td { border-top: 0; }
+.admin-table tbody tr { transition: background-color 0.12s ease; }
+.admin-table tbody tr:hover { background: rgba(226, 113, 29, 0.07); }
+.admin-table tbody tr.is-selected { background: rgba(226, 113, 29, 0.14); box-shadow: inset 3px 0 0 var(--color-shu); }
+
+.admin-search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.admin-search > svg {
+  position: absolute;
+  left: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--color-ink-faint);
+  pointer-events: none;
+}
+.admin-search > input { padding-left: 2rem; }
