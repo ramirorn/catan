@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { isIOS, isStandalone, promptInstall, useCanInstall } from '../../pwa/installPrompt';
+import { checkForUpdate, setUpdateRegistration } from '../../pwa/updateCheck';
 import { AlertIcon, CloseIcon, InfoIcon } from './Icons';
 
 const IOS_HINT_KEY = 'catan_ios_install_hint_seen';
-const UPDATE_CHECK_MS = 30 * 60 * 1000;
+// Fallback poll: a deploy is usually noticed at once through the socket
+// reconnection (see pwa/updateCheck.js)
+const UPDATE_CHECK_MS = 5 * 60 * 1000;
 
 function useOnline() {
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
@@ -33,15 +36,14 @@ export function PwaLayer() {
   } = useRegisterSW({
     onRegisteredSW(_url, registration) {
       if (!registration) return;
-      // Look for a new deploy now and then, and whenever the app comes back
-      // to the foreground (installed apps can stay open for days)
-      const check = () => {
-        if (navigator.onLine && !registration.installing) registration.update().catch(() => {});
-      };
-      setInterval(check, UPDATE_CHECK_MS);
+      setUpdateRegistration(registration);
+      // Look for a new deploy now and then, whenever the app comes back to the
+      // foreground or the network returns (installed apps can stay open for days)
+      setInterval(checkForUpdate, UPDATE_CHECK_MS);
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') check();
+        if (document.visibilityState === 'visible') checkForUpdate();
       });
+      window.addEventListener('online', checkForUpdate);
     },
   });
 

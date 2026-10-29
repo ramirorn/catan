@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
+import { checkForUpdate } from '../pwa/updateCheck';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
@@ -73,9 +74,14 @@ export function SocketProvider({ children, idKey = PLAYER_ID_KEY }) {
       reconnectionDelay: 1000,
     });
 
+    let connectedBefore = false;
     socketInstance.on('connect', () => {
       console.log('Connected to Catan server, socket ID:', socketInstance.id);
       setConnected(true);
+      // Back after a drop: often a deploy restarted the server, so look for
+      // the new version right away instead of waiting for the next poll
+      if (connectedBefore) checkForUpdate();
+      connectedBefore = true;
     });
 
     socketInstance.on('disconnect', () => {
