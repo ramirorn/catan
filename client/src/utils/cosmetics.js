@@ -97,6 +97,20 @@ export const BOARD_THEMES = {
     accent: 'petals',
     swatch: ['#2e6282', '#f7e9ea', '#cf5679', '#f6b6c8'],
   },
+  // Admins only. `premium`: every piece on this board gets polished lacquer
+  // and a gold edge (3D materials / outline, 2D halo and base ring)
+  'board:council': {
+    sea: { base: '#15120e', scale: '#1d1913', stroke: '#6e5320', ring: '#d6ae4f' },
+    frame: { margin: '#f1e3bb', rule: '#b8892a', inner: '#f1e3bb', line: '#1a140c', foam: '#e8cf8a', foamOpacity: 0.35, shore: '#c9b07a' },
+    wash: { color: '#d4a83a', opacity: 0.07 },
+    tileTint: '#fff3dc',
+    tileHaze: '#0d0700',
+    hemi: ['#ffe9c0', '#3a2c1c', 1.05],
+    sun: ['#ffd88a', 1.35],
+    accent: 'gold',
+    premium: true,
+    swatch: ['#1d1913', '#f1e3bb', '#b8892a', '#e8c25a'],
+  },
 };
 
 export function boardThemeOf(id) {

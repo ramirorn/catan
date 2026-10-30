@@ -6,8 +6,10 @@ import { TerrainArt } from './TerrainArt';
 import { useGame } from '../../context/GameContext';
 import { memo } from 'react';
 import { TERRAIN_BASE } from '../../utils/theme';
+import { PremiumTileFrame } from './PremiumTile';
 
-export const HexTile = memo(function HexTile({ hex, wash = null }) {
+// `premium` (admin board): lacquer and gold tile design (PremiumTile.jsx)
+export const HexTile = memo(function HexTile({ hex, wash = null, premium = false }) {
   const game = useGame();
   const canPlaceRobberHere = canMoveRobberTo(game, hex);
   // A signed peace pact keeps the robber off this hex (shown to the mover)
@@ -64,6 +66,7 @@ export const HexTile = memo(function HexTile({ hex, wash = null }) {
         strokeWidth="1.4"
         pointerEvents="none"
       />
+      {premium && <PremiumTileFrame terrain={hex.terrain} x={hex.x} y={hex.y} />}
 
       {/* Robber destination hint */}
       <polygon points={targetPoints} className="robber-target" />

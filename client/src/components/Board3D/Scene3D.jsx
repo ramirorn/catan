@@ -406,7 +406,7 @@ const Piece = memo(function Piece({ set, kind, color, tipId, fxKey = null, rise 
       receiveShadow
       {...tip}
     >
-      <PieceLook kind={kind} color={color} shadow={res.pieceShadow} />
+      <PieceLook kind={kind} color={color} shadow={res.pieceShadow} premium={res.premium} />
     </mesh>
   );
 });

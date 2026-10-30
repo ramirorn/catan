@@ -5,6 +5,7 @@ import { TerrainDefs } from './TerrainDefs';
 import { HexTile } from './HexTile';
 import { Edge } from './Edge';
 import { Vertex } from './Vertex';
+import { PremiumPieces } from './pieceArt2D';
 import { Port } from './Port';
 import { useBoardZoom } from './useBoardZoom';
 import { BoardBanner, ZoomControls } from './BoardChrome';
@@ -142,26 +143,27 @@ export function HexBoard() {
         {/* Layer 2: Hex Tiles */}
         <g className="hexes-layer">
           {hexList.map((hex) => (
-            <HexTile key={hex.id} hex={hex} wash={theme.wash} />
+            <HexTile key={hex.id} hex={hex} wash={theme.wash} premium={!!theme.premium} />
           ))}
         </g>
 
         {/* Printed grain over the island (static pattern, no filter / blend mode) */}
         <path d={islandPath} fill="url(#pat-grain)" fillOpacity="0.4" pointerEvents="none" />
 
-        {/* Layer 3: Edges (Roads) */}
-        <g className="edges-layer">
-          {edgeList.map((edge) => (
-            <Edge key={edge.id} edge={edge} />
-          ))}
-        </g>
-
-        {/* Layer 4: Vertices (Settlements / Cities) */}
-        <g className="vertices-layer">
-          {vertexList.map((vertex) => (
-            <Vertex key={vertex.id} vertex={vertex} />
-          ))}
-        </g>
+        {/* Layers 3-4: roads, then settlements / cities (gold-edged on the
+            admin board) */}
+        <PremiumPieces value={!!theme.premium}>
+          <g className="edges-layer">
+            {edgeList.map((edge) => (
+              <Edge key={edge.id} edge={edge} />
+            ))}
+          </g>
+          <g className="vertices-layer">
+            {vertexList.map((vertex) => (
+              <Vertex key={vertex.id} vertex={vertex} />
+            ))}
+          </g>
+        </PremiumPieces>
       </svg>
     </div>
   );

@@ -190,6 +190,12 @@ await test('admin-only pieces: hidden and owned only for admins, never bought; a
   await rejects(shop.buy('adm', 'pieces:council'), 403);
   await shop.equip('adm', 'pieces', 'pieces:council');
   assert.equal((await shop.loadout('adm')).pieces, 'pieces:council');
+  // The admin board: owned by admins only, and only they can pick it for a room
+  assert.equal(await shop.owns('pl', 'board:council'), false);
+  assert.equal(await shop.owns('adm', 'board:council'), true);
+  await rejects(shop.equip('pl', 'board', 'board:council'), 403);
+  await shop.equip('adm', 'board', 'board:council');
+  assert.equal((await shop.loadout('adm')).board, 'board:council');
   // Losing the role: the set falls back to the default
   const exAdmin = createShopService(store, { isAdmin: async () => false });
   assert.equal((await exAdmin.loadout('adm')).pieces, DEFAULT_ITEMS.pieces);

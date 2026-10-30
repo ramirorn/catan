@@ -74,6 +74,8 @@ export class BoardResources {
     this.pieceMats = new Map();
     this.pieceGeos = new Map();
     this.accentMats = new Map();
+    // Admin board: every piece gets polished lacquer and a gold edge
+    this.premium = !!boardTheme(theme).premium;
 
     const keep = (o) => {
       this.disposables.add(o);
@@ -179,11 +181,11 @@ export class BoardResources {
     if (!list) {
       let accents = this.accentMats.get(setId);
       if (!accents) {
-        accents = createAccentMaterials(setId);
+        accents = createAccentMaterials(setId, this.premium);
         accents.forEach((m) => this.disposables.add(m));
         this.accentMats.set(setId, accents);
       }
-      const player = createPlayerMaterial(setId, color);
+      const player = createPlayerMaterial(setId, color, this.premium);
       this.disposables.add(player);
       list = [player, ...accents];
       this.pieceMats.set(key, list);

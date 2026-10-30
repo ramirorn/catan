@@ -29,6 +29,8 @@ const ITEMS = [
   { id: 'board:mist', slot: 'board', price: 300, name: 'País de la Niebla', description: 'Niebla fría sobre la isla y un marco gris perla.' },
   { id: 'board:valley', slot: 'board', price: 400, name: 'Valle del Fin', description: 'Piedra antigua, cascadas y un mar verde de río.' },
   { id: 'board:spring', slot: 'board', price: 500, name: 'Festival de Primavera', description: 'Pétalos de cerezo sobre el pergamino y el mar.' },
+  // Admins only: the whole room plays on it, and every piece gets a premium finish
+  { id: 'board:council', slot: 'board', price: 0, adminOnly: true, name: 'Palacio del Consejo', description: 'Mar de laca negra con olas de oro. Todas las fichas de la sala lucen laca pulida y filo dorado. Exclusivo del Consejo de la aldea.' },
 ];
 
 for (const item of ITEMS) {

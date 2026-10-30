@@ -576,33 +576,37 @@ export function buildPieceGeometry(id, kind) {
 }
 
 /** Player-colour lacquer of a set */
-export function createPlayerMaterial(id, color) {
+// Premium board (admins): a glossy clear coat over the lacquer
+const PREMIUM_COAT = { clearcoat: 1, clearcoatRoughness: 0.08 };
+
+export function createPlayerMaterial(id, color, premium = false) {
   const p = pieceSet3D(id).player;
   // Admins' gold: polished metal instead of lacquer (some glow keeps it
   // bright without an environment map)
   const gold = isGoldColor(color);
-  return new THREE.MeshStandardMaterial({
+  const opts = {
     color,
     vertexColors: true,
-    roughness: gold ? 0.32 : p.roughness,
-    metalness: gold ? 0.55 : p.metalness,
+    roughness: gold ? 0.32 : premium ? Math.min(p.roughness, 0.3) : p.roughness,
+    metalness: gold ? 0.55 : premium ? Math.max(p.metalness, 0.12) : p.metalness,
     // keeps the lacquer colour saturated on the shaded sides (and lanterns lit)
     emissive: new THREE.Color(color).multiplyScalar(gold ? Math.max(p.glow, 0.3) : p.glow),
-  });
+  };
+  return premium ? new THREE.MeshPhysicalMaterial({ ...opts, ...PREMIUM_COAT }) : new THREE.MeshStandardMaterial(opts);
 }
 
 /** The set's own materials (slots 1, 2) */
-export function createAccentMaterials(id) {
-  return pieceSet3D(id).accents.map(
-    (a) =>
-      new THREE.MeshStandardMaterial({
-        color: a.color,
-        vertexColors: true,
-        roughness: a.roughness ?? 0.7,
-        metalness: a.metalness ?? 0,
-        emissive: new THREE.Color(a.color).multiplyScalar(a.emissive ?? 0.06),
-      })
-  );
+export function createAccentMaterials(id, premium = false) {
+  return pieceSet3D(id).accents.map((a) => {
+    const opts = {
+      color: a.color,
+      vertexColors: true,
+      roughness: a.roughness ?? 0.7,
+      metalness: a.metalness ?? 0,
+      emissive: new THREE.Color(a.color).multiplyScalar(a.emissive ?? 0.06),
+    };
+    return premium ? new THREE.MeshPhysicalMaterial({ ...opts, ...PREMIUM_COAT }) : new THREE.MeshStandardMaterial(opts);
+  });
 }
 
 /* ─── Shared look of the 3D pieces (board, tutorial, shop preview) ─── */
@@ -627,6 +631,10 @@ export const PIECE_RIM_OPACITY = 0.4;
 export function pieceRimColor(color) {
   return new THREE.Color(color).lerp(new THREE.Color('#fff8ea'), 0.6);
 }
+
+/** Premium board: the rim becomes a gold edge, stronger than the usual one */
+export const PREMIUM_RIM = '#f2c75a';
+export const PREMIUM_RIM_OPACITY = 0.85;
 
 /** Footprint (x, z in world units) of the soft contact shadow of each kind */
 export const PIECE_SHADOW_SIZE = {

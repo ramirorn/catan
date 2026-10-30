@@ -7,7 +7,7 @@
 // terrain, the faint tinted halo only lifts it off dark tiles, so the set's
 // own design stays the first thing you see.
 // Plain shapes only (no SVG filters, which re-rasterise on zoom).
-import { memo } from 'react';
+import { createContext, memo, useContext } from 'react';
 import { shade } from '../../utils/theme';
 import { pieceSetOf } from '../../utils/cosmetics';
 
@@ -17,6 +17,14 @@ export const PIECE_RIM = '#fff4dc';
 /** Soft halo around a piece: a light tint of the owner's colour, low opacity */
 const HALO_OPACITY = 0.38;
 const halo = (color) => shade(color, 0.55);
+
+// Admin board (premium): every piece gets a gold edge instead of the tinted
+// halo, and a gold ring on its base plate. The board turns it on for all.
+const PREMIUM_GOLD = '#f2c75a';
+const PREMIUM_HALO_OPACITY = 0.85;
+const PremiumContext = createContext(false);
+export const PremiumPieces = PremiumContext.Provider;
+const usePremium = () => useContext(PremiumContext);
 
 const circ = (cx, cy, r) => `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0 Z`;
 const ell = (cx, cy, rx, ry) => `M ${cx - rx} ${cy} a ${rx} ${ry} 0 1 0 ${2 * rx} 0 a ${rx} ${ry} 0 1 0 ${-2 * rx} 0 Z`;
@@ -338,9 +346,11 @@ const SETS = {
 };
 
 function BasePlate({ rx, color, city = false }) {
+  const premium = usePremium();
   if (city) {
     return (
       <>
+        {premium && <ellipse cx="0" cy="9.8" rx="21.4" ry="7.6" fill={PREMIUM_GOLD} stroke={PIECE_INK} strokeWidth="0.8" />}
         <ellipse cx="0" cy="9.8" rx="19.6" ry="6.4" fill={PIECE_INK} />
         <ellipse cx="0" cy="9.2" rx="18" ry="5.2" fill={color} />
         <ellipse cx="0" cy="9.2" rx="15.6" ry="4.1" fill="none" stroke={shade(color, 0.4)} strokeOpacity="0.7" strokeWidth="1" />
@@ -350,6 +360,7 @@ function BasePlate({ rx, color, city = false }) {
   }
   return (
     <>
+      {premium && <ellipse cx="0" cy="9.5" rx={rx + 3.2} ry="6.5" fill={PREMIUM_GOLD} stroke={PIECE_INK} strokeWidth="0.8" />}
       <ellipse cx="0" cy="9.5" rx={rx + 1.6} ry="5.4" fill={PIECE_INK} />
       <ellipse cx="0" cy="9" rx={rx} ry="4.2" fill={color} />
       <ellipse cx="0" cy="8.2" rx={rx - 2.5} ry="2.4" fill={shade(color, 0.3)} opacity="0.55" />
@@ -358,9 +369,17 @@ function BasePlate({ rx, color, city = false }) {
 }
 
 function Outline({ d, color }) {
+  const premium = usePremium();
   return (
     <>
-      <path d={d} fill="none" stroke={halo(color)} strokeOpacity={HALO_OPACITY} strokeWidth="4.8" strokeLinejoin="round" />
+      <path
+        d={d}
+        fill="none"
+        stroke={premium ? PREMIUM_GOLD : halo(color)}
+        strokeOpacity={premium ? PREMIUM_HALO_OPACITY : HALO_OPACITY}
+        strokeWidth="4.8"
+        strokeLinejoin="round"
+      />
       <path d={d} fill={PIECE_INK} stroke={PIECE_INK} strokeWidth="2.6" strokeLinejoin="round" />
     </>
   );
@@ -467,19 +486,30 @@ export const CityArt = memo(function CityArt({ set, color }) {
 /* ─── Roads (drawn along local x, centred; L = length) ─── */
 
 function StripBase({ L, h = 12.5, color }) {
+  const premium = usePremium();
   return (
     <>
-      <line x1={-L / 2} y1={0} x2={L / 2} y2={0} stroke={halo(color)} strokeOpacity={HALO_OPACITY} strokeWidth={h + 1.2} strokeLinecap="round" />
+      <line
+        x1={-L / 2}
+        y1={0}
+        x2={L / 2}
+        y2={0}
+        stroke={premium ? PREMIUM_GOLD : halo(color)}
+        strokeOpacity={premium ? PREMIUM_HALO_OPACITY : HALO_OPACITY}
+        strokeWidth={h + 1.2}
+        strokeLinecap="round"
+      />
       <line x1={-L / 2} y1={0} x2={L / 2} y2={0} stroke={PIECE_INK} strokeWidth={h - 1} strokeLinecap="round" />
     </>
   );
 }
 
 function Dotted({ points, r, fill, light }) {
+  const premium = usePremium();
   return points.map(([x, y], i) => (
     <g key={i}>
       <circle cx={x + 1.4} cy={y + 2.8} r={r + 1.4} fill="#05070c" opacity="0.45" />
-      <circle cx={x} cy={y} r={r + 2.2} fill={halo(fill)} opacity={HALO_OPACITY} />
+      <circle cx={x} cy={y} r={r + 2.2} fill={premium ? PREMIUM_GOLD : halo(fill)} opacity={premium ? PREMIUM_HALO_OPACITY : HALO_OPACITY} />
       <circle cx={x} cy={y} r={r + 1.1} fill={PIECE_INK} />
       <circle cx={x} cy={y} r={r} fill={fill} />
       {light && <circle cx={x - r * 0.3} cy={y - r * 0.3} r={r * 0.45} fill={light} opacity="0.8" />}

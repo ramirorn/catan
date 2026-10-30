@@ -1,5 +1,5 @@
 // Board-theme decorations on the 3D sea (stars, dunes, mist, river stones,
-// cherry petals): one or two InstancedMeshes per theme, built once per map
+// cherry petals, gold lanterns): one or two InstancedMeshes per theme, built once per map
 // and disposed on unmount. Static: they never ask for extra frames.
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
@@ -79,6 +79,29 @@ function buildAccent(kind) {
             o.position.set(p.x + (rand() - 0.5) * 0.45, 0.012 + rand() * 0.02, p.z + (rand() - 0.5) * 0.45);
             o.scale.set(0.055, 1, 0.032);
             o.rotation.set((rand() - 0.5) * 0.4, rand() * Math.PI * 2, (rand() - 0.5) * 0.4);
+          },
+        },
+      ];
+    case 'gold':
+      // floating paper lanterns with a warm glow, and gold leaf on the water
+      return [
+        {
+          geo: new THREE.SphereGeometry(0.075, 12, 8).scale(1, 1.25, 1),
+          mat: new THREE.MeshStandardMaterial({ color: '#e8b04a', emissive: '#d08a1c', emissiveIntensity: 0.9, roughness: 0.6 }),
+          per: 1,
+          place: (p, k, rand, o) => {
+            o.position.set(p.x, 0.07, p.z);
+            o.scale.setScalar(0.75 + p.s * 0.35);
+          },
+        },
+        {
+          geo: new THREE.CircleGeometry(1, 8).rotateX(-Math.PI / 2),
+          mat: new THREE.MeshStandardMaterial({ color: '#e0b94a', metalness: 0.6, roughness: 0.35, emissive: '#5a3c0c', side: THREE.DoubleSide }),
+          per: 3,
+          place: (p, k, rand, o) => {
+            o.position.set(p.x + (rand() - 0.5) * 0.5, 0.014, p.z + (rand() - 0.5) * 0.5);
+            o.scale.set(0.045, 1, 0.03);
+            o.rotation.set(0, rand() * Math.PI * 2, 0);
           },
         },
       ];

@@ -63,6 +63,21 @@ function Glyph({ kind, p, i }) {
           {i % 3 === 0 && <circle r="1.3" fill="#f4d36b" stroke="none" />}
         </g>
       );
+    case 'gold':
+      // a paper lantern floating on the lacquer sea, with gold leaf around it
+      return (
+        <g transform={`${t} scale(${p.s.toFixed(2)})`}>
+          <circle r="11" fill="#f2b84b" opacity="0.18" />
+          <ellipse rx="5.2" ry="6.4" fill="#e8b04a" stroke="#6e5320" strokeWidth="0.9" />
+          <path d="M -5 -1.6 H 5 M -4.6 1.8 H 4.6" stroke="#b07a1e" strokeWidth="0.7" />
+          <rect x="-2.6" y="-8" width="5.2" height="1.8" fill="#1a140c" />
+          <rect x="-2.6" y="6.2" width="5.2" height="1.8" fill="#1a140c" />
+          <g fill="#d6ae4f" opacity="0.85">
+            <rect x={9 + p.r * 4} y="-6" width="2.6" height="1.6" transform={`rotate(${(p.a * 57).toFixed(0)} ${10 + p.r * 4} -5)`} />
+            <rect x="-13" y={4 + p.r * 3} width="2.2" height="1.4" transform={`rotate(${(p.a * 33).toFixed(0)} -12 ${5 + p.r * 3})`} />
+          </g>
+        </g>
+      );
     default:
       return null;
   }

@@ -88,6 +88,27 @@ const ISLAND = (() => {
   return cells.map(([x, y, terrain, number], i) => ({ id: `p${i}`, x, y, terrain, number }));
 })();
 
+/** Premium board: a few pieces on the island show the gold-edged finish */
+const PREMIUM_SAMPLE = [
+  { kind: 'city', color: '#d23a26', x: 0, y: 60, rot: 0.3 },
+  { kind: 'settlement', color: '#2a6fd0', x: 52, y: -30, rot: -0.4 },
+  { kind: 'road', color: '#2a6fd0', x: 52, y: 0, rot: Math.PI / 2 },
+];
+
+function PremiumSample({ res }) {
+  return PREMIUM_SAMPLE.map((p) => (
+    <mesh
+      key={p.kind}
+      geometry={res.pieceGeometry('pieces:classic', p.kind)}
+      material={res.pieceMaterials('pieces:classic', p.color)}
+      position={[p.x * PX, TILE_H, p.y * PX]}
+      rotation-y={p.rot}
+    >
+      <PieceLook kind={p.kind} color={p.color} shadow={res.pieceShadow} premium />
+    </mesh>
+  ));
+}
+
 function IslandScene({ themeId, lowPower }) {
   const [res, setRes] = useState(null);
   const invalidate = useThree((s) => s.invalidate);
@@ -135,6 +156,7 @@ function IslandScene({ themeId, lowPower }) {
         </mesh>
       </group>
       <ThemeAccents3D themeId={themeId} hexes={ISLAND} />
+      {res.premium && <PremiumSample res={res} />}
       {ISLAND.map((hex) => (
         <group key={hex.id} position={[hex.x * PX, 0, hex.y * PX]}>
           <group scale={[TILE_SCALE, 1, TILE_SCALE]}>

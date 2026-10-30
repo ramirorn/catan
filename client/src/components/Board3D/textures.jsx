@@ -9,6 +9,7 @@ import { createRoot } from 'react-dom/client';
 import * as THREE from 'three';
 import { TerrainDefs } from '../Board/TerrainDefs';
 import { TerrainArt } from '../Board/TerrainArt';
+import { PremiumTileFrame } from '../Board/PremiumTile';
 import { ResourceIcon, AnchorIcon } from '../Shared/Icons';
 import { getHexPoints, getDiceDots, hexUnionPath, HEX_SIZE } from '../../utils/hexMath';
 import { TERRAIN_BASE } from '../../utils/theme';
@@ -73,7 +74,7 @@ async function fontsReady() {
 
 /* ─── Terrain tops ─── */
 
-function terrainMarkup(terrain, px) {
+function terrainMarkup(terrain, px, premium = false) {
   const pts = getHexPoints(0, 0, HEX_SIZE);
   const inner = getHexPoints(0, 0, HEX_SIZE - 4);
   return renderMarkup(
@@ -92,16 +93,17 @@ function terrainMarkup(terrain, px) {
         <polygon points={pts} fill="url(#pat-grain)" fillOpacity="0.4" />
       </g>
       <polygon points={inner} fill="none" stroke="#fff6dc" strokeOpacity="0.22" strokeWidth="1.4" />
+      {premium && <PremiumTileFrame terrain={terrain} />}
       <polygon points={pts} fill="none" stroke="#1f1b17" strokeOpacity="0.85" strokeWidth="2.2" strokeLinejoin="round" />
     </svg>
   );
 }
 
-async function createTerrainTextures(px, anisotropy) {
+async function createTerrainTextures(px, anisotropy, premium = false) {
   const out = {};
   await Promise.all(
     LAND_TERRAINS.map(async (terrain) => {
-      const img = await markupToImage(terrainMarkup(terrain, px));
+      const img = await markupToImage(terrainMarkup(terrain, px, premium));
       const canvas = makeCanvas(px, px);
       canvas.getContext('2d').drawImage(img, 0, 0, px, px);
       out[terrain] = toTexture(canvas, { anisotropy });
@@ -391,7 +393,7 @@ export class TextureStore {
     const palette = boardTheme(theme);
     const tilePx = tileOverride || (this.lowPower ? 256 : 512);
     const [terrain, sea, frame] = await Promise.all([
-      createTerrainTextures(tilePx, this.anisotropy),
+      createTerrainTextures(tilePx, this.anisotropy, !!palette.premium),
       createSeaTexture(this.anisotropy, palette.sea),
       createFrameTextures(hexGeom, bounds, framePx || (this.lowPower ? 1536 : 2560), this.anisotropy, palette.frame),
     ]);
